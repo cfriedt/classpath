@@ -51,188 +51,107 @@ import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
+import java.nio.ByteBuffer;
+
 import java.util.LinkedList;
 import java.security.Principal;
 
+/**
+ * A request by the server for a client certificate.
+ *
+ * <pre>
+struct
+{
+  ClientCertificateType certificate_types&lt;1..2^8-1&gt;;
+  DistinguishedName certificate_authorities&lt;3..2^16-1&gt;;
+} CertificateRequest;
+</pre>
+ */
 final class CertificateRequest implements Handshake.Body
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final ClientType[] types;
-  private final Principal[] authorities;
+  private final ByteBuffer buffer;
 
   // Constructor.
   // -------------------------------------------------------------------------
 
-  CertificateRequest(ClientType[] types, Principal[] authorities)
+  CertificateRequest (final ByteBuffer buffer)
   {
-    if (types == null)
-      {
-        throw new NullPointerException();
-      }
-    this.types = types;
-    if (authorities == null)
-      {
-        throw new NullPointerException();
-      }
-    this.authorities = authorities;
-  }
-
-  // Class methods.
-  // -------------------------------------------------------------------------
-
-  static CertificateRequest read(InputStream in) throws IOException
-  {
-    DataInputStream din = new DataInputStream(in);
-    ClientType[] types = new ClientType[din.readUnsignedByte()];
-    for (int i = 0; i < types.length; i++)
-      {
-        types[i] = ClientType.read(din);
-      }
-
-    LinkedList authorities = new LinkedList();
-    byte[] buf = new byte[din.readUnsignedShort()];
-    din.readFully(buf);
-    ByteArrayInputStream bin = new ByteArrayInputStream(buf);
-    try
-      {
-        String x500name = Util.getSecurityProperty("jessie.x500.class");
-        if (x500name == null)
-          {
-            x500name = "org.metastatic.jessie.pki.X500Name";
-          }
-        Class x500class = null;
-        ClassLoader cl = ClassLoader.getSystemClassLoader();
-        if (cl != null)
-          {
-            x500class = cl.loadClass(x500name);
-          }
-        else
-          {
-            x500class = Class.forName(x500name);
-          }
-        Constructor c = x500class.getConstructor(new Class[] { new byte[0].getClass() });
-        while (bin.available() > 0)
-          {
-            buf = new byte[(bin.read() & 0xFF) << 8 | (bin.read() & 0xFF)];
-            bin.read(buf);
-            authorities.add(c.newInstance(new Object[] { buf }));
-          }
-      }
-    catch (IOException ioe)
-      {
-        throw ioe;
-      }
-    catch (Exception ex)
-      {
-        throw new Error(ex.toString());
-      }
-    return new CertificateRequest(types,
-      (Principal[]) authorities.toArray(new Principal[authorities.size()]));
+    this.buffer = buffer;
   }
 
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public void write(OutputStream out) throws IOException
+  public int getLength ()
   {
-    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-    out.write(types.length);
-    for (int i = 0; i < types.length; i++)
-      {
-        out.write(types[i].getValue());
-      }
-
-    try
-      {
-        Class x500class = authorities[0].getClass();
-        Method m = x500class.getMethod("getEncoded", null);
-        for (int i = 0; i < authorities.length; i++)
-          {
-            byte[] buf = (byte[]) m.invoke(authorities[i], null);
-            bout.write(buf.length >>> 8 & 0xFF);
-            bout.write(buf.length & 0xFF);
-            bout.write(buf, 0, buf.length);
-          }
-      }
-    catch (Exception ex)
-      {
-        throw new Error(ex.toString());
-      }
-    out.write(bout.size() >>> 8 & 0xFF);
-    out.write(bout.size() & 0xFF);
-    bout.writeTo(out);
+    int o1 = (buffer.get (0) & 0xFF) + 1;
+    return o1 + (buffer.getShort (o1) & 0xFFFF) + 2;
   }
 
-  ClientType[] getTypes()
+  ClientCertificateTypeList getTypes ()
   {
-    return types;
+    return new ClientCertificateTypeList (buffer.duplicate ());
   }
 
-  String[] getTypeStrings()
+  X500PrincipalList getAuthorities ()
   {
-    try
-      {
-        return (String[]) Util.transform(types, String.class, "toString", null);
-      }
-    catch (Exception x)
-      {
-        return null;
-      }
-  }
-
-  Principal[] getAuthorities()
-  {
-    return authorities;
+    int offset = (buffer.get (0) & 0xFF) + 1;
+    return new X500PrincipalList (((ByteBuffer) buffer.position (offset)).slice ());
   }
 
   public String toString()
   {
+    return toString (null);
+  }
+
+  public String toString (final String prefix)
+  {
     StringWriter str = new StringWriter();
     PrintWriter out = new PrintWriter(str);
+    String subprefix = "  ";
+    if (prefix != null) subprefix = prefix + "  ";
+    if (prefix != null) out.print (prefix);
     out.println("struct {");
-    out.print("  types = ");
-    for (int i = 0; i < types.length; i++)
-      {
-        out.print(types[i]);
-        if (i != types.length - 1)
-          out.print(", ");
-      }
-    out.println(";");
+    if (prefix != null) out.print (prefix);
+    out.println ("  types =");
+    out.println (getTypes ().toString (subprefix));
+    if (prefix != null) out.print (prefix);
     out.println("  authorities =");
-    for (int i = 0; i < authorities.length; i++)
-      {
-        out.print("    ");
-        out.print(authorities[i].getName());
-        if (i != types.length - 1)
-          out.println(",");
-      }
-    out.println(";");
-    out.println("} CertificateRequest;");
+    out.println (getAuthorities ().toString (subprefix));
+    if (prefix != null) out.print (prefix);
+    out.print ("} CertificateRequest;");
     return str.toString();
   }
 
   // Inner class.
   // -------------------------------------------------------------------------
 
-  static final class ClientType implements Enumerated
+  static final class ClientCertificateType implements Enumerated
   {
 
     // Constants and fields.
     // -----------------------------------------------------------------------
 
-    static final ClientType
-      RSA_SIGN     = new ClientType(1), DSS_SIGN     = new ClientType(2),
-      RSA_FIXED_DH = new ClientType(3), DSS_FIXED_DH = new ClientType(4);
+    private static final int RSA_SIGN_VALUE     = 1;
+    private static final int DSS_SIGN_VALUE     = 2;
+    private static final int RSA_FIXED_DH_VALUE = 3;
+    private static final int DSS_FIXED_DH_VALUE = 4;
+
+    static final ClientCertificateType RSA_SIGN     = new ClientCertificateType (RSA_SIGN_VALUE);
+    static final ClientCertificateType DSS_SIGN     = new ClientCertificateType (DSS_SIGN_VALUE);
+    static final ClientCertificateType RSA_FIXED_DH = new ClientCertificateType (RSA_FIXED_DH_VALUE);
+    static final ClientCertificateType DSS_FIXED_DH = new ClientCertificateType (DSS_FIXED_DH_VALUE);
 
     private final int value;
 
     // Constructor.
     // -----------------------------------------------------------------------
 
-    private ClientType(int value)
+    private ClientCertificateType (final int value)
     {
       this.value = value;
     }
@@ -240,21 +159,16 @@ final class CertificateRequest implements Handshake.Body
     // Class method.
     // -----------------------------------------------------------------------
 
-    static ClientType read(InputStream in) throws IOException
+    static ClientCertificateType forValue (final int value)
     {
-      int i = in.read();
-      if (i == -1)
+      switch (value)
         {
-          throw new EOFException("unexpected end of input stream");
+        case RSA_SIGN_VALUE:     return RSA_SIGN;
+        case DSS_SIGN_VALUE:     return DSS_SIGN;
+        case RSA_FIXED_DH_VALUE: return RSA_FIXED_DH;
+        case DSS_FIXED_DH_VALUE: return DSS_FIXED_DH;
         }
-      switch (i & 0xFF)
-        {
-        case 1: return RSA_SIGN;
-        case 2: return DSS_SIGN;
-        case 3: return RSA_FIXED_DH;
-        case 4: return DSS_FIXED_DH;
-        default: return new ClientType(i);
-        }
+      return new ClientCertificateType (value);
     }
 
     // Instance methods.
@@ -274,10 +188,10 @@ final class CertificateRequest implements Handshake.Body
     {
       switch (value)
         {
-        case 1: return "rsa_sign";
-        case 2: return "dss_sign";
-        case 3: return "rsa_fixed_dh";
-        case 4: return "dss_fixed_dh";
+        case RSA_SIGN_VALUE:     return "rsa_sign";
+        case DSS_SIGN_VALUE:     return "dss_sign";
+        case RSA_FIXED_DH_VALUE: return "rsa_fixed_dh";
+        case DSS_FIXED_DH_VALUE: return "dss_fixed_dh";
         default: return "unknown(" + value + ")";
         }
     }

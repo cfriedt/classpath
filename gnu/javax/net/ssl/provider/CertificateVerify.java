@@ -45,6 +45,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
 import java.security.PublicKey;
 
 final class CertificateVerify extends Signature implements Handshake.Body
@@ -53,19 +54,9 @@ final class CertificateVerify extends Signature implements Handshake.Body
   // Contstructor.
   // -------------------------------------------------------------------------
 
-  CertificateVerify(Object sigValue, String sigAlg)
+  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
   {
-    super(sigValue, sigAlg);
-  }
-
-  // Class method.
-  // --------------------------------------------------------------------------
-
-  static Signature read(InputStream in, CipherSuite suite, PublicKey key)
-    throws IOException
-  {
-    Signature sig = Signature.read(in, suite, key);
-    return new CertificateVerify(sig.getSigValue(), sig.getSigAlg());
+    super (buffer, sigAlg);
   }
 
   // Instance method.
@@ -73,23 +64,21 @@ final class CertificateVerify extends Signature implements Handshake.Body
 
   public String toString()
   {
-    StringWriter str = new StringWriter();
-    PrintWriter out = new PrintWriter(str);
+    return toString (null);
+  }
+
+  public String toString (final String prefix)
+  {
+    StringWriter str = new StringWriter ();
+    PrintWriter out = new PrintWriter (str);
+    if (prefix != null) out.print (prefix);
     out.println("struct {");
-    BufferedReader r = new BufferedReader(new StringReader(super.toString()));
-    String s;
-    try
-      {
-        while ((s = r.readLine()) != null)
-          {
-            out.print("  ");
-            out.println(s);
-          }
-      }
-    catch (IOException ignored)
-      {
-      }
-    out.println("} CertificateVerify;");
+    String subprefix = "  ";
+    if (prefix != null)
+      subprefix = prefix + subprefix;
+    out.println (super.toString (subprefix));
+    if (prefix != null) out.print (prefix);
+    out.print ("} CertificateVerify;");
     return str.toString();
   }
 }

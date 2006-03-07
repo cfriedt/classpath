@@ -38,10 +38,10 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import java.nio.ByteBuffer;
 
 /**
  * An alert message in the SSL protocol. Alerts are sent both as warnings
@@ -52,7 +52,7 @@ import java.io.OutputStream;
  *
  * <pre>
  * struct {
- *   AlertLevel level;
+ *   AlertLevel       level;
  *   AlertDescription description;
  * }
  * </pre>
@@ -63,197 +63,88 @@ final class Alert implements Constructed
   // Fields.
   // -------------------------------------------------------------------------
 
-  /** The alert level enumerated. */
-  private final Level level;
-
-  /** The alert description enumerated. */
-  private final Description description;
+  /** The underlying byte buffer. */
+  private final ByteBuffer buffer;
 
   // Constructor.
   // -------------------------------------------------------------------------
 
-  Alert(Level level, Description description)
+  Alert (final ByteBuffer buffer)
   {
-    this.level = level;
-    this.description = description;
-  }
-
-  // Class method.
-  // -------------------------------------------------------------------------
-
-  static Alert read(InputStream in) throws IOException
-  {
-    Level level = Level.read(in);
-    Description desc = Description.read(in);
-    return new Alert(level, desc);
-  }
-
-  static Alert forName(String name)
-  {
-    if (name == null)
-      {
-        return new Alert(Level.FATAL, Description.INTERNAL_ERROR);
-      }
-    Description desc = Description.INTERNAL_ERROR;
-    if (name.equals("close_notify"))
-      {
-        desc = Description.CLOSE_NOTIFY;
-      }
-    else if (name.equals("unexpected_message"))
-      {
-        desc = Description.UNEXPECTED_MESSAGE;
-      }
-    else if (name.equals("bad_record_mac"))
-      {
-        desc = Description.BAD_RECORD_MAC;
-      }
-    else if (name.equals("DECRYPTION_FAILED"))
-      {
-        desc = Description.DECRYPTION_FAILED;
-      }
-    else if (name.equals("record_overflow"))
-      {
-        desc = Description.RECORD_OVERFLOW;
-      }
-    else if (name.equals("decompression_failure"))
-      {
-        desc = Description.DECOMPRESSION_FAILURE;
-      }
-    else if (name.equals("handshake_failure"))
-      {
-        desc = Description.HANDSHAKE_FAILURE;
-      }
-    else if (name.equals("no_certificate"))
-      {
-        desc = Description.NO_CERTIFICATE;
-      }
-    else if (name.equals("bad_certificate"))
-      {
-        desc = Description.BAD_CERTIFICATE;
-      }
-    else if (name.equals("unsupported_certificate"))
-      {
-        desc = Description.UNSUPPORTED_CERTIFICATE;
-      }
-    else if (name.equals("certificate_revoked"))
-      {
-        desc = Description.CERTIFICATE_REVOKED;
-      }
-    else if (name.equals("certificate_expired"))
-      {
-        desc = Description.CERTIFICATE_EXPIRED;
-      }
-    else if (name.equals("certificate_unknown"))
-      {
-        desc = Description.CERTIFICATE_UNKNOWN;
-      }
-    else if (name.equals("illegal_parameter"))
-      {
-        desc = Description.ILLEGAL_PARAMETER;
-      }
-    else if (name.equals("unknown_ca"))
-      {
-        desc = Description.UNKNOWN_CA;
-      }
-    else if (name.equals("access_denied"))
-      {
-        desc = Description.ACCESS_DENIED;
-      }
-    else if (name.equals("decode_error"))
-      {
-        desc = Description.DECODE_ERROR;
-      }
-    else if (name.equals("decrypt_error"))
-      {
-        desc = Description.DECRYPT_ERROR;
-      }
-    else if (name.equals("export_restriction"))
-      {
-        desc = Description.EXPORT_RESTRICTION;
-      }
-    else if (name.equals("protocol_version"))
-      {
-        desc = Description.PROTOCOL_VERSION;
-      }
-    else if (name.equals("insufficient_security"))
-      {
-        desc = Description.INSUFFICIENT_SECURITY;
-      }
-    else if (name.equals("internal_error"))
-      {
-        desc = Description.INTERNAL_ERROR;
-      }
-    else if (name.equals("user_canceled"))
-      {
-        desc = Description.USER_CANCELED;
-      }
-    else if (name.equals("no_renegotiation"))
-      {
-        desc = Description.NO_RENEGOTIATION;
-      }
-    else if (name.equals("unsupported_extension"))
-      {
-        desc = Description.UNSUPPORTED_EXTENSION;
-      }
-    else if (name.equals("certificate_unobtainable"))
-      {
-        desc = Description.CERTIFICATE_UNOBTAINABLE;
-      }
-    else if (name.equals("unrecognized_name"))
-      {
-        desc = Description.UNRECOGNIZED_NAME;
-      }
-    else if (name.equals("bad_certificate_status_response"))
-      {
-        desc = Description.BAD_CERTIFICATE_STATUS_RESPONSE;
-      }
-    else if (name.equals("bad_certificate_hash_value"))
-      {
-        desc = Description.BAD_CERTIFICATE_HASH_VALUE;
-      }
-    else if (name.equals("unknown_srp_username"))
-      {
-        desc = Description.UNKNOWN_SRP_USERNAME;
-      }
-    else if (name.equals("missing_srp_username"))
-      {
-        desc = Description.MISSING_SRP_USERNAME;
-      }
-    return new Alert(Level.FATAL, desc);
+    this.buffer = buffer;
   }
 
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public void write(OutputStream out) throws IOException
+  public int getLength ()
   {
-    out.write((byte) level.getValue());
-    out.write((byte) description.getValue());
+    return 2;
   }
 
   byte[] getEncoded()
   {
-    return new byte[] { (byte) level.getValue(),
-                        (byte) description.getValue() };
+    byte[] buf = new byte[2];
+    buffer.position (0);
+    buffer.get (buf);
+    return buf;
   }
 
   Level getLevel()
   {
-    return level;
+    return Level.forInteger (buffer.get (0) & 0xFF);
   }
 
   Description getDescription()
   {
-    return description;
+    return Description.forInteger (buffer.get (1) & 0xFF);
+  }
+
+  void setLevel (final Level level)
+  {
+    buffer.put (0, (byte) level.getValue ());
+  }
+
+  void setDescription (final Description description)
+  {
+    buffer.put (1, (byte) description.getValue ());
+  }
+
+  public boolean equals (Object o)
+  {
+    if (!(o instanceof Alert))
+      return false;
+    Alert that = (Alert) o;
+    return that.buffer.position (0).equals (buffer.position (0));
+  }
+
+  public int hashCode ()
+  {
+    return buffer.getShort (0) & 0xFFFF;
   }
 
   public String toString()
   {
-    String nl = System.getProperty("line.separator");
-    return "struct {" + nl +
-           "  level = " + level + ";" + nl +
-           "  description = " + description + ";" + nl +
-           "} Alert;" + nl;
+    return toString (null);
+  }
+
+  public String toString (final String prefix)
+  {
+    StringWriter str = new StringWriter ();
+    PrintWriter out = new PrintWriter (str);
+    if (prefix != null) out.print (prefix);
+    out.println ("struct {");
+    if (prefix != null) out.print (prefix);
+    out.print ("  level:       ");
+    out.print (getLevel ());
+    out.println (";");
+    if (prefix != null) out.print (prefix);
+    out.print ("  description: ");
+    out.print (getDescription ());
+    out.println (";");
+    if (prefix != null) out.print (prefix);
+    out.print ("} Alert;");
+    return str.toString ();
   }
 
   // Inner classes.
@@ -287,18 +178,13 @@ final class Alert implements Constructed
     // Class method.
     // -----------------------------------------------------------------------
 
-    static Level read(InputStream in) throws IOException
+    static Level forInteger (final int value)
     {
-      int i = in.read();
-      if (i == -1)
-        {
-          throw new EOFException("unexpected end of stream");
-        }
-      switch (i & 0xFF)
+      switch (value & 0xFF)
         {
         case 1: return WARNING;
         case 2: return FATAL;
-        default: return new Level(i);
+        default: return new Level (value);
         }
     }
 
@@ -311,6 +197,18 @@ final class Alert implements Constructed
     }
 
     public int getValue()
+    {
+      return value;
+    }
+
+    public boolean equals (Object o)
+    {
+      if (!(o instanceof Level))
+        return false;
+      return ((Level) o).value == value;
+    }
+
+    public int hashCode ()
     {
       return value;
     }
@@ -381,14 +279,16 @@ final class Alert implements Constructed
     // Class method.
     // -----------------------------------------------------------------------
 
-    static Description read(InputStream in) throws IOException
+    /**
+     * Return an alert description object based on the specified integer
+     * value.
+     *
+     * @param value The raw description value.
+     * @return The appropriate description object.
+     */
+    static Description forInteger (final int value)
     {
-      int i = in.read();
-      if (i == -1)
-        {
-          throw new EOFException("unexpected end of input stream");
-        }
-      switch (i)
+      switch (value & 0xFF)
         {
         case 0: return CLOSE_NOTIFY;
         case 10: return UNEXPECTED_MESSAGE;
@@ -416,7 +316,7 @@ final class Alert implements Constructed
         case 100: return NO_RENEGOTIATION;
         case 120: return UNKNOWN_SRP_USERNAME;
         case 121: return MISSING_SRP_USERNAME;
-        default: return new Description(i);
+        default: return new Description (value);
         }
     }
 
@@ -429,6 +329,18 @@ final class Alert implements Constructed
     }
 
     public int getValue()
+    {
+      return value;
+    }
+
+    public boolean equals (Object o)
+    {
+      if (!(o instanceof Description))
+        return false;
+      return ((Description) o).value == value;
+    }
+
+    public int hashCode ()
     {
       return value;
     }

@@ -1,4 +1,4 @@
-/* ContentType.java -- record layer content type.
+/* ContentType.java -- SSL record layer content type.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -45,8 +45,12 @@ import java.io.IOException;
 /**
  * The content type enumeration, which marks packets in the record layer.
  *
- * <pre>enum { change_cipher_spec(20), alert(21), handshake(22),
- *             application_data(23), (255) } ContentType;</pre>
+ * <pre>
+enum { change_cipher_spec(20), alert(21), handshake(22),
+       application_data(23), (255) } ContentType;</pre>
+ *
+ * <p>There is also a "pseudo" content type, <code>client_hello_v2
+ * (1)</code>, which is used for backwards compatibility with SSLv2.
  *
  * @author Casey Marshall (rsdio@metastatic.org)
  */
@@ -82,6 +86,11 @@ final class ContentType implements Enumerated
       {
         throw new EOFException("unexpected end of input stream");
       }
+    return forInteger (value);
+  }
+
+  static final ContentType forInteger (final int value)
+  {
     switch (value & 0xFF)
       {
       case  1: return CLIENT_HELLO_V2;

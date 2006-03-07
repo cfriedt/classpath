@@ -45,80 +45,135 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import java.nio.ByteBuffer;
+
+/**
+ * An SSL nonce.
+ *
+ * <pre>
+struct
+{
+  uint32 gmt_unix_time;
+  opaque random_bytes[28];
+} Random;
+ */
 class Random implements Constructed
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final int gmtUnixTime;
-  private final byte[] randomBytes;
+  static final int RANDOM_LENGTH = 28;
+
+  private final ByteBuffer buffer;
 
   // Constructors.
   // -------------------------------------------------------------------------
 
-  Random(int gmtUnixTime, byte[] randomBytes)
+  Random (final ByteBuffer buffer)
   {
-    this.gmtUnixTime = gmtUnixTime;
-    this.randomBytes = (byte[]) randomBytes.clone();
+    this.buffer = buffer;
   }
 
   // Class methods.
   // -------------------------------------------------------------------------
 
-  static Random read(InputStream in) throws IOException
-  {
-    int time = (in.read() & 0xFF) << 24 | (in.read() & 0xFF) << 16
-             | (in.read() & 0xFF) <<  8 | (in.read() & 0xFF);
-    byte[] buf = new byte[28];
-    in.read(buf);
-    return new Random(time, buf);
-  }
+//   static Random read(InputStream in) throws IOException
+//   {
+//     int time = (in.read() & 0xFF) << 24 | (in.read() & 0xFF) << 16
+//              | (in.read() & 0xFF) <<  8 | (in.read() & 0xFF);
+//     byte[] buf = new byte[28];
+//     in.read(buf);
+//     return new Random(time, buf);
+//   }
 
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public void write(OutputStream out) throws IOException
+//   public void write(OutputStream out) throws IOException
+//   {
+//     out.write((gmtUnixTime >>> 24) & 0xFF);
+//     out.write((gmtUnixTime >>> 16) & 0xFF);
+//     out.write((gmtUnixTime >>>  8) & 0xFF);
+//     out.write(gmtUnixTime & 0xFF);
+//     out.write(randomBytes);
+//   }
+
+//   byte[] getEncoded()
+//   {
+//     ByteArrayOutputStream bout = new ByteArrayOutputStream(32);
+//     try
+//       {
+//         write(bout);
+//       }
+//     catch (IOException cantHappen)
+//       {
+//         throw new Error(cantHappen.toString());
+//       }
+//     return bout.toByteArray();
+//   }
+
+  public int getLength ()
   {
-    out.write((gmtUnixTime >>> 24) & 0xFF);
-    out.write((gmtUnixTime >>> 16) & 0xFF);
-    out.write((gmtUnixTime >>>  8) & 0xFF);
-    out.write(gmtUnixTime & 0xFF);
-    out.write(randomBytes);
+    return RANDOM_LENGTH + 4;
   }
 
-  byte[] getEncoded()
+  int getGMTUnixTime ()
   {
-    ByteArrayOutputStream bout = new ByteArrayOutputStream(32);
-    try
-      {
-        write(bout);
-      }
-    catch (IOException cantHappen)
-      {
-        throw new Error(cantHappen.toString());
-      }
-    return bout.toByteArray();
-  }
-
-  int getTime()
-  {
-    return gmtUnixTime;
+    return buffer.getInt (0);
   }
 
   byte[] getRandomBytes()
   {
-    return randomBytes;
+    byte[] buf = new byte[28];
+    buffer.position (4);
+    buffer.get (buf);
+    return buf;
   }
 
-  public String toString()
+  void setGMTUnixTime (final int gmtUnixTime)
+  {
+    buffer.putInt (0, gmtUnixTime);
+  }
+
+  void setRandomBytes (final byte[] randomBytes)
+  {
+    setRandomBytes (randomBytes, 0);
+  }
+
+  void setRandomBytes (final byte[] randomBytes, final int offset)
+  {
+    if (randomBytes.length - offset < RANDOM_LENGTH)
+      throw new IllegalArgumentException ("random value too short");
+    buffer.position (4);
+    buffer.put (randomBytes, offset, RANDOM_LENGTH);
+  }
+
+  public String toString (final String prefix)
   {
     StringWriter str = new StringWriter();
     PrintWriter out = new PrintWriter(str);
+    if (prefix != null)
+      out.print (prefix);
     out.println("struct {");
-    out.println("  gmt_unix_time = " + gmtUnixTime + ";");
-    out.println("  random_bytes = " + Util.toHexString(randomBytes, ':') + ";");
-    out.println("} Random;");
+    if (prefix != null)
+      out.print (prefix);
+    out.print ("  gmt_unix_time: ");
+    out.print (getGMTUnixTime ());
+    out.println (";");
+    if (prefix != null)
+      out.print (prefix);
+    out.print ("  random_bytes:  ");
+    out.print (Util.toHexString (getRandomBytes (), ':'));
+    out.println (";");
+    if (prefix != null)
+      out.print (prefix);
+    out.print ("} Random;");
     return str.toString();
+  }
+
+  public String toString ()
+  {
+    return toString (null);
   }
 }

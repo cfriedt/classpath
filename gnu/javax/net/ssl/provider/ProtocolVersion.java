@@ -74,7 +74,7 @@ final class ProtocolVersion implements Comparable, Constructed
     return getInstance(major, minor);
   }
 
-  static ProtocolVersion getInstance(int major, int minor)
+  static ProtocolVersion getInstance(final int major, final int minor)
   {
     if (major == 3)
       {
@@ -88,13 +88,25 @@ final class ProtocolVersion implements Comparable, Constructed
     return new ProtocolVersion(major, minor);
   }
 
+  static ProtocolVersion getInstance (final short raw_value)
+  {
+    int major = raw_value >>> 8 & 0xFF;
+    int minor = raw_value & 0xFF;
+    return getInstance (major, minor);
+  }
+
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public void write(OutputStream out) throws IOException
+//   public void write(OutputStream out) throws IOException
+//   {
+//     out.write(major);
+//     out.write(minor);
+//   }
+
+  public int getLength ()
   {
-    out.write(major);
-    out.write(minor);
+    return 2;
   }
 
   byte[] getEncoded()
@@ -114,9 +126,14 @@ final class ProtocolVersion implements Comparable, Constructed
     return minor;
   }
 
+  int getRawValue ()
+  {
+    return (major << 8) | minor;
+  }
+
   public boolean equals(Object o)
   {
-    if (o == null || !(o instanceof ProtocolVersion))
+    if (!(o instanceof ProtocolVersion))
       {
         return false;
       }
@@ -131,31 +148,30 @@ final class ProtocolVersion implements Comparable, Constructed
 
   public int compareTo(Object o)
   {
-    if (o == null || !(o instanceof ProtocolVersion))
+    ProtocolVersion that = (ProtocolVersion) o;
+    if (major > that.major)
       {
         return 1;
       }
-    if (this.equals(o))
-      {
-        return 0;
-      }
-    if (major > ((ProtocolVersion) o).major)
-      {
-        return 1;
-      }
-    else if (major < ((ProtocolVersion) o).major)
+    else if (major < that.major)
       {
         return -1;
       }
-    if (minor > ((ProtocolVersion) o).minor)
+
+    if (minor > that.minor)
       {
         return 1;
       }
-    else if (minor < ((ProtocolVersion) o).minor)
+    else if (minor < that.minor)
       {
         return -1;
       }
     return 0;
+  }
+
+  public String toString (String prefix)
+  {
+    return toString ();
   }
 
   public String toString()

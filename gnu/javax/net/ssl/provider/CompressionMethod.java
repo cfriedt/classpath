@@ -1,4 +1,4 @@
-/* CompressionMethod.java -- the compression method enum.
+/* CompressionMethod.java -- The CompressionMethod enum.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -64,13 +64,8 @@ final class CompressionMethod implements Enumerated
   // Class method.
   // -------------------------------------------------------------------------
 
-  static CompressionMethod read(InputStream in) throws IOException
+  static CompressionMethod getInstance (final int value)
   {
-    int value = in.read();
-    if (value == -1)
-      {
-        throw new EOFException("unexpected end of input stream");
-      }
     switch (value & 0xFF)
       {
       case 0: return NULL;
@@ -88,6 +83,18 @@ final class CompressionMethod implements Enumerated
   }
 
   public int getValue()
+  {
+    return value;
+  }
+
+  public boolean equals (final Object o)
+  {
+    if (!(o instanceof CompressionMethod))
+      return false;
+    return ((CompressionMethod) o).value == value;
+  }
+
+  public int hashCode ()
   {
     return value;
   }
