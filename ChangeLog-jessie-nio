@@ -1,0 +1,3 @@
+2006-03-06  Casey Marshall  <csm@gnu.org>
+
+	* lib/standard.omit: add old non-nio jessie files.
