@@ -1,3 +1,24 @@
 2006-03-06  Casey Marshall  <csm@gnu.org>
 
+	* gnu/javax/net/ssl/provider/CipherAlgorithm.java
+	* gnu/javax/net/ssl/provider/CipherSuiteList.java
+	* gnu/javax/net/ssl/provider/ClientCertificateTypeList.java
+	* gnu/javax/net/ssl/provider/ClientDiffieHellmanPublic.java
+	* gnu/javax/net/ssl/provider/CompressionMethodList.java
+	* gnu/javax/net/ssl/provider/EncryptedPreMasterSecret.java
+	* gnu/javax/net/ssl/provider/ExchangeKeys.java
+	* gnu/javax/net/ssl/provider/HelloRequest.java
+	* gnu/javax/net/ssl/provider/KeyExchangeAlgorithm.java
+	* gnu/javax/net/ssl/provider/MacAlgorithm.java
+	* gnu/javax/net/ssl/provider/Record.java
+	* gnu/javax/net/ssl/provider/ServerDHParams.java
+	* gnu/javax/net/ssl/provider/ServerHelloDone.java
+	* gnu/javax/net/ssl/provider/ServerKeyExchangeParams.java
+	* gnu/javax/net/ssl/provider/ServerRSAParams.java
+	* gnu/javax/net/ssl/provider/SignatureAlgorithm.java
+	* gnu/javax/net/ssl/provider/X500PrincipalList.java
+	New files.
+
+2006-03-06  Casey Marshall  <csm@gnu.org>
+
 	* lib/standard.omit: add old non-nio jessie files.
