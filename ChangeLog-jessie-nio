@@ -1,5 +1,26 @@
 2006-03-10  Casey Marshall  <csm@gnu.org>
 
+	* gnu/java/lang/PseudoEnum.java: new file.
+	* javax/net/ssl/CertPathTrustManagerParameters.java: new file.	
+	* javax/net/ssl/HandshakeCompletedEvent.java (getLocalPrincipal,
+	getPeerPrincipal): new method.
+	* javax/net/ssl/HttpsURLConnection.java (<init>): don't declare to
+	throw IOException.
+	(getLocalPrincipal, getPeerPrincipal): new methods.
+	* javax/net/ssl/KeyStoreBuilderParameters.java: new file.
+	* javax/net/ssl/SSLContext.java (createSSLEngine,
+	createSSLEngine): new methods.
+	* javax/net/ssl/SSLContextSpi.java (engineCreateSSLEngine,
+	engineCreateSSLEngine): new methods.
+	* javax/net/ssl/SSLEngine.java: new file.
+	* javax/net/ssl/SSLEngineResult.java: new file.
+	* javax/net/ssl/SSLSession.java (getApplicationBufferSize,
+	getLocalPrincipal, getPacketBufferSize, getPeerPort,
+	getPeerPrincipal, isValid): new methods.
+	* javax/net/ssl/X509ExtendedKeyManager.java: new file.
+
+2006-03-10  Casey Marshall  <csm@gnu.org>
+
 	Fixes PR 23768.
 	* javax/crypto/Cipher.java (doFinal, doFinal, doFinal): don't
 	reset `state.'
