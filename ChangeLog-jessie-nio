@@ -1,3 +1,51 @@
+2006-03-10  Casey Marshall  <csm@gnu.org>
+
+	Fixes PR 23768.
+	* javax/crypto/Cipher.java (doFinal, doFinal, doFinal): don't
+	reset `state.'
+	(doFinal, update): new methods.
+	(init, init, init, init): initialize `state' after trying the
+	implementation, which can throw an exception.
+	* javax/crypto/CipherSpi.java (engineDoFinal, engineUpdate): new
+	methods.
+
+2006-03-06  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/Alert.java: modified to use backing
+	byte buffer.
+	* gnu/javax/net/ssl/provider/Certificate.java: likewise.
+	* gnu/javax/net/ssl/provider/CertificateRequest.java: likewise.
+	* gnu/javax/net/ssl/provider/CertificateVerify.java: likewise.
+	* gnu/javax/net/ssl/provider/CipherSuite.java: modified to use
+	backing byte buffer; use enumerations instead of string constants;
+	use JCE instead of GNU Crypto API.
+	* gnu/javax/net/ssl/provider/ClientHello.java: modified to use
+	backing byte buffer.
+	* gnu/javax/net/ssl/provider/ClientKeyExchange.java: likewise.
+	* gnu/javax/net/ssl/provider/CompressionMethod.java: likewise.
+	* gnu/javax/net/ssl/provider/Constructed.java
+	(getLength): new method.
+	(write): removed.
+	(toString): new method.
+	* gnu/javax/net/ssl/provider/ContentType.java
+	(forInteger): new method.
+	* gnu/javax/net/ssl/provider/Finished.java: modified to use
+	backing byte buffer.
+	* gnu/javax/net/ssl/provider/Handshake.java: likewise.
+	* gnu/javax/net/ssl/provider/ProtocolVersion.java
+	(getInstance): new method.
+	(write): removed.
+	(getLength): new method.
+	(getRawValue): new method.
+	(toString): new method.
+	* gnu/javax/net/ssl/provider/Random.java: modified to use backing
+	byte buffer.
+	* gnu/javax/net/ssl/provider/ServerHello.java: likewise.
+	* gnu/javax/net/ssl/provider/ServerKeyExchange.java: likewise.
+	* gnu/javax/net/ssl/provider/Signature.java: likewise.
+	* gnu/javax/net/ssl/provider/Util.java
+	(hexDump, hexDump): new methods.
+
 2006-03-06  Casey Marshall  <csm@gnu.org>
 
 	* gnu/javax/net/ssl/provider/CipherAlgorithm.java
