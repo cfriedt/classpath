@@ -64,14 +64,26 @@ class Record
     this.buffer = buffer;
   }
 
+  // XXX remove
+  ContentType getContentType ()
+  {
+    return contentType ();
+  }
+
   /**
    * Gets the content type field.
    *
    * @return The content type field.
    */
-  ContentType getContentType ()
+  ContentType contentType ()
   {
     return ContentType.forInteger (buffer.get (0) & 0xFF);
+  }
+
+  // XXX remove.
+  int getFragment (final ByteBuffer sink)
+  {
+    return fragment (sink);
   }
 
   /**
@@ -80,11 +92,17 @@ class Record
    * @param sink The sink for the fragment bytes.
    * @return The number of bytes put into <code>sink</code>
    */
-  int getFragment (final ByteBuffer sink)
+  int fragment (final ByteBuffer sink)
   {
-    int length = getLength ();
+    int length = length ();
     sink.put (((ByteBuffer) buffer.limit (5 + length).position (5)).slice ());
     return length;
+  }
+
+  // XXX remove.
+  ByteBuffer getFragment ()
+  {
+    return fragment ();
   }
 
   /**
@@ -95,10 +113,16 @@ class Record
    *
    * @return The fragment buffer.
    */
-  ByteBuffer getFragment ()
+  ByteBuffer fragment ()
   {
     int length = getLength ();
     return ((ByteBuffer) buffer.limit (5 + length).position (5)).slice ();
+  }
+
+  // XXX remove.
+  int getLength ()
+  {
+    return length ();
   }
 
   /**
@@ -106,9 +130,14 @@ class Record
    *
    * @return The fragment length.
    */
-  int getLength ()
+  int length ()
   {
     return buffer.getShort (3) & 0xFFFF;
+  }
+
+  ProtocolVersion getVersion ()
+  {
+    return version ();
   }
 
   /**
@@ -116,7 +145,7 @@ class Record
    *
    * @return The protocol version field.
    */
-  ProtocolVersion getVersion ()
+  ProtocolVersion version ()
   {
     int major = buffer.get (1) & 0xFF;
     int minor = buffer.get (2) & 0xFF;

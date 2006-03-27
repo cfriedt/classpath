@@ -41,6 +41,7 @@ package javax.crypto;
 import gnu.java.security.Engine;
 
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -395,6 +396,24 @@ public class Mac implements Cloneable
         throw new IllegalStateException("not initialized");
       }
     macSpi.engineUpdate(input, offset, length);
+  }
+
+  /**
+   * Updates this MAC with the <code>remaining()</input> bytes from
+   * the given byte buffer, starting at <code>position()</code>.
+   *
+   * @param input The input bytes.
+   * @throws IllegalStateException If this instance has not been
+   *  initialized.
+   */
+  public final void update (ByteBuffer input)
+    throws IllegalStateException
+  {
+    if (virgin)
+      {
+        throw new IllegalStateException ("not initialized");
+      }
+    macSpi.engineUpdate (input);
   }
 
   /**

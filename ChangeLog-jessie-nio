@@ -1,3 +1,18 @@
+2006-03-27  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/Record.java
+	(getContentType, getFragment, getFragment, getLength, getVersion):
+	call new accessors.
+	(contentType, fragment, fragment, length, version): new methods.
+	* gnu/javax/net/ssl/provider/CipheredStruct.java,
+	* gnu/javax/net/ssl/provider/GenericBlockCipher.java,
+	* gnu/javax/net/ssl/provider/GenericStreamCipher.java,
+	* gnu/javax/net/ssl/provider/InputSecurityParameters.java,	
+	* gnu/javax/net/ssl/provider/OutputSecurityParameters.java: new
+	files.
+	* javax/crypto/Mac.java (update): new method.
+	* javax/crypto/MacSpi.java (engineUpdate): new method.
+
 2006-03-26  Casey Marshall  <csm@gnu.org>
 
 	* jessie-tests/gnu/javax/net/ssl/provider/testAlert.java,

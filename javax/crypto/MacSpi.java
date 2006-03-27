@@ -38,6 +38,7 @@ exception statement from your version. */
 
 package javax.crypto;
 
+import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -142,4 +143,27 @@ public abstract class MacSpi
    * @param length The number of bytes to update.
    */
   protected abstract void engineUpdate(byte[] input, int offset, int length);
+
+  /**
+   * Update this MAC with a byte buffer.
+   *
+   * <p>Note that the default implementation uses a byte array to
+   * repeatedly <code>get</code> bytes from the buffer, then passes
+   * that byte array to {@link
+   * engineUpdate(byte[],int,int)}. Subclasses are encouraged to
+   * override this implementation if they can operate more efficiently
+   * on byte buffers.
+   *
+   * @param input The input buffer.
+   */
+  protected void engineUpdate (ByteBuffer input)
+  {
+    byte[] buf = new byte[256];
+    while (input.hasRemaining ())
+      {
+        int l = Math.min (input.remaining (), 256);
+        input.get (buf, 0, l);
+        engineUpdate (buf, 0, l);
+      }
+  }
 }
