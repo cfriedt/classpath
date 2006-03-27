@@ -1,3 +1,18 @@
+2006-03-26  Casey Marshall  <csm@gnu.org>
+
+	* jessie-tests/gnu/javax/net/ssl/provider/testAlert.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testCertificate.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testCertificateRequest.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testCipherSuiteList.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testClientHello.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testCompressionMethodList.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testHelloRequest.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testRecord.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testServerDHParams.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testServerHello.java,
+	* jessie-tests/gnu/javax/net/ssl/provider/testServerRSAParams.java,
+	* jessie-tests/run-tests.sh: new files.
+
 2006-03-10  Casey Marshall  <csm@gnu.org>
 
 	* gnu/java/lang/PseudoEnum.java: new file.
