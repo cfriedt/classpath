@@ -121,6 +121,24 @@ class ClientCertificateTypeList
     return str.toString ();
   }
 
+  public boolean equals (Object o)
+  {
+    if (!(o instanceof ClientCertificateTypeList))
+      return false;
+    ClientCertificateTypeList that = (ClientCertificateTypeList) o;
+
+    if (size () != that.size ())
+      return false;
+
+    for (Iterator it1 = new Iterator (), it2 = that.new Iterator ();
+         it1.hasNext () && it2.hasNext (); )
+      {
+        if (!it1.next ().equals (it2.next ()))
+          return false;
+      }
+    return true;
+  }
+
   class Iterator implements ListIterator
   {
     private int index;

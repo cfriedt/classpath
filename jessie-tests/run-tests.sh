@@ -28,6 +28,7 @@ date | tee -a check.err >> check.log
 for test in $tests
 do
   echo $test
+  echo ---- $test ---- >> check.log
   echo ---- $test ---- >> check.err
   if `(${JAVA} ${JAVA_OPTIONS} -cp ${CLASSPATH}:test-classes $test 2>> check.err || echo FAIL: $test) | tee -a check.log | grep -q ^FAIL > /dev/null`
       then

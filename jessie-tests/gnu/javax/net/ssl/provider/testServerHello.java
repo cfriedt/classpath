@@ -3,10 +3,24 @@
 package gnu.javax.net.ssl.provider;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 class testServerHello
 {
-  public static void main (String[] argv) throws Exception
+  public static void main (String[] argv)
+  {
+    try
+      {
+        check ();
+      }
+    catch (Exception x)
+      {
+        System.out.println ("FAIL: caught exception " + x);
+        x.printStackTrace ();
+      }
+  }
+
+  static void check () throws Exception
   {
     final int alloc_len = 4096;
     ByteBuffer buffer = ByteBuffer.allocate (alloc_len);
@@ -15,11 +29,11 @@ class testServerHello
     handshake.setType (Handshake.Type.SERVER_HELLO);
     handshake.setLength (alloc_len - 4);
 
-    ServerHello hello = (ServerHello) handshake.getBody ();
+    ServerHello hello = (ServerHello) handshake.body ();
 
     hello.setProtocolVersion (ProtocolVersion.TLS_1);
-    Random random = hello.getRandom ();
-    random.setGMTUnixTime (123456);
+    Random random = hello.random ();
+    random.setGmtUnixTime (123456);
     byte[] nonce = new byte[28];
     for (int i = 0; i < nonce.length; i++)
       nonce[i] = (byte) i;
@@ -32,7 +46,24 @@ class testServerHello
     hello.setCompressionMethod (CompressionMethod.ZLIB);
     hello.setExtensionsLength (0);
 
-    handshake.setLength (hello.getLength ());
+    handshake.setLength (hello.length ());
     System.err.println (handshake);
+
+    handshake = new Handshake (buffer);
+    hello = (ServerHello) handshake.body ();
+    if (Arrays.equals (sessionId, hello.sessionId ()))
+      System.out.println ("PASS: sessionId");
+    else
+      System.out.println ("FAIL: sessionId");
+
+    if (hello.cipherSuite () == CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA)
+      System.out.println ("PASS: cipherSuite");
+    else
+      System.out.println ("FAIL: cipherSuite");
+
+    if (hello.compressionMethod () == CompressionMethod.ZLIB)
+      System.out.println ("PASS: compressionMethod");
+    else
+      System.out.println ("FAIL: compressionMethod");
   }
 }

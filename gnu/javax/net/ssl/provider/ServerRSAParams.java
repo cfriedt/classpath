@@ -64,12 +64,12 @@ class ServerRSAParams implements ServerKeyExchangeParams
     this.buffer = buffer;
   }
 
-  public KeyExchangeAlgorithm getAlgorithm ()
+  public KeyExchangeAlgorithm algorithm ()
   {
     return KeyExchangeAlgorithm.RSA;
   }
 
-  public int getLength ()
+  public int length ()
   {
     int offset = buffer.getShort (0) & 0xFFFF;
     return (buffer.getShort (offset + 2) & 0xFFFF) + offset + 4;
@@ -80,7 +80,7 @@ class ServerRSAParams implements ServerKeyExchangeParams
    *
    * @return The modulus.
    */
-  BigInteger getModulus ()
+  BigInteger modulus ()
   {
     int len = buffer.getShort (0) & 0xFFFF;
     byte[] buf = new byte[len];
@@ -94,7 +94,7 @@ class ServerRSAParams implements ServerKeyExchangeParams
    *
    * @return The exponent.
    */
-  BigInteger getExponent ()
+  BigInteger exponent ()
   {
     int off = (buffer.getShort (0) & 0xFFFF) + 2;
     int len = buffer.getShort (off) & 0xFFFF;
@@ -152,10 +152,10 @@ class ServerRSAParams implements ServerKeyExchangeParams
     out.println ("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  rsa_modulus:  ");
-    out.println (getModulus ().toString (16));
+    out.println (modulus ().toString (16));
     if (prefix != null) out.print (prefix);
     out.print ("  rsa_exponent: ");
-    out.println (getExponent ());
+    out.println (exponent ());
     if (prefix != null) out.print (prefix);
     out.print ("} ServerRSAParams;");
     return str.toString ();

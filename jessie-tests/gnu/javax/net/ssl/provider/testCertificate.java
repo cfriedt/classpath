@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.List;
 
 class testCertificate
 {
@@ -28,6 +29,19 @@ class testCertificate
 
   public static void main (String[] argv) throws Throwable
   {
+    try
+      {
+        check ();
+      }
+    catch (Exception x)
+      {
+        System.out.println ("FAIL: caught exception " + x);
+        x.printStackTrace ();
+      }
+  }
+
+  static void check () throws Exception
+  {
     final int alloc_len = 4096;
     CertificateFactory factory = CertificateFactory.getInstance ("X.509");
     X509Certificate cert = (X509Certificate)
@@ -38,9 +52,19 @@ class testCertificate
     handshake.setType (Handshake.Type.CERTIFICATE);
     handshake.setLength (alloc_len - 4);
 
-    Certificate _cert = (Certificate) handshake.getBody ();
+    Certificate _cert = (Certificate) handshake.body ();
     _cert.setCertificates (Collections.singletonList (cert));
-    System.err.println (_cert.getCertificates ());
+    System.err.println (_cert.certificates ());
     System.err.println (_cert);
+    handshake.setLength (_cert.length ());
+
+    Handshake handshake2 = new Handshake (buffer);
+    Certificate _cert2 = (Certificate) handshake2.body ();
+    List certs = _cert2.certificates ();
+
+    if (cert.equals (certs.get (0)))
+      System.out.println ("PASS: equals()");
+    else
+      System.out.println ("FAIL: equals()");
   }
 }

@@ -100,14 +100,14 @@ class Signature implements Constructed
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int getLength ()
+  public int length ()
   {
     if (alg.equals (SignatureAlgorithm.ANONYMOUS))
       return 0;
     return (buffer.getShort (0) & 0xFFFF) + 2;
   }
 
-  byte[] getSignature ()
+  byte[] signature ()
   {
     if (alg.equals (SignatureAlgorithm.ANONYMOUS))
       return new byte[0];
@@ -149,7 +149,7 @@ class Signature implements Constructed
         String subprefix = "  ";
         if (prefix != null)
           subprefix = prefix + subprefix;
-        out.print (Util.hexDump (getSignature (), subprefix));
+        out.print (Util.hexDump (signature (), subprefix));
       }
     if (prefix != null)
       out.print (prefix);

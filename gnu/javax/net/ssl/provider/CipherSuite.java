@@ -902,12 +902,12 @@ final class CipherSuite implements Constructed
   // Intance methods.
   // -------------------------------------------------------------------------
 
-  CipherAlgorithm getCipherAlgorithm ()
+  CipherAlgorithm cipherAlgorithm ()
   {
     return cipherAlgorithm;
   }
 
-  Cipher getCipher () throws NoSuchAlgorithmException, NoSuchPaddingException
+  Cipher cipher () throws NoSuchAlgorithmException, NoSuchPaddingException
   {
     if (cipherAlgorithm == null)
       throw new NoSuchAlgorithmException (toString () + ": unresolved cipher suite");
@@ -918,7 +918,7 @@ final class CipherSuite implements Constructed
     if (cipherAlgorithm == CipherAlgorithm.RC4)
       alg = "RC4";
     else
-      alg = cipherAlgorithm + "/CBC/SSL3Padding";
+      alg = cipherAlgorithm + "/CBC/NoPadding";
     GetSecurityPropertyAction gspa =
       new GetSecurityPropertyAction ("jessie.jce.provider");
     final String provider = (String) AccessController.doPrivileged (gspa);
@@ -940,7 +940,7 @@ final class CipherSuite implements Constructed
     return macAlgorithm;
   }
 
-  Mac getMac () throws NoSuchAlgorithmException
+  Mac mac () throws NoSuchAlgorithmException
   {
     if (macAlgorithm == null)
       throw new NoSuchAlgorithmException (toString () + ": unresolved cipher suite");
@@ -962,12 +962,12 @@ final class CipherSuite implements Constructed
     return Mac.getInstance (macAlgorithm.toString ());
   }
 
-  SignatureAlgorithm getSignatureAlgorithm ()
+  SignatureAlgorithm signatureAlgorithm ()
   {
     return signatureAlgorithm;
   }
 
-  KeyExchangeAlgorithm getKeyExchangeAlgorithm ()
+  KeyExchangeAlgorithm keyExchangeAlgorithm ()
   {
     return keyExchangeAlgorithm;
   }
@@ -977,7 +977,7 @@ final class CipherSuite implements Constructed
     return ephemeralDH;
   }
 
-  public int getLength ()
+  public int length ()
   {
     return 2;
   }
@@ -1101,7 +1101,7 @@ final class CipherSuite implements Constructed
     return this;
   }
 
-  int getKeyLength()
+  int keyLength()
   {
     return keyLength;
   }
@@ -1129,12 +1129,12 @@ final class CipherSuite implements Constructed
 //     return kexName + "_" + sigName;
 //   }
 
-  byte[] getId()
+  byte[] id()
   {
     return id;
   }
 
-  ProtocolVersion getVersion()
+  ProtocolVersion version()
   {
     return version;
   }
@@ -1147,7 +1147,7 @@ final class CipherSuite implements Constructed
       }
     if (o == this)
       return true;
-    byte[] id = ((CipherSuite) o).getId();
+    byte[] id = ((CipherSuite) o).id();
     return (id[0] == this.id[0] &&
             id[1] == this.id[1]);
   }
@@ -1158,7 +1158,7 @@ final class CipherSuite implements Constructed
       {
         return 0xFFFF0000 | (id[0] & 0xFF) << 8 | (id[1] & 0xFF);
       }
-    return (version.getMajor() << 24 | version.getMinor() << 16
+    return (version.major() << 24 | version.minor() << 16
             | (id[0] & 0xFF) << 8 | (id[1] & 0xFF));
   }
 

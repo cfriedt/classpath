@@ -48,7 +48,7 @@ interface Constructed
    *
    * @return The length of this structure.
    */
-  int getLength ();
+  int length ();
 
   /**
    * Returns a printable representation of this structure, with the

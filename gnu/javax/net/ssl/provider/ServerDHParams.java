@@ -64,12 +64,12 @@ class ServerDHParams implements ServerKeyExchangeParams
     this.buffer = buffer;
   }
 
-  public KeyExchangeAlgorithm getAlgorithm ()
+  public KeyExchangeAlgorithm algorithm ()
   {
     return KeyExchangeAlgorithm.DIFFIE_HELLMAN;
   }
 
-  public int getLength ()
+  public int length ()
   {
     int offset1 = buffer.getShort (0) & 0xFFFF;
     int offset2 = buffer.getShort (offset1 + 2) & 0xFFFF;
@@ -82,7 +82,7 @@ class ServerDHParams implements ServerKeyExchangeParams
    *
    * @return p.
    */
-  BigInteger getP ()
+  BigInteger p ()
   {
     int len = buffer.getShort (0) & 0xFFFF;
     byte[] buf = new byte[len];
@@ -96,7 +96,7 @@ class ServerDHParams implements ServerKeyExchangeParams
    *
    * @return g.
    */
-  BigInteger getG ()
+  BigInteger g ()
   {
     int off = (buffer.getShort (0) & 0xFFFF) + 2;
     int len = buffer.getShort (off) & 0xFFFF;
@@ -111,7 +111,7 @@ class ServerDHParams implements ServerKeyExchangeParams
    *
    * @return Y.
    */
-  BigInteger getY ()
+  BigInteger y ()
   {
     int offset1 = (buffer.getShort (0) & 0xFFFF) + 2;
     int offset2 = (buffer.getShort (offset1) & 0xFFFF) + offset1 + 2;
@@ -189,13 +189,13 @@ class ServerDHParams implements ServerKeyExchangeParams
     out.println ("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  dh_p:  ");
-    out.println (getP ().toString (16));
+    out.println (p ().toString (16));
     if (prefix != null) out.print (prefix);
     out.print ("  dh_g:  ");
-    out.println (getG ().toString (16));
+    out.println (g ().toString (16));
     if (prefix != null) out.print (prefix);
     out.print ("  dh_Ys: ");
-    out.println (getY ().toString (16));
+    out.println (y ().toString (16));
     if (prefix != null) out.print (prefix);
     out.print ("} ServerDHParams;");
     return str.toString ();

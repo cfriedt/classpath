@@ -9,57 +9,55 @@ class testRecord
 {
   public static void main (final String[] argv)
   {
+    try
+      {
+        check ();
+      }
+    catch (Exception x)
+      {
+        System.out.println ("FAIL: caught exception " + x);
+        x.printStackTrace ();
+      }
+  }
+
+  static void check () throws Exception
+  {
     ByteBuffer buf = ByteBuffer.allocate (42 + 5);
     Record record = new Record (buf);
     byte[] fragment = new byte[42];
     new java.util.Random (31337).nextBytes (fragment);
-    try
-      {
-        record.setVersion (ProtocolVersion.TLS_1);
-        System.out.println ("PASS: setVersion");
-        record.setContentType (ContentType.APPLICATION_DATA);
-        System.out.println ("PASS: setContentType");
-        record.setLength (42);
-        System.out.println ("PASS: setLength");
-      }
-    catch (Throwable t)
-      {
-        System.out.println ("FAIL: " + t);
-        System.exit (1);
-      }
 
-    try
-      {
-        record.getFragment ().put (fragment);
-        System.out.println ("PASS: getFragment ().put ()");
-      }
-    catch (Throwable t)
-      {
-        System.out.println ("FAIL: " + t);
-        System.exit (1);
-      }
+    record.setVersion (ProtocolVersion.TLS_1);
+    System.out.println ("PASS: setVersion");
+    record.setContentType (ContentType.APPLICATION_DATA);
+    System.out.println ("PASS: setContentType");
+    record.setLength (42);
+    System.out.println ("PASS: setLength");
 
-    if (ProtocolVersion.TLS_1.equals (record.getVersion ()))
-      System.out.println ("PASS: getVersion()");
+    record.fragment ().put (fragment);
+    System.out.println ("PASS: fragment ().put ()");
+
+    if (ProtocolVersion.TLS_1.equals (record.version ()))
+      System.out.println ("PASS: version()");
     else
-      System.out.println ("FAIL: getVersion()");
+      System.out.println ("FAIL: version()");
 
-    if (ContentType.APPLICATION_DATA.equals (record.getContentType ()))
-      System.out.println ("PASS: getContentType()");
+    if (ContentType.APPLICATION_DATA.equals (record.contentType ()))
+      System.out.println ("PASS: contentType()");
     else
-      System.out.println ("FAIL: getContentType()");
+      System.out.println ("FAIL: contentType()");
 
-    if (record.getLength () == 42)
-      System.out.println ("PASS: getLength()");
+    if (record.length () == 42)
+      System.out.println ("PASS: length()");
     else
-      System.out.println ("FAIL: getLength()");
+      System.out.println ("FAIL: length()");
 
     byte[] fragment2 = new byte[42];
-    record.getFragment ().get (fragment2);
+    record.fragment ().get (fragment2);
     if (Arrays.equals (fragment, fragment2))
-      System.out.println ("PASS: getFragment ().get ()");
+      System.out.println ("PASS: fragment ().get ()");
     else
-      System.out.println ("FAIL: getFragment ().get ()");
+      System.out.println ("FAIL: fragment ().get ()");
 
     System.err.println (record);
   }

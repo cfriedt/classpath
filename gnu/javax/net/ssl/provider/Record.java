@@ -80,12 +80,6 @@ class Record
     return ContentType.forInteger (buffer.get (0) & 0xFF);
   }
 
-  // XXX remove.
-  int getFragment (final ByteBuffer sink)
-  {
-    return fragment (sink);
-  }
-
   /**
    * Get the fragment content, storing it into <code>sink</code>.
    *
@@ -99,12 +93,6 @@ class Record
     return length;
   }
 
-  // XXX remove.
-  ByteBuffer getFragment ()
-  {
-    return fragment ();
-  }
-
   /**
    * Returns the fragment field as a ByteBuffer. The returned buffer
    * is shared with this object's underlying buffer, so it will share
@@ -115,14 +103,8 @@ class Record
    */
   ByteBuffer fragment ()
   {
-    int length = getLength ();
+    int length = length ();
     return ((ByteBuffer) buffer.limit (5 + length).position (5)).slice ();
-  }
-
-  // XXX remove.
-  int getLength ()
-  {
-    return length ();
   }
 
   /**
@@ -133,11 +115,6 @@ class Record
   int length ()
   {
     return buffer.getShort (3) & 0xFFFF;
-  }
-
-  ProtocolVersion getVersion ()
-  {
-    return version ();
   }
 
   /**
@@ -192,7 +169,7 @@ class Record
    */
   void setVersion (final ProtocolVersion version)
   {
-    buffer.put (1, (byte) version.getMajor ()).put (2, (byte) version.getMinor ());
+    buffer.put (1, (byte) version.major ()).put (2, (byte) version.minor ());
   }
 
   public String toString ()
@@ -201,13 +178,13 @@ class Record
     PrintWriter out = new PrintWriter (str);
     out.println ("struct {");
     out.print ("  type:    ");
-    out.print (getContentType ());
+    out.print (contentType ());
     out.println (";");
     out.print ("  version: ");
-    out.print (getVersion ());
+    out.print (version ());
     out.println (";");
     out.println ("  fragment {");
-    out.print (Util.hexDump (getFragment (), "    "));
+    out.print (Util.hexDump (fragment (), "    "));
     out.println ("  };");
     out.print ("} Record;");
     return str.toString ();

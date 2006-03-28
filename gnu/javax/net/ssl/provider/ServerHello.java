@@ -146,7 +146,7 @@ class ServerHello implements Handshake.Body
 //       }
 //   }
 
-  public int getLength ()
+  public int length ()
   {
     return totalLength;
   }
@@ -160,7 +160,7 @@ class ServerHello implements Handshake.Body
    *
    * @return The server's protocol version.
    */
-  ProtocolVersion getProtocolVersion()
+  ProtocolVersion protocolVersion()
   {
     return ProtocolVersion.getInstance (buffer.getShort (0));
   }
@@ -173,7 +173,7 @@ class ServerHello implements Handshake.Body
    *
    * @return The server's random value.
    */
-  Random getRandom()
+  Random random()
   {
     ByteBuffer randomBuf =
       ((ByteBuffer) buffer.duplicate ().position (RANDOM_OFFSET)
@@ -187,7 +187,7 @@ class ServerHello implements Handshake.Body
    *
    * @return The session ID.
    */
-  byte[] getSessionId()
+  byte[] sessionId()
   {
     int idlen = buffer.get (SESSID_OFFSET) & 0xFF;
     byte[] sessionId = new byte[idlen];
@@ -202,11 +202,11 @@ class ServerHello implements Handshake.Body
    *
    * @return The server's chosen cipher suite.
    */
-  CipherSuite getCipherSuite ()
+  CipherSuite cipherSuite ()
   {
     int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 1;
     return (CipherSuite.forValue (buffer.getShort (offset))
-            .resolve (getProtocolVersion ()));
+            .resolve (protocolVersion ()));
   }
 
   /**
@@ -214,13 +214,13 @@ class ServerHello implements Handshake.Body
    *
    * @return The chosen compression method.
    */
-  CompressionMethod getCompressionMethod ()
+  CompressionMethod compressionMethod ()
   {
     int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 3;
     return CompressionMethod.getInstance (buffer.get (offset) & 0xFF);
   }
 
-  ByteBuffer getExtensions ()
+  ByteBuffer extensions ()
   {
     int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 4;
     return ((ByteBuffer) buffer.duplicate ().position (offset)
@@ -229,7 +229,7 @@ class ServerHello implements Handshake.Body
 
   void setProtocolVersion (final ProtocolVersion version)
   {
-    buffer.putShort (0, (short) version.getRawValue ());
+    buffer.putShort (0, (short) version.rawValue ());
   }
 
   void setSessionId (final byte[] sessionId)
@@ -250,7 +250,7 @@ class ServerHello implements Handshake.Body
   {
     int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 1;
     buffer.position (offset);
-    buffer.put (suite.getId ());
+    buffer.put (suite.id ());
   }
 
   void setCompressionMethod (final CompressionMethod comp)
@@ -282,24 +282,24 @@ class ServerHello implements Handshake.Body
       subprefix += prefix;
     out.print (subprefix);
     out.print ("version: ");
-    out.print (getProtocolVersion ());
+    out.print (protocolVersion ());
     out.println (";");
     out.print (subprefix);
     out.println ("random:");
-    out.println (getRandom ().toString (subprefix));
+    out.println (random ().toString (subprefix));
     out.print (subprefix);
     out.print ("sessionId:         ");
-    out.print (Util.toHexString(getSessionId (), ':'));
+    out.print (Util.toHexString(sessionId (), ':'));
     out.println (";");
     out.print (subprefix);
     out.print ("cipherSuite:       ");
-    out.print (getCipherSuite ());
+    out.print (cipherSuite ());
     out.println (";");
     out.print (subprefix);
     out.print ("compressionMethod: ");
-    out.print (getCompressionMethod ());
+    out.print (compressionMethod ());
     out.println (";");
-    ByteBuffer extbuf = getExtensions ();
+    ByteBuffer extbuf = extensions ();
     if (extbuf.limit () > 0)
       {
         out.print (subprefix);

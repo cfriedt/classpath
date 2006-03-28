@@ -113,7 +113,7 @@ class CipherSuiteList
       throw new IndexOutOfBoundsException ("limit: " + size
                                            + "; requested: " + index);
     buffer.position (2 + (index << 1));
-    buffer.put (suite.getId ());
+    buffer.put (suite.id ());
     modCount++;
   }
 
@@ -171,6 +171,24 @@ class CipherSuiteList
       out.print (prefix);
     out.print ("};");
     return str.toString ();
+  }
+
+  public boolean equals (Object o)
+  {
+    if (!(o instanceof CipherSuiteList))
+      return false;
+    CipherSuiteList that = (CipherSuiteList) o;
+
+    if (size () != that.size ())
+      return false;
+
+    for (Iterator it1 = new Iterator (), it2 = that.new Iterator ();
+         it1.hasNext () && it2.hasNext (); )
+      {
+        if (!it1.next ().equals (it2.next ()))
+          return false;
+      }
+    return true;
   }
 
   /**

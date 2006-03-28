@@ -113,17 +113,17 @@ class Random implements Constructed
 //     return bout.toByteArray();
 //   }
 
-  public int getLength ()
+  public int length ()
   {
     return RANDOM_LENGTH + 4;
   }
 
-  int getGMTUnixTime ()
+  int gmtUnixTime ()
   {
     return buffer.getInt (0);
   }
 
-  byte[] getRandomBytes()
+  byte[] randomBytes()
   {
     byte[] buf = new byte[28];
     buffer.position (4);
@@ -131,7 +131,7 @@ class Random implements Constructed
     return buf;
   }
 
-  void setGMTUnixTime (final int gmtUnixTime)
+  void setGmtUnixTime (final int gmtUnixTime)
   {
     buffer.putInt (0, gmtUnixTime);
   }
@@ -159,12 +159,12 @@ class Random implements Constructed
     if (prefix != null)
       out.print (prefix);
     out.print ("  gmt_unix_time: ");
-    out.print (getGMTUnixTime ());
+    out.print (gmtUnixTime ());
     out.println (";");
     if (prefix != null)
       out.print (prefix);
     out.print ("  random_bytes:  ");
-    out.print (Util.toHexString (getRandomBytes (), ':'));
+    out.print (Util.toHexString (randomBytes (), ':'));
     out.println (";");
     if (prefix != null)
       out.print (prefix);

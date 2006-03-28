@@ -67,6 +67,12 @@ class OutputSecurityParameters
     sequence = 0;
   }
 
+  /**
+   * Encrypt a record, storing the result in the given output buffer.
+   *
+   * @return The number of bytes stored into `output;' that is, the
+   * size of the encrypted fragment, plus the encoding for the record.
+   */
   int encrypt (final Record record, final ByteBuffer output)
     throws DataFormatException, IllegalBlockSizeException, ShortBufferException
   {
@@ -139,12 +145,12 @@ class OutputSecurityParameters
         mac.update ((byte) (sequence >>> 16));
         mac.update ((byte) (sequence >>>  8));
         mac.update ((byte)  sequence);
-        mac.update ((byte) record.getContentType ().getValue ());
+        mac.update ((byte) record.contentType ().getValue ());
         ProtocolVersion version = record.version ();
         if (version != ProtocolVersion.SSL_3)
           {
-            mac.update ((byte) version.getMajor ());
-            mac.update ((byte) version.getMinor ());
+            mac.update ((byte) version.major ());
+            mac.update ((byte) version.minor ());
           }
         mac.update ((byte) (plaintext.contentLength () >>> 8));
         mac.update ((byte)  plaintext.contentLength ());
@@ -154,7 +160,7 @@ class OutputSecurityParameters
 
     Record outrecord = new Record (output);
     outrecord.setContentType (record.contentType ());
-    outrecord.setVersion (record.getVersion ());
+    outrecord.setVersion (record.version ());
     outrecord.setLength (fragmentLength);
 
     if (cipher != null)

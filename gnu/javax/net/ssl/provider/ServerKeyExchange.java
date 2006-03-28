@@ -86,15 +86,15 @@ class ServerKeyExchange implements Handshake.Body
     suite.getClass ();
     this.buffer = buffer;
     this.suite = suite;
-    if (suite.isResolved ())
+    if (!suite.isResolved ())
       throw new IllegalArgumentException ("requires resolved cipher suite");
   }
 
-  public int getLength ()
+  public int length ()
   {
-    if (suite.getKeyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
+    if (suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
       return 0;
-    return getParams ().getLength () + getSignature ().getLength ();
+    return params ().length () + signature ().length ();
   }
 
   /**
@@ -103,9 +103,9 @@ class ServerKeyExchange implements Handshake.Body
    *
    * @return The server's key exchange parameters.
    */
-  ServerKeyExchangeParams getParams ()
+  ServerKeyExchangeParams params ()
   {
-    KeyExchangeAlgorithm kex = suite.getKeyExchangeAlgorithm ();
+    KeyExchangeAlgorithm kex = suite.keyExchangeAlgorithm ();
     if (kex.equals (KeyExchangeAlgorithm.RSA))
       return new ServerRSAParams (buffer.duplicate ());
     else if (kex.equals (KeyExchangeAlgorithm.DIFFIE_HELLMAN))
@@ -122,13 +122,13 @@ class ServerKeyExchange implements Handshake.Body
    *
    * @return The signature.
    */
-  Signature getSignature ()
+  Signature signature ()
   {
-    if (suite.getKeyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
+    if (suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
       return null;
-    ServerKeyExchangeParams params = getParams ();
-    ByteBuffer sigbuf = ((ByteBuffer) buffer.position (params.getLength ())).slice ();
-    return new Signature (sigbuf, suite.getSignatureAlgorithm ());
+    ServerKeyExchangeParams params = params ();
+    ByteBuffer sigbuf = ((ByteBuffer) buffer.position (params.length ())).slice ();
+    return new Signature (sigbuf, suite.signatureAlgorithm ());
   }
 
   public String toString()
@@ -144,19 +144,19 @@ class ServerKeyExchange implements Handshake.Body
     out.println("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  algorithm: ");
-    out.print (suite.getKeyExchangeAlgorithm ());
+    out.print (suite.keyExchangeAlgorithm ());
     out.println (";");
-    if (!suite.getKeyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
+    if (!suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
       {
         if (prefix != null) out.print (prefix);
         out.println ("  parameters:");
-        out.println (getParams ().toString (prefix != null ? prefix+"  " : "  "));
+        out.println (params ().toString (prefix != null ? prefix+"  " : "  "));
       }
-    if (!suite.getSignatureAlgorithm ().equals (SignatureAlgorithm.ANONYMOUS))
+    if (!suite.signatureAlgorithm ().equals (SignatureAlgorithm.ANONYMOUS))
       {
         if (prefix != null) out.print (prefix);
         out.println ("  signature:");
-        out.println (getSignature ().toString (prefix != null ? prefix+"  " : "  "));
+        out.println (signature ().toString (prefix != null ? prefix+"  " : "  "));
       }
     if (prefix != null) out.print (prefix);
     out.print ("} ServerKeyExchange;");

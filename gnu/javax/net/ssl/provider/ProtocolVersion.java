@@ -104,7 +104,7 @@ final class ProtocolVersion implements Comparable, Constructed
 //     out.write(minor);
 //   }
 
-  public int getLength ()
+  public int length ()
   {
     return 2;
   }
@@ -116,17 +116,17 @@ final class ProtocolVersion implements Comparable, Constructed
     };
   }
 
-  int getMajor()
+  int major()
   {
     return major;
   }
 
-  int getMinor()
+  int minor()
   {
     return minor;
   }
 
-  int getRawValue ()
+  int rawValue ()
   {
     return (major << 8) | minor;
   }

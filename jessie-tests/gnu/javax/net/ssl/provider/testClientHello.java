@@ -9,6 +9,19 @@ class testClientHello
 {
   public static void main (String[] argv)
   {
+    try
+      {
+        check ();
+      }
+    catch (Exception x)
+      {
+        System.out.println ("FAIL: caught exception " + x);
+        x.printStackTrace ();
+      }
+  }
+
+  static void check () throws Exception
+  {
     final int alloc_len = 4096;
     ByteBuffer buffer = ByteBuffer.allocate (alloc_len);
     Handshake handshake = new Handshake (buffer);
@@ -17,16 +30,7 @@ class testClientHello
     handshake.setLength (alloc_len - 4);
 
     ClientHello hello = null;
-    try
-      {
-        hello = (ClientHello) handshake.getBody ();
-      }
-    catch (Exception x)
-      {
-        x.printStackTrace (System.err);
-        System.out.println ("FAIL: " + x);
-        System.exit (1);
-      }
+    hello = (ClientHello) handshake.body ();
 
     byte[] sessionId = new byte[32];
     for (int i = 0; i < 32; i++)
@@ -35,14 +39,14 @@ class testClientHello
     hello.setProtocolVersion (ProtocolVersion.TLS_1);
     hello.setSessionId (sessionId);
 
-    Random random = hello.getRandom ();
-    random.setGMTUnixTime (123456);
+    Random random = hello.random ();
+    random.setGmtUnixTime (123456);
     byte[] nonce = new byte [28];
     for (int i = 0; i < nonce.length; i++)
       nonce[i] = (byte) i;
     random.setRandomBytes (nonce);
 
-    CipherSuiteList suites = hello.getCipherSuites ();
+    CipherSuiteList suites = hello.cipherSuites ();
     suites.setSize (10);
     suites.put (0, CipherSuite.TLS_NULL_WITH_NULL_NULL);
     suites.put (1, CipherSuite.TLS_RSA_WITH_NULL_MD5);
@@ -55,21 +59,41 @@ class testClientHello
     suites.put (8, CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA);
     suites.put (9, CipherSuite.TLS_DH_RSA_EXPORT_WITH_DES40_CBC_SHA);
 
-    CompressionMethodList comps = hello.getCompressionMethods ();
+    CompressionMethodList comps = hello.compressionMethods ();
     comps.setSize (2);
     comps.put (0, CompressionMethod.NULL);
     comps.put (1, CompressionMethod.ZLIB);
 
     hello.setExtensionsLength (0);
-    handshake.setLength (hello.getLength ());
+    handshake.setLength (hello.length ());
 
-    hello = (ClientHello) handshake.getBody ();
-    if (!ProtocolVersion.TLS_1.equals (hello.getProtocolVersion ()))
-      System.out.println ("FAIL: getProtocolVersion ()");
-    if (hello.getRandom ().getGMTUnixTime () != 123456)
-      System.out.println ("FAIL: getRandom ().getGMTUnixTime ()");
-    if (!Arrays.equals (nonce, hello.getRandom ().getRandomBytes ()))
-      System.out.println ("FAIL: getRandom ().getRandomBytes ()");
+    handshake = new Handshake (buffer);
+
+    hello = (ClientHello) handshake.body ();
+    if (ProtocolVersion.TLS_1.equals (hello.protocolVersion ()))
+      System.out.println ("PASS: protocolVersion ()");
+    else
+      System.out.println ("FAIL: protocolVersion ()");
+
+    if (hello.random ().gmtUnixTime () == 123456)
+      System.out.println ("PASS: random ().gmtUnixTime ()");
+    else
+      System.out.println ("FAIL: random ().gmtUnixTime ()");
+
+    if (Arrays.equals (nonce, hello.random ().randomBytes ()))
+      System.out.println ("PASS: random ().randomBytes ()");
+    else
+      System.out.println ("FAIL: random ().randomBytes ()");
+
+    if (suites.equals (hello.cipherSuites ()))
+      System.out.println ("PASS: cipherSuites()");
+    else
+      System.out.println ("FAIL: cipherSuites()");
+
+    if (comps.equals (hello.compressionMethods ()))
+      System.out.println ("PASS: compressionMethods()");
+    else
+      System.out.println ("FAIL: compressionMethods()");
 
     System.err.println (handshake);
   }

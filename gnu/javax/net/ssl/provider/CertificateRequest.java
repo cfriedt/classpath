@@ -86,18 +86,18 @@ final class CertificateRequest implements Handshake.Body
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int getLength ()
+  public int length ()
   {
     int o1 = (buffer.get (0) & 0xFF) + 1;
     return o1 + (buffer.getShort (o1) & 0xFFFF) + 2;
   }
 
-  ClientCertificateTypeList getTypes ()
+  ClientCertificateTypeList types ()
   {
     return new ClientCertificateTypeList (buffer.duplicate ());
   }
 
-  X500PrincipalList getAuthorities ()
+  X500PrincipalList authorities ()
   {
     int offset = (buffer.get (0) & 0xFF) + 1;
     return new X500PrincipalList (((ByteBuffer) buffer.position (offset)).slice ());
@@ -118,10 +118,10 @@ final class CertificateRequest implements Handshake.Body
     out.println("struct {");
     if (prefix != null) out.print (prefix);
     out.println ("  types =");
-    out.println (getTypes ().toString (subprefix));
+    out.println (types ().toString (subprefix));
     if (prefix != null) out.print (prefix);
     out.println("  authorities =");
-    out.println (getAuthorities ().toString (subprefix));
+    out.println (authorities ().toString (subprefix));
     if (prefix != null) out.print (prefix);
     out.print ("} CertificateRequest;");
     return str.toString();

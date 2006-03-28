@@ -170,6 +170,24 @@ class CompressionMethodList
     return str.toString ();
   }
 
+  public boolean equals (Object o)
+  {
+    if (!(o instanceof CompressionMethodList))
+      return false;
+    CompressionMethodList that = (CompressionMethodList) o;
+
+    if (size () != that.size ())
+      return false;
+
+    for (Iterator it1 = new Iterator (), it2 = that.new Iterator ();
+         it1.hasNext () && it2.hasNext (); )
+      {
+        if (!it1.next ().equals (it2.next ()))
+          return false;
+      }
+    return true;
+  }
+
   /**
    * An iterator for the elements in this list. The iterator supports
    * only the <code>set</code> method out of the optional methods,

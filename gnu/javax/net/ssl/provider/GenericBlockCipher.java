@@ -62,7 +62,7 @@ class GenericBlockCipher extends CipheredStruct
     return buffer.limit () - maclen - padlen - 1;
   }
 
-  public int getLength ()
+  public int length ()
   {
     return length + macLength + paddingLength () + 1;
   }

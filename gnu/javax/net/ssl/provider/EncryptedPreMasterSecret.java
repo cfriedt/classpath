@@ -62,7 +62,7 @@ final class EncryptedPreMasterSecret extends ExchangeKeys
     this.version = version;
   }
 
-  byte[] getEncryptedSecret ()
+  byte[] encryptedSecret ()
   {
     byte[] secret;
     if (version == ProtocolVersion.SSL_3)
@@ -95,7 +95,7 @@ final class EncryptedPreMasterSecret extends ExchangeKeys
       }
   }
 
-  public int getLength ()
+  public int length ()
   {
     if (version == ProtocolVersion.SSL_3)
       {
@@ -120,7 +120,7 @@ final class EncryptedPreMasterSecret extends ExchangeKeys
     out.println ("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  pre_master_secret = ");
-    out.print (Util.toHexString (getEncryptedSecret (), ':'));
+    out.print (Util.toHexString (encryptedSecret (), ':'));
     out.println (';');
     if (prefix != null) out.print (prefix);
     out.print ("} EncryptedPreMasterSecret;");

@@ -77,7 +77,7 @@ final class Alert implements Constructed
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int getLength ()
+  public int length ()
   {
     return 2;
   }
@@ -90,12 +90,12 @@ final class Alert implements Constructed
     return buf;
   }
 
-  Level getLevel()
+  Level level()
   {
     return Level.forInteger (buffer.get (0) & 0xFF);
   }
 
-  Description getDescription()
+  Description description()
   {
     return Description.forInteger (buffer.get (1) & 0xFF);
   }
@@ -136,11 +136,11 @@ final class Alert implements Constructed
     out.println ("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  level:       ");
-    out.print (getLevel ());
+    out.print (level ());
     out.println (";");
     if (prefix != null) out.print (prefix);
     out.print ("  description: ");
-    out.print (getDescription ());
+    out.print (description ());
     out.println (";");
     if (prefix != null) out.print (prefix);
     out.print ("} Alert;");

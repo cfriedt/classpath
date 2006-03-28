@@ -48,7 +48,7 @@ class ServerHelloDone implements Handshake.Body
 {
   ServerHelloDone () { }
 
-  public int getLength ()
+  public int length ()
   {
     return 0;
   }

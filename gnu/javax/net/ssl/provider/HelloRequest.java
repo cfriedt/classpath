@@ -58,7 +58,7 @@ class HelloRequest implements Handshake.Body
     return str.toString ();
   }
 
-  public int getLength ()
+  public int length ()
   {
     return 0;
   }

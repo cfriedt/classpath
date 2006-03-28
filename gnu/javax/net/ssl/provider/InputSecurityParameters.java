@@ -77,12 +77,12 @@ class InputSecurityParameters
     ByteBuffer fragment;
     if (cipher != null)
       {
-        ByteBuffer input = record.getFragment ();
+        ByteBuffer input = record.fragment ();
         fragment = ByteBuffer.allocate (input.limit ());
         cipher.doFinal (input, fragment);
       }
     else
-      fragment = record.getFragment ();
+      fragment = record.fragment ();
 
     int maclen = 0;
     if (mac != null)
@@ -133,8 +133,8 @@ class InputSecurityParameters
         ProtocolVersion version = record.version ();
         if (version != ProtocolVersion.SSL_3)
           {
-            mac.update ((byte) version.getMajor ());
-            mac.update ((byte) version.getMinor ());
+            mac.update ((byte) version.major ());
+            mac.update ((byte) version.minor ());
           }
         mac.update ((byte) (plaintext.contentLength () >>> 8));
         mac.update ((byte)  plaintext.contentLength ());

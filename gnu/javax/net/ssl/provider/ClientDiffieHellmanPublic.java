@@ -63,9 +63,9 @@ class ClientDiffieHellmanPublic extends ExchangeKeys
     super (buffer);
   }
 
-  BigInteger getPublicValue ()
+  BigInteger publicValue ()
   {
-    int len = getLength ();
+    int len = length ();
     byte[] b = new byte[len];
     buffer.position (2);
     buffer.get (b);
@@ -87,7 +87,7 @@ class ClientDiffieHellmanPublic extends ExchangeKeys
     buffer.put (buf, offset, length);
   }
 
-  public int getLength ()
+  public int length ()
   {
     return buffer.getShort (0) & 0xFFFF;
   }
@@ -105,7 +105,7 @@ class ClientDiffieHellmanPublic extends ExchangeKeys
     out.println ("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  dh_Yc = ");
-    out.print (getPublicValue ().toString (16));
+    out.print (publicValue ().toString (16));
     out.println (';');
     if (prefix != null) out.print (prefix);
     out.print ("} ClientDiffieHellmanPublic;");

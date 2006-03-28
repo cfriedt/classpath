@@ -86,13 +86,13 @@ final class Certificate implements Handshake.Body
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int getLength ()
+  public int length ()
   {
     return (((buffer.get (0) & 0xFF) << 24)
             | buffer.getShort (1)) + 3;
   }
 
-  List getCertificates ()
+  List certificates ()
     throws CertificateException, NoSuchAlgorithmException
   {
     LinkedList list = new LinkedList ();
@@ -147,7 +147,7 @@ final class Certificate implements Handshake.Body
     out.println ("struct {");
     try
       {
-        List certs = getCertificates ();
+        List certs = certificates ();
         if (prefix != null)
           out.print (prefix);
         out.print ("  certificateList: [");

@@ -89,19 +89,19 @@ final class ClientKeyExchange implements Handshake.Body
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  ExchangeKeys getExchangeKeys ()
+  ExchangeKeys exchangeKeys ()
   {
-    KeyExchangeAlgorithm alg = suite.getKeyExchangeAlgorithm ();
+    KeyExchangeAlgorithm alg = suite.keyExchangeAlgorithm ();
     if (alg == KeyExchangeAlgorithm.RSA)
-      return new EncryptedPreMasterSecret (buffer, suite.getVersion ());
+      return new EncryptedPreMasterSecret (buffer, suite.version ());
     else if (alg == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
       return new ClientDiffieHellmanPublic (buffer);
     throw new IllegalArgumentException ("unsupported key exchange");
   }
 
-  public int getLength ()
+  public int length ()
   {
-    return getExchangeKeys ().getLength ();
+    return exchangeKeys ().length ();
   }
 
   public String toString ()
@@ -119,7 +119,7 @@ final class ClientKeyExchange implements Handshake.Body
     String subprefix = "  ";
     if (prefix != null)
       subprefix = prefix + subprefix;
-    out.println (getExchangeKeys ().toString (subprefix));
+    out.println (exchangeKeys ().toString (subprefix));
     if (prefix != null)
       out.print (prefix);
     out.println("} ClientKeyExchange;");

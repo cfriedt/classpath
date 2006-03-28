@@ -24,5 +24,12 @@ class testCipherSuiteList
       }
 
     System.err.println (list);
+
+    CipherSuiteList list2 = new CipherSuiteList (buffer);
+
+    if (list2.equals (list))
+      System.out.println ("PASS: equals()");
+    else
+      System.out.println ("FAIL: equals()");
   }
 }

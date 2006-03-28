@@ -113,7 +113,7 @@ final class Handshake implements Constructed
    *
    * @return The handshake type.
    */
-  Type getType()
+  Type type()
   {
     return Type.forInteger (buffer.get (0) & 0xFF);
   }
@@ -123,7 +123,7 @@ final class Handshake implements Constructed
    *
    * @return The message length.
    */
-  public int getLength ()
+  public int length ()
   {
     // Length is a uint24.
     return buffer.getInt (0) & 0xFFFFFF;
@@ -135,10 +135,10 @@ final class Handshake implements Constructed
    *
    * @return The handshake body.
    */
-  Body getBody()
+  Body body()
   {
     int type = buffer.get (0) & 0xFF;
-    ByteBuffer bodyBuffer = getBodyBuffer ();
+    ByteBuffer bodyBuffer = bodyBuffer ();
     switch (type)
       {
       case Type.HELLO_REQUEST_VALUE:
@@ -163,13 +163,13 @@ final class Handshake implements Constructed
         return new ServerHelloDone ();
 
       case Type.CERTIFICATE_VERIFY_VALUE:
-        return new CertificateVerify (bodyBuffer, suite.getSignatureAlgorithm ());
+        return new CertificateVerify (bodyBuffer, suite.signatureAlgorithm ());
 
       case Type.CLIENT_KEY_EXCHANGE_VALUE:
         return new ClientKeyExchange (bodyBuffer, suite);
 
       case Type.FINISHED_VALUE:
-        return new Finished (bodyBuffer, suite.getVersion ());
+        return new Finished (bodyBuffer, suite.version ());
 
       case Type.CERTIFICATE_URL_VALUE:
       case Type.CERTIFICATE_STATUS_VALUE:
@@ -184,9 +184,9 @@ final class Handshake implements Constructed
    *
    * @return The body's byte buffer.
    */
-  ByteBuffer getBodyBuffer ()
+  ByteBuffer bodyBuffer ()
   {
-    int length = getLength ();
+    int length = length ();
     return ((ByteBuffer) buffer.position (4).limit (4 + length)).slice ();
   }
 
@@ -232,9 +232,9 @@ final class Handshake implements Constructed
     out.println("struct {");
     if (prefix != null) out.print (prefix);
     out.print ("  type: ");
-    out.print (getType ());
+    out.print (type ());
     out.println (";");
-    Body body = getBody ();
+    Body body = body ();
     out.println (body.toString (prefix != null ? (prefix + "  ") : "  "));
     if (prefix != null) out.print (prefix);
     out.print ("} Handshake;");
@@ -246,7 +246,7 @@ final class Handshake implements Constructed
 
   static interface Body extends Constructed
   {
-    int getLength ();
+    int length ();
 
     String toString (String prefix);
   }

@@ -46,5 +46,5 @@ package gnu.javax.net.ssl.provider;
  */
 interface ServerKeyExchangeParams extends Constructed
 {
-  KeyExchangeAlgorithm getAlgorithm ();
+  KeyExchangeAlgorithm algorithm ();
 }

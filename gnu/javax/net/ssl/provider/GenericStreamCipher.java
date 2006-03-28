@@ -56,7 +56,7 @@ class GenericStreamCipher extends CipheredStruct
     super (buffer, buffer.limit () - macLength, macLength);
   }
 
-  public int getLength ()
+  public int length ()
   {
     return length + macLength;
   }

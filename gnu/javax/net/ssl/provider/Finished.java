@@ -66,7 +66,7 @@ final class Finished implements Handshake.Body
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int getLength ()
+  public int length ()
   {
     if (version == ProtocolVersion.TLS_1)
       return 12;
@@ -75,7 +75,7 @@ final class Finished implements Handshake.Body
     throw new IllegalArgumentException ("length for this version unknown");
   }
 
-  byte[] getVerifyData()
+  byte[] verifyData()
   {
     if (version == ProtocolVersion.TLS_1)
       {
@@ -87,7 +87,7 @@ final class Finished implements Handshake.Body
     throw new IllegalArgumentException ("not TLSv1");
   }
 
-  byte[] getMD5Hash()
+  byte[] md5Hash()
   {
     if (version == ProtocolVersion.SSL_3)
       {
@@ -99,7 +99,7 @@ final class Finished implements Handshake.Body
     throw new IllegalArgumentException ("not SSLv3");
   }
 
-  byte[] getSHAHash()
+  byte[] shaHash()
   {
     if (version == ProtocolVersion.SSL_3)
       {
@@ -127,7 +127,7 @@ final class Finished implements Handshake.Body
     buffer.put (md5, offset, 16);
   }
 
-  void setSHAHash (final byte[] sha, final int offset)
+  void setShaHash (final byte[] sha, final int offset)
   {
     if (version != ProtocolVersion.SSL_3)
       throw new IllegalArgumentException ("not SSLv3");
@@ -152,17 +152,17 @@ final class Finished implements Handshake.Body
     if (version == ProtocolVersion.TLS_1)
       {
         out.print ("  verifyData = ");
-        out.print (Util.toHexString (getVerifyData (), ':'));
+        out.print (Util.toHexString (verifyData (), ':'));
       }
     else if (version == ProtocolVersion.SSL_3)
       {
         out.print ("  md5 = ");
-        out.print (Util.toHexString (getMD5Hash (), ':'));
+        out.print (Util.toHexString (md5Hash (), ':'));
         out.println (';');
         if (prefix != null)
           out.print (prefix);
         out.print ("  sha = ");
-        out.print (Util.toHexString (getSHAHash (), ':'));
+        out.print (Util.toHexString (shaHash (), ':'));
       }
     out.println (';');
     if (prefix != null)
