@@ -15,12 +15,15 @@ tests="gnu.javax.net.ssl.provider.testAlert \
        gnu.javax.net.ssl.provider.testRecord \
        gnu.javax.net.ssl.provider.testServerDHParams \
        gnu.javax.net.ssl.provider.testServerHello \
-       gnu.javax.net.ssl.provider.testServerRSAParams"
+       gnu.javax.net.ssl.provider.testServerKeyExchange \
+       gnu.javax.net.ssl.provider.testServerRSAParams \
+       gnu.javax.net.ssl.provider.testSignature"
 
 rm -rf test-classes
 mkdir test-classes
 ${JAVAC} -d test-classes gnu/javax/net/ssl/provider/*.java || exit 1
 
+ntests=0
 fails=0
 rm -rf check.log check.err
 echo -n "Jessie check run at " | tee check.err > check.log
@@ -35,18 +38,19 @@ do
       echo FAIL: $test
       let 'fails = fails + 1'
   fi
+  let 'ntests = ntests + 1'
 done
 
 if test ${fails} -eq 1
 then
-    echo $fails failure
-    echo ---- $fails failure ---- >> check.err
+    echo $ntests tests, $fails failure
+    echo ---- $ntests tests, $fails failure ---- >> check.err
 else
-    echo $fails failures
-    echo ---- $fails failures ---- >> check.err
+    echo $ntests tests, $fails failures
+    echo ---- $ntests tests, $fails failures ---- >> check.err
 fi
-echo -n "Jessie check done at " >> check.err
-date >> check.err
+echo -n "Jessie check done at " | tee -a check.err >> check.log
+date | tee -a check.err >> check.log
 
 if test ${fails} -gt 0
     then
