@@ -1,3 +1,7 @@
+2006-05-30  Casey Marshall  <csm@gnu.org>
+
+	Merge scatter/gather NIO patch by Michael Barker to branch.
+
 2006-03-28  Casey Marshall  <csm@gnu.org>
 
 	* jessie-tests/run-tests.sh: add new tests; count number of tests

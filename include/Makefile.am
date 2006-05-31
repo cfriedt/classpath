@@ -119,6 +119,7 @@ $(GTKPEER_H_FILES) \
 $(QTPEER_H_FILES) \
 $(top_srcdir)/include/gnu_java_net_PlainDatagramSocketImpl.h \
 $(top_srcdir)/include/gnu_java_net_PlainSocketImpl.h \
+$(top_srcdir)/include/gnu_java_nio_VMChannel.h \
 $(top_srcdir)/include/gnu_java_nio_VMPipe.h \
 $(top_srcdir)/include/gnu_java_nio_VMSelector.h \
 $(top_srcdir)/include/gnu_java_nio_channels_FileChannelImpl.h \
@@ -168,6 +169,8 @@ $(top_srcdir)/include/gnu_java_net_PlainDatagramSocketImpl.h: $(top_srcdir)/gnu/
 	$(JAVAH) -o $@ gnu.java.net.PlainDatagramSocketImpl
 $(top_srcdir)/include/gnu_java_net_PlainSocketImpl.h: $(top_srcdir)/gnu/java/net/PlainSocketImpl.java
 	$(JAVAH) -o $@ gnu.java.net.PlainSocketImpl
+$(top_srcdir)/include/gnu_java_nio_VMChannel.h: $(top_srcdir)/vm/reference/gnu/java/nio/VMChannel.java
+	$(JAVAH) -o $@ gnu.java.nio.VMChannel
 $(top_srcdir)/include/gnu_java_nio_VMPipe.h: $(top_srcdir)/vm/reference/gnu/java/nio/VMPipe.java
 	$(JAVAH) -o $@ gnu.java.nio.VMPipe
 $(top_srcdir)/include/gnu_java_nio_VMSelector.h: $(top_srcdir)/vm/reference/gnu/java/nio/VMSelector.java

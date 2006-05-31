@@ -41,8 +41,6 @@ package gnu.java.nio;
 import gnu.java.net.PlainSocketImpl;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -110,7 +108,8 @@ public final class SocketChannelImpl extends SocketChannel
 
   protected void implConfigureBlocking (boolean blocking) throws IOException
   {
-    socket.setSoTimeout (blocking ? 0 : NIOConstants.DEFAULT_TIMEOUT);
+    VMChannel vmch = VMChannel.getVMChannel(impl);
+    vmch.setBlocking(blocking);
   }   
 
   public boolean connect (SocketAddress remote) throws IOException
@@ -215,25 +214,6 @@ public final class SocketChannelImpl extends SocketChannel
   {
     if (!isConnected())
       throw new NotYetConnectedException();
-    
-    byte[] data;
-    int offset = 0;
-    InputStream input = socket.getInputStream();
-    int available = input.available();
-    int len = dst.remaining();
-	
-    if ((! isBlocking()) && available == 0)
-      return 0;
-    
-    if (dst.hasArray())
-      {
-        offset = dst.arrayOffset() + dst.position();
-        data = dst.array();
-      }
-    else
-      {
-        data = new byte [len];
-      }
 
     int readBytes = 0;
     boolean completed = false;
@@ -241,8 +221,8 @@ public final class SocketChannelImpl extends SocketChannel
     try
       {
         begin();
-        socket.getPlainSocketImpl().setInChannelOperation(true);
-        readBytes = input.read (data, offset, len);
+        VMChannel vmch = VMChannel.getVMChannel(impl);
+        readBytes = vmch.read(dst);
         completed = true;
       }
     finally
@@ -251,15 +231,6 @@ public final class SocketChannelImpl extends SocketChannel
         socket.getPlainSocketImpl().setInChannelOperation(false);
       }
 
-    if (readBytes > 0)
-      if (dst.hasArray())
-	{
-	  dst.position (dst.position() + readBytes);
-	}
-      else
-        {
-          dst.put (data, offset, readBytes);
-        }
 
     return readBytes;
   }
@@ -270,16 +241,22 @@ public final class SocketChannelImpl extends SocketChannel
     if (!isConnected())
       throw new NotYetConnectedException();
     
-    if ((offset < 0)
-        || (offset > dsts.length)
-        || (length < 0)
-        || (length > (dsts.length - offset)))
-      throw new IndexOutOfBoundsException();
-      
     long readBytes = 0;
+    
+    boolean completed = false;
 
-    for (int index = offset; index < length; index++)
-      readBytes += read (dsts [index]);
+    try
+      {
+        begin();
+        VMChannel vmch = VMChannel.getVMChannel(impl);
+        readBytes = vmch.readScattering(dsts, offset, length);
+        completed = true;
+      }
+    finally
+      {
+        end (completed);
+        socket.getPlainSocketImpl().setInChannelOperation(false);
+      }
 
     return readBytes;
   }
@@ -289,30 +266,15 @@ public final class SocketChannelImpl extends SocketChannel
   {
     if (!isConnected())
       throw new NotYetConnectedException();
-    
-    byte[] data;
-    int offset = 0;
-    int len = src.remaining();
-    
-    if (!src.hasArray())
-      {
-        data = new byte [len];
-        src.get (data, 0, len);
-      }
-    else
-      {
-        offset = src.arrayOffset() + src.position();
-        data = src.array();
-      }
 
-    OutputStream output = socket.getOutputStream();
+    int readBytes = 0;
     boolean completed = false;
 
     try
       {
         begin();
-        socket.getPlainSocketImpl().setInChannelOperation(true);
-        output.write (data, offset, len);
+        VMChannel vmch = VMChannel.getVMChannel(impl);
+        readBytes = vmch.write(src);
         completed = true;
       }
     finally
@@ -321,12 +283,8 @@ public final class SocketChannelImpl extends SocketChannel
         socket.getPlainSocketImpl().setInChannelOperation(false);
       }
 
-    if (src.hasArray())
-      {
-	src.position (src.position() + len);
-      }
-    
-    return len;
+
+    return readBytes;
   }
 
   public long write (ByteBuffer[] srcs, int offset, int length)
@@ -334,18 +292,24 @@ public final class SocketChannelImpl extends SocketChannel
   {
     if (!isConnected())
       throw new NotYetConnectedException();
-    
-    if ((offset < 0)
-        || (offset > srcs.length)
-        || (length < 0)
-        || (length > (srcs.length - offset)))
-      throw new IndexOutOfBoundsException();
-      
-    long writtenBytes = 0;
 
-    for (int index = offset; index < length; index++)
-      writtenBytes += write (srcs [index]);
+    long readBytes = 0;
+    boolean completed = false;
 
-    return writtenBytes;
+    try
+      {
+        begin();
+        VMChannel vmch = VMChannel.getVMChannel(impl);
+        readBytes = vmch.writeGathering(srcs, offset, length);
+        completed = true;
+      }
+    finally
+      {
+        end (completed);
+        socket.getPlainSocketImpl().setInChannelOperation(false);
+      }
+
+
+    return readBytes;
   }
 }
