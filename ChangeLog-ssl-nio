@@ -1,0 +1,6 @@
+2006-06-03  C. Scott Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/ServerHelloDone.java: made public.
+	* jessie-tests/run-tests.sh: add `testServerHelloDone.'
+	* jessie-tests/testServerHelloDone.java: new test.
+

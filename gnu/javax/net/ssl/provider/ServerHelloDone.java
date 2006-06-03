@@ -44,9 +44,9 @@ package gnu.javax.net.ssl.provider;
  *
  * <pre>struct { } ServerHelloDone;</pre>
  */
-class ServerHelloDone implements Handshake.Body
+public class ServerHelloDone implements Handshake.Body
 {
-  ServerHelloDone () { }
+  public ServerHelloDone () { }
 
   public int length ()
   {

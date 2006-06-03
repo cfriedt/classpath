@@ -8,8 +8,8 @@ test -z "$CLASSPATH"    && export CLASSPATH=.
 tests="testAlert testCertificate testCertificateRequest \
        testCipherSuiteList testClientHello testCompressionMethodList \
        testHelloRequest testRecord testServerDHParams \
-       testServerHello testServerKeyExchange testServerRSAParams \
-       testSignature"
+       testServerHello testServerHelloDone testServerKeyExchange \
+       testServerRSAParams testSignature"
 
 rm -rf test-classes
 mkdir test-classes
