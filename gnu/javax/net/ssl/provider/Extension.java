@@ -38,177 +38,109 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-final class Extension implements Constructed
+import java.nio.ByteBuffer;
+
+public final class Extension implements Constructed
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final Type type;
-  private final byte[] value;
+  private final ByteBuffer buffer;
 
   // Constructor.
   // -------------------------------------------------------------------------
 
-  Extension(Type type, byte[] value)
+  Extension(final ByteBuffer buffer)
   {
-    if (type == null || value == null)
-      {
-        throw new NullPointerException();
-      }
-    this.type = type;
-    this.value = value;
-  }
-
-  // Class method.
-  // -------------------------------------------------------------------------
-
-  static Extension read(InputStream in) throws IOException
-  {
-    Type t = Type.read(in);
-    int len = (in.read() & 0xFF) << 8 | (in.read() & 0xFF);
-    byte[] v = new byte[len];
-    int count = 0;
-    while (count < len)
-      {
-        int l = in.read(v, count, len - count);
-        if (l == -1)
-          {
-            throw new EOFException("unexpected end of extension");
-          }
-        count += l;
-      }
-    return new Extension(t, v);
+    this.buffer = buffer;
   }
 
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public void write(OutputStream out) throws IOException
+  public int length ()
   {
-    out.write(type.getEncoded());
-    out.write(value.length >>> 8 & 0xFF);
-    out.write(value.length & 0xFF);
-    out.write(value);
+    return (buffer.getShort (2) & 0xFFFF) + 4;
   }
 
-  Type getType()
+  public Type type()
   {
-    return type;
+    return Type.forValue (buffer.getShort (0) & 0xFFFF);
   }
 
-  byte[] getValue()
+  public byte[] value()
   {
+    int len = buffer.getShort (2) & 0xFFFF;
+    byte[] value = new byte[len];
+    ((ByteBuffer) buffer.duplicate ().position (4)).get (value);
     return value;
   }
 
   public String toString()
   {
+    return toString(null);
+  }
+
+  public String toString(String prefix)
+  {
     StringWriter str = new StringWriter();
     PrintWriter out = new PrintWriter(str);
+    if (prefix != null) out.print (prefix);
     out.println("struct {");
-    out.println("  type = " + type + ";");
+    if (prefix != null) out.print (prefix);
+    out.println("  type = " + type () + ";");
+    if (prefix != null) out.print (prefix);
     out.println("  value =");
-    out.println(Util.hexDump(value, "    "));
-    out.println("} Extension;");
+    out.println(Util.hexDump(value (), (prefix != null) ? prefix + "    " : "    "));
+    if (prefix != null) out.print (prefix);
+    out.print("} Extension;");
     return str.toString();
   }
 
   // Inner class.
   // -------------------------------------------------------------------------
 
-  static final class Type implements Enumerated
+  public static enum Type
   {
-
-    // Constants and fields.
-    // -----------------------------------------------------------------------
-
-    static final Type SERVER_NAME            = new Type(0);
-    static final Type MAX_FRAGMENT_LENGTH    = new Type(1);
-    static final Type CLIENT_CERTIFICATE_URL = new Type(2);
-    static final Type TRUSTED_CA_KEYS        = new Type(3);
-    static final Type TRUNCATED_HMAC         = new Type(4);
-    static final Type STATUS_REQUEST         = new Type(5);
-    static final Type SRP                    = new Type(6);
-    static final Type CERT_TYPE              = new Type(7);
+    SERVER_NAME            (0),
+    MAX_FRAGMENT_LENGTH    (1),
+    CLIENT_CERTIFICATE_URL (2),
+    TRUSTED_CA_KEYS        (3),
+    TRUNCATED_HMAC         (4),
+    STATUS_REQUEST         (5),
+    SRP                    (6),
+    CERT_TYPE              (7);
 
     private final int value;
-
-    // Constructor.
-    // -----------------------------------------------------------------------
 
     private Type(int value)
     {
       this.value = value;
     }
 
-    // Class methods.
-    // -----------------------------------------------------------------------
-
-    static Type read(InputStream in) throws IOException
+    public static Type forValue (final int value)
     {
-      int i = in.read();
-      if (i == -1)
+      switch (value & 0xFFFF)
         {
-          throw new EOFException("unexpected end of input stream");
-        }
-      int value = (i & 0xFF) << 8;
-      i = in.read();
-      if (i == -1)
-        {
-          throw new EOFException("unexpected end of input stream");
-        }
-      value |= i & 0xFF;
-      switch (value)
-        {
-        case 0: return SERVER_NAME;
-        case 1: return MAX_FRAGMENT_LENGTH;
-        case 2: return CLIENT_CERTIFICATE_URL;
-        case 3: return TRUSTED_CA_KEYS;
-        case 4: return TRUNCATED_HMAC;
-        case 5: return STATUS_REQUEST;
-        case 6: return SRP;
-        case 7: return CERT_TYPE;
-        default: return new Type(value);
+          case 0: return SERVER_NAME;
+          case 1: return MAX_FRAGMENT_LENGTH;
+          case 2: return CLIENT_CERTIFICATE_URL;
+          case 3: return TRUSTED_CA_KEYS;
+          case 4: return TRUNCATED_HMAC;
+          case 5: return STATUS_REQUEST;
+          case 6: return SRP;
+          case 7: return CERT_TYPE;
+          default: return null;
         }
     }
-
-    // Instance methods.
-    // -----------------------------------------------------------------------
-
-    public byte[] getEncoded()
-    {
-      return new byte[] {
-        (byte) (value >>> 8 & 0xFF), (byte) (value & 0xFF)
-      };
-    }
-
+    
     public int getValue()
     {
       return value;
-    }
-
-    public String toString()
-    {
-      switch (value)
-        {
-        case 0: return "server_name";
-        case 1: return "max_fragment_length";
-        case 2: return "client_certificate_url";
-        case 3: return "trusted_ca_keys";
-        case 4: return "truncated_hmac";
-        case 5: return "status_request";
-        case 6: return "srp";
-        case 7: return "cert_type";
-        default: return "unknown(" + value + ")";
-        }
     }
   }
 }

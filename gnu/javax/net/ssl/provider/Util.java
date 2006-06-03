@@ -38,10 +38,15 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
+
+import java.nio.ByteBuffer;
 
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -172,7 +177,7 @@ final class Util
         str.append("  ");
         String s = Util.toHexString(buf, i+off, Math.min(16, len-i), ' ');
         str.append(s);
-        for (int j = 56 - (56 - s.length()); j < 56; j++)
+        for (int j = s.length(); j < 49; j++)
           str.append(" ");
         for (int j = 0; j < Math.min(16, len - i); j++)
           {
@@ -185,6 +190,44 @@ final class Util
         i += 16;
       }
     return str.toString();
+  }
+
+  static String hexDump (ByteBuffer buf)
+  {
+    return hexDump (buf, null);
+  }
+
+  static String hexDump (ByteBuffer buf, String prefix)
+  {
+    StringWriter str = new StringWriter ();
+    PrintWriter out = new PrintWriter (str);
+    int i = 0;
+    int len = buf.limit ();
+    byte[] line = new byte[16];
+    while (i < len)
+      {
+        if (prefix != null)
+          out.print (prefix);
+        out.print (Util.formatInt (i, 16, 8));
+        out.print ("  ");
+        int l = Math.min (16, len - i);
+        buf.get (line, 0, l);
+        String s = Util.toHexString (line, 0, l, ' ');
+        out.print (s);
+        for (int j = s.length (); j < 49; j++)
+          out.print (' ');
+        for (int j = 0; j < l; j++)
+          {
+            int c = line[j] & 0xFF;
+            if (c < 0x20 || c > 0x7E)
+              out.print ('.');
+            else
+              out.print ((char) c);
+          }
+        out.println ();
+        i += 16;
+      }
+    return str.toString ();
   }
 
   /**

@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* ServerHelloDone.java -- SSL ServerHelloDone message.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,47 +38,29 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.nio.ByteBuffer;
-import java.security.PublicKey;
-
-final class CertificateVerify extends Signature implements Handshake.Body
+/**
+ * An empty message that signals that the server is finished sending
+ * its handshake data.
+ *
+ * <pre>struct { } ServerHelloDone;</pre>
+ */
+class ServerHelloDone implements Handshake.Body
 {
+  ServerHelloDone () { }
 
-  // Contstructor.
-  // -------------------------------------------------------------------------
-
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  public int length ()
   {
-    super (buffer, sigAlg);
+    return 0;
   }
 
-  // Instance method.
-  // -------------------------------------------------------------------------
-
-  public String toString()
+  public String toString ()
   {
     return toString (null);
   }
 
   public String toString (final String prefix)
   {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
-    if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
+    return ((prefix != null ? prefix : "")
+            + "struct { } ServerHelloDone;");
   }
 }

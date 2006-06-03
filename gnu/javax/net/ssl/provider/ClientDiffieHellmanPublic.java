@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* ClientDiffieHellmanPublic.java -- Client Diffie-Hellman value.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,31 +38,61 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
+
+import java.math.BigInteger;
+
 import java.nio.ByteBuffer;
-import java.security.PublicKey;
 
-final class CertificateVerify extends Signature implements Handshake.Body
+/**
+ * The client's explicit Diffie Hellman value.
+ *
+ * <pre>
+struct {
+  select (PublicValueEncoding) {
+    case implicit: struct { };
+    case explicit: opaque dh_Yc&lt;1..2^16-1&gt;;
+  } dh_public;
+} ClientDiffieHellmanPublic;</pre> 
+ */
+class ClientDiffieHellmanPublic extends ExchangeKeys
 {
-
-  // Contstructor.
-  // -------------------------------------------------------------------------
-
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  ClientDiffieHellmanPublic (final ByteBuffer buffer)
   {
-    super (buffer, sigAlg);
+    super (buffer);
   }
 
-  // Instance method.
-  // -------------------------------------------------------------------------
+  BigInteger publicValue ()
+  {
+    int len = length ();
+    byte[] b = new byte[len];
+    buffer.position (2);
+    buffer.get (b);
+    return new BigInteger (1, b);
+  }
 
-  public String toString()
+  void setPublicValue (final BigInteger y)
+  {
+    byte[] buf = y.toByteArray ();
+    int length = buf.length;
+    int offset = 0;
+    if (buf[0] == 0)
+      {
+        length--;
+        offset++;
+      }
+    buffer.putShort (0, (short) length);
+    buffer.position (2);
+    buffer.put (buf, offset, length);
+  }
+
+  public int length ()
+  {
+    return buffer.getShort (0) & 0xFFFF;
+  }
+
+  public String toString ()
   {
     return toString (null);
   }
@@ -72,13 +102,13 @@ final class CertificateVerify extends Signature implements Handshake.Body
     StringWriter str = new StringWriter ();
     PrintWriter out = new PrintWriter (str);
     if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
+    out.println ("struct {");
     if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
+    out.print ("  dh_Yc = ");
+    out.print (publicValue ().toString (16));
+    out.println (';');
+    if (prefix != null) out.print (prefix);
+    out.print ("} ClientDiffieHellmanPublic;");
+    return str.toString ();
   }
 }

@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* SSLv3BlockCipherSuite.java --
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,47 +38,41 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
+import gnu.javax.net.ssl.SSLCipherSuite;
+import gnu.javax.net.ssl.SSLProtocolVersion;
+
 import java.nio.ByteBuffer;
-import java.security.PublicKey;
+import java.security.NoSuchAlgorithmException;
 
-final class CertificateVerify extends Signature implements Handshake.Body
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+
+public abstract class SSLv3BlockCipherSuiteImpl extends SSLCipherSuite
 {
-
-  // Contstructor.
-  // -------------------------------------------------------------------------
-
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  protected final Cipher cipher;
+  protected final Mac mac;
+  
+  public SSLv3BlockCipherSuiteImpl (String name, byte[] id, String cipherName,
+                                    String macName, String sigName, String kexName)
+    throws NoSuchAlgorithmException, NoSuchPaddingException
   {
-    super (buffer, sigAlg);
+    super (name, id, SSLProtocolVersion.SSLv3);
+    if (cipherName != null)
+      this.cipher = Cipher.getInstance (cipherName);
+    else
+      this.cipher = null;
+    if (macName != null)
+      this.mac = Mac.getInstance (macName);
+    else
+      this.mac = null;
   }
-
-  // Instance method.
-  // -------------------------------------------------------------------------
-
-  public String toString()
+  
+  public void encryptRecord (final ByteBuffer in, final ByteBuffer out)
   {
-    return toString (null);
   }
-
-  public String toString (final String prefix)
+  
+  public void decryptRecord (final ByteBuffer in, final ByteBuffer out)
   {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
-    if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
   }
 }

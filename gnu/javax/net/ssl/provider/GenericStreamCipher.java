@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* GenericStreamCipher.java -- a stream-ciphered struct
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,31 +38,30 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
+
 import java.nio.ByteBuffer;
-import java.security.PublicKey;
 
-final class CertificateVerify extends Signature implements Handshake.Body
+class GenericStreamCipher extends CipheredStruct
 {
-
-  // Contstructor.
-  // -------------------------------------------------------------------------
-
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  GenericStreamCipher (final ByteBuffer buffer, final int length,
+                       final int macLength)
   {
-    super (buffer, sigAlg);
+    super (buffer, length, macLength);
   }
 
-  // Instance method.
-  // -------------------------------------------------------------------------
+  GenericStreamCipher (final ByteBuffer buffer, final int macLength)
+  {
+    super (buffer, buffer.limit () - macLength, macLength);
+  }
 
-  public String toString()
+  public int length ()
+  {
+    return length + macLength;
+  }
+
+  public String toString ()
   {
     return toString (null);
   }
@@ -71,14 +70,19 @@ final class CertificateVerify extends Signature implements Handshake.Body
   {
     StringWriter str = new StringWriter ();
     PrintWriter out = new PrintWriter (str);
+
     if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
+    out.println ("struct {");
     if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
+    out.println ("  content =");
+    out.println (Util.hexDump (content (),
+                               prefix != null ? (prefix + "  ") : "  "));
+    if (prefix != null) out.print (prefix);
+    out.print ("  mac = ");
+    out.println (Util.toHexString (mac (), ':'));
+    if (prefix != null) out.print (prefix);
+    out.println ("} GenericStreamCipher;");
+
+    return str.toString ();
   }
 }

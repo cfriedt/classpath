@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* EncryptedPreMasterSecret.java -- RSA encrypted secret.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,31 +38,76 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
+
 import java.nio.ByteBuffer;
-import java.security.PublicKey;
 
-final class CertificateVerify extends Signature implements Handshake.Body
+/**
+ * The client's RSA-encrypted pre-master secret.
+ *
+ * <pre>
+struct {
+  public-key-encrypted PreMasterSecret pre_master_secret;
+} EncryptedPreMasterSecret;</pre>
+ */
+final class EncryptedPreMasterSecret extends ExchangeKeys
 {
+  private final ProtocolVersion version;
 
-  // Contstructor.
-  // -------------------------------------------------------------------------
-
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  EncryptedPreMasterSecret (final ByteBuffer buffer, final ProtocolVersion version)
   {
-    super (buffer, sigAlg);
+    super (buffer);
+    version.getClass ();
+    this.version = version;
   }
 
-  // Instance method.
-  // -------------------------------------------------------------------------
+  byte[] encryptedSecret ()
+  {
+    byte[] secret;
+    if (version == ProtocolVersion.SSL_3)
+      {
+        buffer.position (0);
+        secret = new byte[buffer.limit ()];
+      }
+    else
+      {
+        int len = buffer.getShort (0) & 0xFFFF;
+        secret = new byte[len];
+        buffer.position (2);
+        buffer.get (secret);
+      }
+    return secret;
+  }
 
-  public String toString()
+  void setEncryptedSecret (final byte[] secret, final int offset, final int length)
+  {
+    if (version == ProtocolVersion.SSL_3)
+      {
+        buffer.position (0);
+        buffer.put (secret, offset, length);
+      }
+    else
+      {
+        buffer.putShort (0, (short) length);
+        buffer.position (2);
+        buffer.put (secret, offset, length);
+      }
+  }
+
+  public int length ()
+  {
+    if (version == ProtocolVersion.SSL_3)
+      {
+        return buffer.position (0).limit ();
+      }
+    else
+      {
+        return buffer.getShort (0) & 0xFFFF;
+      }
+  }
+
+  public String toString ()
   {
     return toString (null);
   }
@@ -72,13 +117,13 @@ final class CertificateVerify extends Signature implements Handshake.Body
     StringWriter str = new StringWriter ();
     PrintWriter out = new PrintWriter (str);
     if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
+    out.println ("struct {");
     if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
+    out.print ("  pre_master_secret = ");
+    out.print (Util.toHexString (encryptedSecret (), ':'));
+    out.println (';');
+    if (prefix != null) out.print (prefix);
+    out.print ("} EncryptedPreMasterSecret;");
+    return str.toString ();
   }
 }

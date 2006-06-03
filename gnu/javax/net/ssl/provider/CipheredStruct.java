@@ -1,4 +1,4 @@
-/* CertificateVerify.java -- SSL CertificateVerify message.
+/* CipheredStruct.java -- abstract 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,47 +38,47 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
-import java.security.PublicKey;
 
-final class CertificateVerify extends Signature implements Handshake.Body
+abstract class CipheredStruct implements Constructed
 {
+  /** The content length. */
+  protected final int length;
 
-  // Contstructor.
-  // -------------------------------------------------------------------------
+  /** The MAC length. */
+  protected final int macLength;
 
-  CertificateVerify (final ByteBuffer buffer, final SignatureAlgorithm sigAlg)
+  protected final ByteBuffer buffer;
+
+  protected CipheredStruct (final ByteBuffer buffer, final int length,
+                            final int macLength)
   {
-    super (buffer, sigAlg);
+    this.buffer = buffer;
+    this.length = length;
+    this.macLength = macLength;
   }
 
-  // Instance method.
-  // -------------------------------------------------------------------------
-
-  public String toString()
+  ByteBuffer content ()
   {
-    return toString (null);
+    return ((ByteBuffer) buffer.position (0).limit (length)).slice ();
   }
 
-  public String toString (final String prefix)
+  int contentLength ()
   {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    if (prefix != null) out.print (prefix);
-    out.println("struct {");
-    String subprefix = "  ";
-    if (prefix != null)
-      subprefix = prefix + subprefix;
-    out.println (super.toString (subprefix));
-    if (prefix != null) out.print (prefix);
-    out.print ("} CertificateVerify;");
-    return str.toString();
+    return length;
+  }
+
+  byte[] mac ()
+  {
+    buffer.position (length);
+    byte[] mac = new byte[macLength];
+    buffer.get (mac);
+    return mac;
+  }
+
+  void setMac (final byte[] mac, final int offset)
+  {
+    buffer.position (length);
+    buffer.put (mac, offset, macLength);
   }
 }

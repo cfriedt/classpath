@@ -1,4 +1,4 @@
-/* Constructed.java -- constructed type.
+/* Constructed.java -- Constructed type.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,20 +38,25 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.IOException;
-import java.io.OutputStream;
-
 /**
  * The base interface to SSL constructed types.
  */
-interface Constructed
+public interface Constructed
 {
+  /**
+   * Returns the total length, in bytes, of this structure.
+   *
+   * @return The length of this structure.
+   */
+  int length ();
 
   /**
-   * Writes this structure's encoded form to the given output stream.
+   * Returns a printable representation of this structure, with the
+   * given prefix prepended to each line.
    *
-   * @param out The output stream.
-   * @throws IOException If an I/O error occurs.
+   * @param prefix The prefix to prepend to each line of the
+   * output. This value may be <code>null</code>.
+   * @return A printable representation of this structure.
    */
-  void write(OutputStream out) throws IOException;
+  String toString (String prefix);
 }
