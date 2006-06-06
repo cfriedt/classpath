@@ -1,4 +1,13 @@
-2006-06-05  Casey Marshall <csm@gnu.org>
+2006-06-05  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/Extension.java: add Javadoc.
+	(length): return the length of the extension value.
+	(setLength, setType, setValue, setValue): new methods.
+	* gnu/javax/net/ssl/provider/ExtensionList.java: new file.
+	* jessie-tests/run-tests.sh: add testExtensionList.
+	* jessie-tests/testExtensionList.java: new file.
+
+2006-06-05  Casey Marshall  <csm@gnu.org>
 
 	* gnu/javax/net/ssl/provider/CipherSuiteList.java: implement
 	Iterable<CipherSuite>.
@@ -20,4 +29,3 @@
 	* gnu/javax/net/ssl/provider/ServerHelloDone.java: made public.
 	* jessie-tests/run-tests.sh: add `testServerHelloDone.'
 	* jessie-tests/testServerHelloDone.java: new test.
-

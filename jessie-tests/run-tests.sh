@@ -7,7 +7,7 @@ test -z "$CLASSPATH"    && export CLASSPATH=.
 
 tests="testAlert testCertificate testCertificateRequest \
        testCipherSuiteList testClientHello testCompressionMethodList \
-       testHelloRequest testRecord testServerDHParams \
+       testExtensionList testHelloRequest testRecord testServerDHParams \
        testServerHello testServerHelloDone testServerKeyExchange \
        testServerRSAParams testSignature"
 

@@ -43,6 +43,17 @@ import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
 
+/**
+ * An SSL hello extension.
+ * 
+ * <pre>
+ * struct {
+ *   ExtensionType extension_type;
+ *   opaque extension_data<0..2^16-1>;
+ * } Extension;</pre>
+ * 
+ * @author csm@gnu.org
+ */
 public final class Extension implements Constructed
 {
 
@@ -64,7 +75,7 @@ public final class Extension implements Constructed
 
   public int length ()
   {
-    return (buffer.getShort (2) & 0xFFFF) + 4;
+    return (buffer.getShort (2) & 0xFFFF);
   }
 
   public Type type()
@@ -79,7 +90,31 @@ public final class Extension implements Constructed
     ((ByteBuffer) buffer.duplicate ().position (4)).get (value);
     return value;
   }
+  
+  public void setLength (final int newLength)
+  {
+    if (newLength < 0 || newLength > 65535)
+      throw new IllegalArgumentException ("length is out of bounds");
+    buffer.putShort (2, (short) newLength);
+  }
+  
+  public void setType (final Type type)
+  {
+    buffer.putShort(0, (short) type.getValue());
+  }
 
+  public void setValue (byte[] value)
+  {
+    setValue (value, 0, value.length);
+  }
+  
+  public void setValue (final byte[] value, final int offset, final int length)
+  {
+    if (length != length ())
+      throw new IllegalArgumentException ("length is different than claimed length");
+    ((ByteBuffer) buffer.duplicate().position(4)).put(value, offset, length);
+  }
+  
   public String toString()
   {
     return toString(null);
