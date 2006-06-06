@@ -46,7 +46,7 @@ import java.util.ConcurrentModificationException;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
-public final class CipherSuiteList
+public final class CipherSuiteList implements Iterable<CipherSuite>
 {
   private final ByteBuffer buffer;
   private final ProtocolVersion version;
@@ -191,6 +191,11 @@ public final class CipherSuiteList
     return true;
   }
 
+  public java.util.Iterator<CipherSuite> iterator ()
+  {
+    return new Iterator ();
+  }
+  
   /**
    * An iterator for the elements in this list. The iterator supports
    * only the <code>set</code> method out of the optional methods,

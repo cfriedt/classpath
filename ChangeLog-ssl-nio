@@ -1,3 +1,15 @@
+2006-06-05  Casey Marshall <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/CipherSuiteList.java: implement
+	Iterable<CipherSuite>.
+	(iterator): new method.
+	* gnu/javax/net/ssl/provider/CompressionMethodList.java: implement
+	Iterable<CompressionMethod>.
+	(iterator): new method.
+	* gnu/javax/net/ssl/provider/X500PrincipalList.java: implement
+	Iterable<X500Principal>.
+	(iterator): new method.
+
 2006-06-05  C. Scott Marshall  <csm@gnu.org>
 
 	* java/security/MessageDigest.java (update): new method.

@@ -49,7 +49,7 @@ import java.util.NoSuchElementException;
 
 import javax.security.auth.x500.X500Principal;
 
-public final class X500PrincipalList
+public final class X500PrincipalList implements Iterable<X500Principal>
 {
   private final ByteBuffer buffer;
   private int modCount;
@@ -184,6 +184,11 @@ public final class X500PrincipalList
     return true;
   }
 
+  public java.util.Iterator<X500Principal> iterator ()
+  {
+    return new Iterator();
+  }
+  
   public class Iterator implements ListIterator<X500Principal>
   {
     private final int modCount;

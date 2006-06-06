@@ -51,7 +51,7 @@ import java.util.NoSuchElementException;
  * A basic list interface to a list of compression methods in an SSL
  * packet.
  */
-public final class CompressionMethodList
+public final class CompressionMethodList implements Iterable<CompressionMethod>
 {
   private final ByteBuffer buffer;
   private int modCount;
@@ -188,6 +188,11 @@ public final class CompressionMethodList
     return true;
   }
 
+  public java.util.Iterator<CompressionMethod> iterator ()
+  {
+    return new Iterator ();
+  }
+  
   /**
    * An iterator for the elements in this list. The iterator supports
    * only the <code>set</code> method out of the optional methods,
