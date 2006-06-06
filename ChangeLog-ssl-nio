@@ -1,3 +1,8 @@
+2006-06-05  C. Scott Marshall  <csm@gnu.org>
+
+	* java/security/MessageDigest.java (update): new method.
+	* java/security/MessageDigestSpi.java (engineUpdate): new method.
+
 2006-06-03  C. Scott Marshall  <csm@gnu.org>
 
 	* gnu/javax/net/ssl/provider/ServerHelloDone.java: made public.
