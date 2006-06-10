@@ -43,6 +43,7 @@ exception statement from your version. */
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
+#include <dirent.h>
 
 #include <jni.h>
 
@@ -419,3 +420,30 @@ int cpio_rename (const char *old_name, const char *new_name)
   return 0;
 }
 
+int cpio_openDir (const char *dirname, void **handle)
+{
+  *handle = (void *)opendir(dirname);
+  if (*handle == NULL)
+    return errno;
+  
+  return 0;
+}
+
+int cpio_closeDir (void *handle)
+{
+  closedir((DIR *)handle);
+  return 0;
+}
+
+
+int cpio_readDir (void *handle, const char **filename)
+{
+  struct dirent *dBuf;
+
+  dBuf = readdir((DIR *)handle);
+  if (dBuf == NULL)
+    return errno;
+
+  *filename = dBuf->d_name;
+  return 0;
+}

@@ -1,3 +1,12 @@
+2006-06-10  Guilhem Lavaux  <guilhem@kaffe.org>
+
+	* native/jni/native-lib/cpio.c
+	(cpio_openDir, cpio_closeDir, cpio_readDir): Implemented.
+
+	* native/jni/native-lib/cpnet.h:
+	(cpnet_bytesToIPV4Address): Fixed type casting to avoid being
+	messed by signs in jbyte.
+	
 2006-06-07  Guilhem Lavaux  <guilhem@kaffe.org>
 
 	* Merged HEAD as of 2006-06-06.

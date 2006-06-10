@@ -180,6 +180,8 @@ jint cpnet_connect(JNIEnv *env UNUSED, jint fd, cpnet_address *addr)
   int ret;
 
   /* TODO: implement socket time out */
+  struct sockaddr_in *theaddr = (struct sockaddr_in *)addr->data;
+
   ret = connect(fd, (struct sockaddr *)addr->data, addr->len);
   if (ret != 0)
     return errno;

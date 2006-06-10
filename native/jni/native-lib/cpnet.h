@@ -189,10 +189,10 @@ static inline void cpnet_bytesToIPV4Address(cpnet_address *netaddr, jbyte *octet
   jint sysaddr;
   struct sockaddr_in *ipaddr = (struct sockaddr_in *)&(netaddr->data[0]);
 
-  sysaddr = ((jint)octets[0]) << 24;
-  sysaddr |= ((jint)octets[1]) << 16;
-  sysaddr |= ((jint)octets[2]) << 8;
-  sysaddr |= ((jint)octets[3]);
+  sysaddr = ((jint)(unsigned char)octets[0]) << 24;
+  sysaddr |= ((jint)(unsigned char)octets[1]) << 16;
+  sysaddr |= ((jint)(unsigned char)octets[2]) << 8;
+  sysaddr |= ((jint)(unsigned char)octets[3]);
 
   ipaddr->sin_addr.s_addr = htonl(sysaddr);
 }
