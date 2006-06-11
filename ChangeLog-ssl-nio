@@ -1,3 +1,41 @@
+2006-06-10  Casey Marshall  <csm@gnu.org>
+
+	* jessie-tests/testClientHello.java: update for extensions
+	changes.
+	* jessie-tests/testExtensionList.java: likewise.
+	* jessie-tests/testServerHello.java: likewise.
+
+2006-06-10  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/ServerHello.java (extensions): return
+	an ExtensionList.
+	(setExtensionsLength): set the length in the buffer.
+	(toString): print out individual extensions.
+	* gnu/javax/net/ssl/provider/Extension.java (valueBytes): new
+	method.
+	(valueBuffer): new method.
+	(value): return an Extenion.Value.
+	(toString): print out extension value.
+	(Value): new abstract inner class.
+	* gnu/javax/net/ssl/provider/ClientHello.java (extensions): return
+	an ExtensionList.
+	(setExtensionListLength): set the length in the buffer.
+	(toString): print out extensions.
+	* gnu/javax/net/ssl/provider/ServerHandshake.java
+	(chooseSuite, chooseCompression): use generics and foreach loops.
+	* gnu/javax/net/ssl/provider/ExtensionList.java: new class.
+	* gnu/javax/net/ssl/provider/MaxFragmentLength.java: new class.
+	* gnu/javax/net/ssl/provider/CertificateURL.java: new class.
+	* gnu/javax/net/ssl/provider/UnresolvedExtensionValue.java: new
+	class. 
+	* gnu/javax/net/ssl/provider/TruncatedHMAC.java: new class.
+	* gnu/javax/net/ssl/provider/ServerNameList.java: new class.
+	* gnu/javax/net/ssl/provider/TrustedAuthorities.java: new class.
+	* gnu/javax/net/ssl/provider/CertificateStatusType.java: new
+	class. 
+	* gnu/javax/net/ssl/provider/CertificateStatusRequest.java: new
+	class.
+
 2006-06-05  Casey Marshall  <csm@gnu.org>
 
 	* gnu/javax/net/ssl/provider/Extension.java: add Javadoc.

@@ -1,6 +1,8 @@
 
 import gnu.javax.net.ssl.provider.CipherSuite;
 import gnu.javax.net.ssl.provider.CompressionMethod;
+import gnu.javax.net.ssl.provider.Extension;
+import gnu.javax.net.ssl.provider.ExtensionList;
 import gnu.javax.net.ssl.provider.Handshake;
 import gnu.javax.net.ssl.provider.ProtocolVersion;
 import gnu.javax.net.ssl.provider.Random;
@@ -48,7 +50,14 @@ class testServerHello
     hello.setSessionId (sessionId);
     hello.setCipherSuite (CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA);
     hello.setCompressionMethod (CompressionMethod.ZLIB);
-    hello.setExtensionsLength (0);
+    hello.setExtensionsLength (12);
+    ExtensionList exts = hello.extensions();
+    // Max fragment length of 2^9-1
+    exts.set (0, Extension.Type.MAX_FRAGMENT_LENGTH, 1); // 2 + 2 + 1
+    exts.get (0).setValue (new byte[] { 1 });
+    // Zero-length server name.
+    exts.set (1, Extension.Type.SERVER_NAME, 3); // 2 + 2 + 3
+    exts.get(1).setValue(new byte[3]);
 
     handshake.setLength (hello.length ());
     System.err.println (handshake);
@@ -69,5 +78,58 @@ class testServerHello
       System.out.println ("PASS: compressionMethod");
     else
       System.out.println ("FAIL: compressionMethod");
+    
+    exts = hello.extensions();
+    Extension e = exts.get(0);
+    if (e.type() == Extension.Type.MAX_FRAGMENT_LENGTH)
+      System.out.println ("PASS: extensions().get(0).type");
+    else
+      System.out.println ("FAIL: extensions().get(0).type");
+    if (Arrays.equals(e.valueBytes(), new byte[] { 1 }))
+      System.out.println ("PASS: extensions().get(0).value");
+    else
+      System.out.println ("FAIL: extensions().get(0).value");
+
+    e = exts.get(1);
+    if (e.type() == Extension.Type.SERVER_NAME)
+      System.out.println ("PASS: extensions().get(1).type");
+    else
+      System.out.println ("FAIL: extensions().get(1).type");
+    if (Arrays.equals(e.valueBytes(), new byte[3]))
+      System.out.println ("PASS: extensions().get(1).value");
+    else
+      System.out.println ("FAIL: extensions().get(1).value");
+ 
+    // Part 2: with no extensions.
+    buffer = ByteBuffer.allocate (74);
+    handshake = new Handshake (buffer);
+
+    handshake.setType (Handshake.Type.SERVER_HELLO);
+    handshake.setLength (70);
+
+    hello = (ServerHello) handshake.body ();
+
+    hello.setVersion (ProtocolVersion.TLS_1); // 2
+    random = hello.random ();
+    random.setGmtUnixTime (123456);
+    nonce = new byte[28];
+    for (int i = 0; i < nonce.length; i++)
+      nonce[i] = (byte) i;
+    random.setRandomBytes (nonce);            // + 32
+    sessionId = new byte[32];
+    for (int i = 0; i < sessionId.length; i++)
+      sessionId[i] = (byte) i;
+    hello.setSessionId (sessionId);           // + 33
+    hello.setCipherSuite (CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA); // + 2
+    hello.setCompressionMethod (CompressionMethod.ZLIB); // + 1
+    
+    handshake = new Handshake (buffer);
+    hello = (ServerHello) handshake.body();
+    if (hello.extensions() == null)
+      System.out.println ("PASS: hello.extensions() == null");
+    else
+      System.out.println ("FAIL: hello.extensions() != null");
+    
+    System.err.println (handshake);
   }
 }
