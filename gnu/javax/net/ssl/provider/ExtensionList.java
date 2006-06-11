@@ -113,7 +113,7 @@ public class ExtensionList implements Iterable<Extension>
                                          + "list length");
     buffer.putShort(i, (short) e.type().getValue());
     buffer.putShort(i+2, (short) e.length());
-    ((ByteBuffer) buffer.duplicate().position(i+4)).put (e.value());
+    ((ByteBuffer) buffer.duplicate().position(i+4)).put (e.valueBuffer());
     modCount++;
   }
   

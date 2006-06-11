@@ -67,6 +67,7 @@ struct
   SessionID session_id;
   CipherSuite cipher_suite;
   CompressionMethod compression_method;
+  Extensions server_hello_extension_list&lt;0..2^16-1&gt;
 } ServerHello;
 </pre>
  *
@@ -171,11 +172,19 @@ public class ServerHello implements Handshake.Body
     return CompressionMethod.getInstance (buffer.get (offset) & 0xFF);
   }
 
-  public ByteBuffer extensions ()
+  public ExtensionList extensions ()
   {
     int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 4;
-    return ((ByteBuffer) buffer.duplicate ().position (offset)
-            .limit (totalLength)).slice ();
+    if (offset == totalLength)
+      return null;
+    if (buffer.limit() <= offset)
+      return null;
+    int len = buffer.getShort(offset) & 0xFFFF;
+    if (len == 0)
+      len = buffer.limit() - offset - 2;
+    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate ().position (offset)
+                       .limit (offset + len + 2)).slice ();
+    return new ExtensionList (ebuf);
   }
 
   public void setVersion (final ProtocolVersion version)
@@ -213,7 +222,9 @@ public class ServerHello implements Handshake.Body
   public void setExtensionsLength (final int length)
   {
     totalLength = (SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF)
-                   + 4 + length);
+                   + 4 + length + 4);
+    buffer.putShort (SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 4,
+                     (short) length);
   }
 
   public String toString ()
@@ -250,13 +261,11 @@ public class ServerHello implements Handshake.Body
     out.print ("compressionMethod: ");
     out.print (compressionMethod ());
     out.println (";");
-    ByteBuffer extbuf = extensions ();
-    if (extbuf.limit () > 0)
-      {
-        out.print (subprefix);
-        out.println ("extensions:");
-        out.print (Util.hexDump (extbuf, subprefix));
-      }
+    ExtensionList exts = extensions ();
+    out.print (subprefix);
+    out.println ("extensions:");
+    out.println (exts != null ? exts.toString (subprefix+"  ")
+                                : subprefix + "  (nil)");
     if (prefix != null)
       out.print (prefix);
     out.print ("} ServerHello;");

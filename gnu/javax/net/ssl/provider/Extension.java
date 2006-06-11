@@ -83,12 +83,54 @@ public final class Extension implements Constructed
     return Type.forValue (buffer.getShort (0) & 0xFFFF);
   }
 
-  public byte[] value()
+  public byte[] valueBytes()
   {
     int len = buffer.getShort (2) & 0xFFFF;
     byte[] value = new byte[len];
     ((ByteBuffer) buffer.duplicate ().position (4)).get (value);
     return value;
+  }
+  
+  public ByteBuffer valueBuffer()
+  {
+    int len = buffer.getShort(2) & 0xFFFF;
+    return ((ByteBuffer) buffer.duplicate().position(4).limit(len+4)).slice();
+  }
+  
+  public Value value()
+  {
+    switch (type ())
+      {
+        case SERVER_NAME:
+          return new ServerNameList(valueBuffer());
+          
+        case MAX_FRAGMENT_LENGTH:
+          switch (valueBuffer().get() & 0xFF)
+            {
+              case 1: return MaxFragmentLength.LEN_2_9;
+              case 2: return MaxFragmentLength.LEN_2_10;
+              case 3: return MaxFragmentLength.LEN_2_11;
+              case 4: return MaxFragmentLength.LEN_2_12;
+              default:
+                throw new IllegalArgumentException("invalid max_fragment_len");
+            }
+          
+        case TRUNCATED_HMAC:
+          return new TruncatedHMAC();
+
+        case CLIENT_CERTIFICATE_URL:
+          return new CertificateURL(valueBuffer());
+          
+        case TRUSTED_CA_KEYS:
+          return new TrustedAuthorities(valueBuffer());
+          
+        case STATUS_REQUEST:
+          return new CertificateStatusRequest(valueBuffer());
+          
+        case SRP:
+        case CERT_TYPE:
+      }
+    return new UnresolvedExtensionValue(valueBuffer());
   }
   
   public void setLength (final int newLength)
@@ -130,13 +172,14 @@ public final class Extension implements Constructed
     out.println("  type = " + type () + ";");
     if (prefix != null) out.print (prefix);
     out.println("  value =");
-    out.println(Util.hexDump(value (), (prefix != null) ? prefix + "    " : "    "));
+//    out.println(Util.hexDump(value (), (prefix != null) ? prefix + "    " : "    "));
+    out.println(value());
     if (prefix != null) out.print (prefix);
     out.print("} Extension;");
     return str.toString();
   }
 
-  // Inner class.
+  // Inner classes.
   // -------------------------------------------------------------------------
 
   public static enum Type
@@ -177,5 +220,9 @@ public final class Extension implements Constructed
     {
       return value;
     }
+  }
+  
+  public static abstract class Value implements Constructed
+  {
   }
 }

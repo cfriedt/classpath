@@ -67,6 +67,7 @@ struct
   SessionID         session_id;                    // 1 + 0..32
   CipherSuite       cipher_suites&lt;2..2^16-1&gt;
   CompressionMethod compression_methods&lt;1..2^8-1&gt;
+  Extension         client_hello_extension_list&lt;0..2^16-1&gt;
 } ClientHello;
 </pre>
  */
@@ -156,11 +157,17 @@ public final class ClientHello implements Handshake.Body
     return new CompressionMethodList (listBuf);
   }
 
-  public ByteBuffer extensions()
+  public ExtensionList extensions()
   {
     int offset = getExtensionsOffset ();
-    return ((ByteBuffer) buffer.duplicate ().position (offset)
-            .limit (totalLength)).slice ();
+    if (offset >= buffer.limit())
+      return null;
+    int len = buffer.getShort(offset) & 0xFFFF;
+    if (len == 0)
+      len = buffer.limit() - offset - 2;
+    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate ().position (offset)
+                       .limit (offset + len + 2)).slice ();
+    return new ExtensionList (ebuf);
   }
 
   public void setVersion (final ProtocolVersion version)
@@ -183,7 +190,9 @@ public final class ClientHello implements Handshake.Body
 
   public void setExtensionsLength (final int length)
   {
-    this.totalLength = getExtensionsOffset () + length;
+    int offset = getExtensionsOffset();
+    this.totalLength = offset + length + 4;
+    buffer.putShort(offset, (short) length);
   }
 
   private int getCipherSuitesOffset ()
@@ -238,13 +247,10 @@ public final class ClientHello implements Handshake.Body
     out.print (subprefix);
     out.println ("compression_methods:");
     out.println (compressionMethods ().toString (subprefix));
-    ByteBuffer extbuf = extensions ();
-    if (extbuf.limit () > 0)
-      {
-        out.print (subprefix);
-        out.println ("extensions:");
-        out.print (Util.hexDump (extbuf, subprefix));
-      }
+    out.print (subprefix);
+    out.print ("extensions: ");
+    ExtensionList el = extensions();
+    out.println (el != null ? el.toString(subprefix+"  ") : "(nil)");
     if (prefix != null)
       out.print (prefix);
     out.print ("} ClientHello;");

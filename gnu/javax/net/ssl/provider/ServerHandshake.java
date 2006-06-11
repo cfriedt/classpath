@@ -127,19 +127,18 @@ class ServerHandshake extends AbstractHandshake
                                           final ProtocolVersion version)
     throws SSLException
   {
-    HashSet suites = new HashSet (enabledSuites.length);
-    for (int i = 0; i < enabledSuites.length; i++)
+    HashSet<CipherSuite> suites = new HashSet<CipherSuite> (enabledSuites.length);
+    for (String s : enabledSuites)
       {
-        CipherSuite suite = CipherSuite.forName (enabledSuites[i]);
+        CipherSuite suite = CipherSuite.forName (s);
         if (suite != null)
           {
             suite = suite.resolve (version);
             suites.add (suite);
           }
       }
-    for (int i = 0; i < clientSuites.size (); i++)
+    for (CipherSuite suite : clientSuites)
       {
-        CipherSuite suite = clientSuites.get (i);
         if (suites.contains (suite))
           return suite.resolve (version);
       }
@@ -159,14 +158,14 @@ class ServerHandshake extends AbstractHandshake
     throws SSLException
   {
     // Scan for ZLIB first.
-    for (int i = 0; i < comps.size (); i++)
+    for (CompressionMethod cm : comps)
       {
-        if (comps.get (i).equals (CompressionMethod.ZLIB))
+        if (cm.equals (CompressionMethod.ZLIB))
           return CompressionMethod.ZLIB;
       }
-    for (int i = 0; i < comps.size (); i++)
+    for (CompressionMethod cm : comps)
       {
-        if (comps.get (i).equals (CompressionMethod.NULL))
+        if (cm.equals (CompressionMethod.NULL))
           return CompressionMethod.NULL;
       }
 
