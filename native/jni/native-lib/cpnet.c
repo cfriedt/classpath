@@ -601,7 +601,7 @@ jint cpnet_getHostByName (JNIEnv *env, const char *hostname, cpnet_address ***ad
     {
       buf = (char *)JCL_malloc(env, buflen);
       ret = gethostbyname_r (hostname, &hret, buf, buflen, &result, &herr);
-      if (ret != 0)
+      if (ret != 0 || result == NULL)
 	{
 	  if (herr == ERANGE)
 	    {
@@ -611,7 +611,7 @@ jint cpnet_getHostByName (JNIEnv *env, const char *hostname, cpnet_address ***ad
 	    }
 	  JCL_free(env, buf);	  
 
-	  return herr;
+	  return -herr;
 	}
 
       break;

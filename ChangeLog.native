@@ -1,3 +1,27 @@
+2006-06-16  Guilhem Lavaux  <guilhem@kaffe.org>
+
+	* native/jni/java-net/java_net_VMInetAddress.c
+	(Java_java_net_VMInetAddress_getHostByName): Fix detection of
+	error.
+
+	* native/jni/java-net/javanet.c
+	(_javanet_accept): Fixed bogus call to TARGET.
+	(_javanet_create_inetaddress): Fixed address generation. Fixed
+	bogus memory free.
+	(_javanet_bind): set "Reuse address" flag.
+
+	* native/jni/native-lib/cpio.c
+	(cpio_getModificationTime): Fixed type.
+	(cpio_removeFile): Use rmdir too.
+
+	* native/jni/native-lib/cpnet.c
+	(cpnet_getHostByName): Fixed error detection.
+
+	* native/jni/native-lib/cpnet.h
+	(cpnet_newIPV4address, cpnet_newIPV6address): Put zero in the
+	memory.
+	(cpnet_IPV4AddressToBytes): Fixed types.
+	
 2006-06-10  Guilhem Lavaux  <guilhem@kaffe.org>
 
 	* native/jni/native-lib/cpio.c

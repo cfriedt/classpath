@@ -221,7 +221,7 @@ Java_java_net_VMInetAddress_getHostByName (JNIEnv * env,
     }
 
   result = cpnet_getHostByName (env, hostname, &addresses, &addresses_count);
-  if (result != CPNATIVE_OK)
+  if (result != CPNATIVE_OK || addresses_count == 0)
     {
       JCL_ThrowException (env, UNKNOWN_HOST_EXCEPTION, (char *) hostname);
       return (jobjectArray) NULL;

@@ -374,7 +374,7 @@ int cpio_getModificationTime (const char *filename, jlong *mtime)
   if (stat(filename, &statbuf) < 0)
     return errno;
 
-  *mtime = statbuf.st_mtime * 1000;
+  *mtime = (jlong)statbuf.st_mtime * (jlong)1000;
 
   return 0;
 }
@@ -398,7 +398,7 @@ int cpio_setModificationTime (const char *filename, jlong mtime)
 
 int cpio_removeFile (const char *filename)
 {
-  if (unlink(filename) < 0)
+  if (unlink(filename) < 0 && rmdir(filename) < 0)
     return errno;
 
   return 0;

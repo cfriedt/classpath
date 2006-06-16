@@ -237,7 +237,7 @@ _javanet_create_inetaddress (JNIEnv * env, cpnet_address *netaddr)
 {
 #ifndef WITHOUT_NETWORK
   jbyte octets[4];
-  char buf[16];
+  char buf[64];
   jclass ia_cls;
   jmethodID mid;
   jstring ip_str;
@@ -245,7 +245,7 @@ _javanet_create_inetaddress (JNIEnv * env, cpnet_address *netaddr)
 
   /* Build a string IP address */
   cpnet_IPV4AddressToBytes(netaddr, octets);
-  sprintf (buf, "%d.%d.%d.%d", octets[0], octets[1], octets[2], octets[3]);
+  sprintf (buf, "%d.%d.%d.%d", (int) (unsigned char)octets[0], (int)(unsigned char)octets[1], (int)(unsigned char)octets[2], (int)(unsigned char)octets[3]);
   DBG ("_javanet_create_inetaddress(): Created ip addr string\n");
 
   /* Get an InetAddress object for this IP */
@@ -574,8 +574,6 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
 	}
     }
   while (result != CPNATIVE_OK);
-
-  cpnet_freeAddress(env, netaddr);
   
   DBG ("_javanet_connect(): Connected successfully\n");
 
@@ -583,6 +581,7 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
   result = cpnet_getLocalAddr (env, fd, &local_addr);
   if (result != CPNATIVE_OK)
     {
+      cpnet_freeAddress(env, netaddr);
       JCL_ThrowException (env, IO_EXCEPTION,
 			  cpnative_getErrorString (result));
       /* We don't care whether this succeeds. close() will cleanup later. */
@@ -594,6 +593,7 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
   if ((*env)->ExceptionOccurred (env))
     {
       /* We don't care whether this succeeds. close() will cleanup later. */
+      cpnet_freeAddress(env, netaddr);
       cpnet_freeAddress(env, local_addr);
       cpnet_close (env, fd);
       return;
@@ -611,6 +611,7 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
   if ((*env)->ExceptionOccurred (env))
     {
       /* We don't care whether this succeeds. close() will cleanup later. */
+      cpnet_freeAddress(env, netaddr);
       cpnet_close (env, fd);
       return;
     }
@@ -619,6 +620,7 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
   result = cpnet_getRemoteAddr (env, fd, &remote_addr);
   if (result != CPNATIVE_OK)
     {
+      cpnet_freeAddress(env, netaddr);
       JCL_ThrowException (env, IO_EXCEPTION,
 			  cpnative_getErrorString (result));
       /* We don't care whether this succeeds. close() will cleanup later. */
@@ -636,6 +638,7 @@ _javanet_connect (JNIEnv * env, jobject this, jobject addr, jint port,
 	{
 	  _javanet_set_remhost (env, this, remote_addr);
 	}
+      cpnet_freeAddress(env, netaddr);
 
       if ((*env)->ExceptionOccurred (env))
 	{
@@ -691,6 +694,8 @@ _javanet_bind (JNIEnv * env, jobject this, jobject addr, jint port,
 			  "Internal error: _javanet_connect(): no native file descriptor");
       return;
     }
+
+  cpnet_setReuseAddress (env, fd, 1);
 
   /* Get the address to connect to */
   tmpaddr = _javanet_get_ip_netaddr (env, addr);
@@ -807,7 +812,7 @@ _javanet_accept (JNIEnv * env, jobject this, jobject impl)
   while (result != CPNATIVE_OK);
 
   /* Reset the inherited timeout. */
-  TARGET_NATIVE_NETWORK_SOCKET_SET_OPTION_SO_TIMEOUT (newfd, 0, result);
+  cpnet_setSocketTimeout (env, newfd, 0);
 
   /* Populate instance variables */
   _javanet_set_int_field (env, impl, "gnu/java/net/PlainSocketImpl",

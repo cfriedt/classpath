@@ -101,8 +101,8 @@ static inline cpnet_address *cpnet_newIPV4Address(JNIEnv * env)
   struct sockaddr_in *netaddr = (struct sockaddr_in *)&(addr->data[0]);
 
   addr->len = sizeof(struct sockaddr_in);
+  memset(netaddr, 0, addr->len);
   netaddr->sin_family = AF_INET;
-
   return addr;
 }
 
@@ -119,6 +119,7 @@ static inline cpnet_address *cpnet_newIPV6Address(JNIEnv * env)
   struct sockaddr_in6 *netaddr = (struct sockaddr_in6 *)&(addr->data[0]);
 
   addr->len = sizeof(struct sockaddr_in6);
+  memset(netaddr, 0, addr->len);
   netaddr->sin6_family = AF_INET6;
 
   return addr;
@@ -176,12 +177,12 @@ static inline jboolean cpnet_isIPV4Address(cpnet_address *addr)
 static inline void cpnet_IPV4AddressToBytes(cpnet_address *netaddr, jbyte *octets)
 {
   struct sockaddr_in *ipaddr = (struct sockaddr_in *)&(netaddr->data[0]);
-  jint sysaddr = ntohl(ipaddr->sin_addr.s_addr);
+  unsigned long sysaddr = ntohl(ipaddr->sin_addr.s_addr);
 
-  octets[0] = (sysaddr >> 24) & 0xff;
-  octets[1] = (sysaddr >> 16) & 0xff;
-  octets[2] = (sysaddr >> 8) & 0xff;
-  octets[3] = sysaddr & 0xff;
+  octets[0] = ((sysaddr >> 24) & 0xff);
+  octets[1] = ((sysaddr >> 16) & 0xff);
+  octets[2] = ((sysaddr >> 8) & 0xff);
+  octets[3] = (sysaddr & 0xff);
 }
 
 static inline void cpnet_bytesToIPV4Address(cpnet_address *netaddr, jbyte *octets)
