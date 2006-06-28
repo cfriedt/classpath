@@ -46,15 +46,20 @@ import java.security.cert.Certificate;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Set;
 
+import javax.crypto.SealedObject;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSessionBindingEvent;
+import javax.net.ssl.SSLSessionBindingListener;
+import javax.net.ssl.SSLSessionContext;
 import javax.security.cert.X509Certificate;
 
 /**
  * A concrete implementation of the {@link SSLSession} interface. This
- * class is provided to allow pluggable {@link SessionStore}
+ * class is provided to allow pluggable {@link AbstractSessionContext}
  * implementations.
  */
 public abstract class Session implements SSLSession, Serializable
@@ -62,6 +67,9 @@ public abstract class Session implements SSLSession, Serializable
   protected final long creationTime;
   protected long lastAccessedTime;
   protected int applicationBufferSize;
+  
+  // Default to 2^14 + 5 -- the maximum size for a record.
+  protected int packetBufferSize = 16389;
   protected ID sessionId;
   protected Certificate[] localCerts;
   protected Certificate[] peerCerts;
@@ -69,127 +77,207 @@ public abstract class Session implements SSLSession, Serializable
   protected String peerHost;
   protected int peerPort;
   protected boolean peerVerified;
-  protected HashMap values;
+  protected HashMap<String,Object> values;
   protected boolean valid;
-  protected SecureRandom random;
+  protected boolean truncatedMac = false;
+  transient protected SecureRandom random;
+  transient protected SSLSessionContext context;
 
-  protected Session ()
+  protected Session()
   {
-    creationTime = System.currentTimeMillis ();
-    values = new HashMap ();
+    creationTime = System.currentTimeMillis();
+    values = new HashMap<String, Object>();
   }
 
-  public void access ()
+  public void access()
   {
     lastAccessedTime = System.currentTimeMillis ();
   }
 
-  public int getApplicationBufferSize ()
+  public int getApplicationBufferSize()
   {
     return applicationBufferSize;
   }
 
-  public String getCipherSuite ()
+  public String getCipherSuite()
   {
     return null;
   }
 
-  public long getCreationTime ()
+  public long getCreationTime()
   {
     return creationTime;
   }
 
-  public byte[] getId ()
+  public byte[] getId()
   {
-    return sessionId.id ();
+    return sessionId.id();
   }
 
-  public ID id ()
+  public ID id()
   {
     return sessionId;
   }
 
-  public long getLastAccessedTime ()
+  public long getLastAccessedTime()
   {
     return lastAccessedTime;
   }
 
-  public Certificate[] getLocalCertificates ()
+  public Certificate[] getLocalCertificates()
   {
     if (localCerts == null)
       return null;
-    return (Certificate[]) localCerts.clone ();
+    return (Certificate[]) localCerts.clone();
   }
 
-  public Certificate[] getPeerCertificates () throws SSLPeerUnverifiedException
+  public Principal getLocalPrincipal()
   {
-    if (!peerVerified)
-      throw new SSLPeerUnverifiedException ("peer not verified");
-    if (peerCerts == null)
-      return null;
-    return (Certificate[]) peerCerts.clone ();
-  }
-
-  public X509Certificate[] getPeerCertificateChain () throws SSLPeerUnverifiedException
-  {
-    if (!peerVerified)
-      throw new SSLPeerUnverifiedException ("peer not verified");
-    if (peerCertChain == null)
-      return null;
-    return (X509Certificate[]) peerCertChain.clone ();
+    if (localCerts != null)
+      {
+        if (localCerts[0] instanceof java.security.cert.X509Certificate)
+          return ((java.security.cert.X509Certificate) localCerts[0]).getSubjectDN();
+      }
+    return null;
   }
   
-  public String getPeerHost ()
+  public int getPacketBufferSize()
+  {
+    return packetBufferSize;
+  }
+  
+  public Certificate[] getPeerCertificates() throws SSLPeerUnverifiedException
+  {
+    if (!peerVerified)
+      throw new SSLPeerUnverifiedException("peer not verified");
+    if (peerCerts == null)
+      return null;
+    return (Certificate[]) peerCerts.clone();
+  }
+
+  public X509Certificate[] getPeerCertificateChain()
+    throws SSLPeerUnverifiedException
+  {
+    if (!peerVerified)
+      throw new SSLPeerUnverifiedException("peer not verified");
+    if (peerCertChain == null)
+      return null;
+    return (X509Certificate[]) peerCertChain.clone();
+  }
+  
+  public String getPeerHost()
   {
     return peerHost;
   }
   
-  public int getPeerPort ()
+  public int getPeerPort()
   {
     return peerPort;
   }
-
-  public Principal getPeerPrincipal () throws SSLPeerUnverifiedException
+  
+  public Principal getPeerPrincipal() throws SSLPeerUnverifiedException
   {
-    return null;
+    if (!peerVerified)
+      throw new SSLPeerUnverifiedException("peer not verified");
+    if (peerCertChain == null)
+      return null;
+    return peerCertChain[0].getSubjectDN();
   }
   
-  public String[] getValueNames ()
+  public SSLSessionContext getSessionContext()
   {
-    HashMap values = this.values;
-    String[] s = new String[values.size ()];
-    int i = 0;
-    for (Iterator it = values.keySet ().iterator (); it.hasNext () && i < s.length; )
-      s[i++] = (String) it.next ();
-    return s;
+    return context;
   }
   
-  public Object getValue (String name)
+  public String[] getValueNames()
   {
-    return values.get (name);
+    Set<String> keys = this.values.keySet();
+    return keys.toArray(new String[keys.size()]);
   }
   
-  public void invalidate ()
+  public Object getValue(String name)
+  {
+    return values.get(name);
+  }
+  
+  public void invalidate()
   {
     valid = false;
   }
   
-  public boolean isValid ()
+  public boolean isValid()
   {
     return valid;
   }
   
-  public void putValue (String name, Object value)
+  public void putValue(String name, Object value)
   {
-    values.put (name, value);
+    values.put(name, value);
+    try
+      {
+        if (value instanceof SSLSessionBindingListener)
+          ((SSLSessionBindingListener) value).valueBound
+            (new SSLSessionBindingEvent(this, name));
+      }
+    catch (Exception x)
+      {
+      }
   }
   
-  public void removeValue (String name)
+  public void removeValue(String name)
   {
-    values.remove (name);
+    Object value = values.remove(name);
+    try
+      {
+        if (value instanceof SSLSessionBindingListener)
+          ((SSLSessionBindingListener) value).valueUnbound
+            (new SSLSessionBindingEvent(this, name));
+      }
+    catch (Exception x)
+      {
+      }   
+  }
+  
+  public final boolean isTruncatedMac()
+  {
+    return truncatedMac;
   }
 
-  public abstract void prepare (char[] password);
+  /**
+   * Prepare this session for serialization. Private data will be encrypted
+   * with the given password, and this object will then be ready to be
+   * serialized.
+   * 
+   * @param password The password to protect this session with.
+   * @throws SSLException If encrypting this session's private data fails.
+   */
+  public abstract void prepare (char[] password) throws SSLException;
+  
+  /**
+   * Repair this session's private data after deserialization. This method
+   * will decrypt this session's private data, and prepare the session for
+   * use in new SSL connections.
+   * 
+   * @param password The password to decrypt the private data with.
+   * @throws SSLException
+   */
+  public abstract void repair(char[] password) throws SSLException;
+  
+  /**
+   * Get the private data of this session. This method may only be called
+   * after first calling {@link #prepare(char[])}.
+   * 
+   * @return The sealed private data.
+   * @throws SSLException If the private data have not been sealed.
+   */
+  public abstract SealedObject privateData() throws SSLException;
+  
+  /**
+   * Set the private data of this session.
+   * @param data
+   * @throws SSLException
+   */
+  public abstract void setPrivateData(SealedObject data) throws SSLException;
 
   // Inner classes.
   // -------------------------------------------------------------------------
@@ -203,6 +291,7 @@ public abstract class Session implements SSLSession, Serializable
     // Fields.
     // -----------------------------------------------------------------------
 
+    static final long serialVersionUID = 7887036954666565936L;
     /** The ID itself. */
     private final byte[] id;
 

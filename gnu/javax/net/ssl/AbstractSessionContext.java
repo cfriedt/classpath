@@ -1,4 +1,4 @@
-/* SessionStore.java -- stores SSL sessions, possibly persistently.
+/* AbstractSessionContext -- stores SSL sessions, possibly persistently.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -38,35 +38,122 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl;
 
+import gnu.java.security.Requires;
+
+import gnu.javax.net.ssl.provider.SimpleSessionContext;
+
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPermission;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSessionContext;
 
-public abstract class SessionStore
+/**
+ * A skeletal implementation of {@link SSLSessionContext}. This class may
+ * be subclassed to add extended functionality to session contexts, such
+ * as by storing sessions in files on disk, or by sharing contexts
+ * across different JVM instances.
+ * 
+ * <p>In order to securely store sessions, along with private key data,
+ * the abstract methods {@lnk {@link #load(char[])} and {@link #store(char[])}
+ * come into play. When storing sessions, a session context implementation
+ * must pass this password to the {@link Session#prepare(char[])} method,
+ * before either writing the {@link java.io.Serializable} session to the
+ * underlying store, or getting the opaque {@link Session#privateData()}
+ * class from the session, and storing that.
+ * 
+ * <p>As a simple example, that writes sessions to some object output
+ * stream:
+ * 
+ * <pre>
+  char[] password = ...;
+  ObjectOutputStream out = ...;
+  ...
+  for (Session s : this)
+    {
+      s.prepare(password);
+      out.writeObject(s);
+    }</pre>
+ * 
+ * <p>The reverse must be done when deserializing sessions, by using the
+ * {@link Session#repair(char[])} method, possibly by first calling
+ * {@link Session#setPrivateData(java.io.Serializable)} with the read,
+ * opaque private data type. Thus an example of reading may be:
+ * 
+ * <pre>
+  char[] password = ...;
+  ObjectInputStream in = ...;
+  ...
+  while (hasMoreSessions(in))
+    {
+      Session s = (Session) in.readObject();
+      s.repair(password);
+      addToThisStore(s);
+    }</pre>
+ * 
+ * @author Casey Marshall (csm@gnu.org)
+ */
+public abstract class AbstractSessionContext implements SSLSessionContext
 {
+  protected long timeout;
+  private static Class<? extends AbstractSessionContext> 
+    implClass = SimpleSessionContext.class;
 
-  protected final long timeout;
-  private static SessionStore globalInstance; // = XXX default impl.
+  /**
+   * Create a new instance of a session context, according to the configured
+   * implementation class.
+   * 
+   * @return The new session context.
+   * @throws SSLException If an error occurs in creating the instance.
+   */
+  public static SSLSessionContext newInstance () throws SSLException
+  {
+    try
+      {
+        return implClass.newInstance();
+      }
+    catch (IllegalAccessException iae)
+      {
+        throw new SSLException(iae);
+      }
+    catch (InstantiationException ie)
+      {
+        throw new SSLException(ie);
+      }
+  }
 
-  public static SessionStore globalInstance ()
+  /**
+   * Reconfigure this instance to use a different session context
+   * implementation.
+   * 
+   * <p><strong>Note:</strong> this method requires that the caller have
+   * {@link SSLPermission} with target
+   * <code>gnu.javax.net.ssl.AbstractSessionContext</code> and action
+   * <code>setImplClass</code>.
+   * 
+   * @param clazz The new implementation class.
+   * @throws SecurityException If the caller does not have permission to
+   *  change the session context.
+   */
+  @Requires(permissionClass = SSLPermission.class,
+            target = "gnu.javax.net.ssl.AbstractSessionContext",
+            action = "setImplClass")
+  public static synchronized void setImplClass
+    (Class<? extends AbstractSessionContext> clazz)
+    throws SecurityException
   {
     SecurityManager sm = System.getSecurityManager ();
     if (sm != null)
-      sm.checkPermission (new SSLPermission ("gnu.javax.net.ssl.SessionStore",
-                                             "getGlobalInstance"));
-    return globalInstance;
+      sm.checkPermission(new SSLPermission("gnu.javax.net.ssl.AbstractSessionContext",
+                                           "setImplClass"));
+    implClass = clazz;
   }
 
-  public static void setGlobalInstance (SessionStore store)
+  /**
+   * @param timeout The initial session timeout.
+   */
+  protected AbstractSessionContext (final int timeout)
   {
-    SecurityManager sm = System.getSecurityManager ();
-    if (sm != null)
-      sm.checkPermission (new SSLPermission ("gnu.javax.net.ssl.SessionStore",
-                                             "setGlobalInstance"));
-    globalInstance = store;
-  }
-
-  protected SessionStore (final long timeout)
-  {
-    this.timeout = timeout;
+    setSessionTimeout(timeout);
   }
 
   /**
@@ -83,7 +170,7 @@ public abstract class SessionStore
    * @return The found session, or null if no such session was found,
    * or if that session has expired.
    */
-  public final Session get (Session.ID sessionId)
+  public final SSLSession getSession (byte[] sessionId)
   {
     Session s = implGet (sessionId);
     if (System.currentTimeMillis () - s.getLastAccessedTime () > timeout)
@@ -94,8 +181,21 @@ public abstract class SessionStore
     return s;
   }
   
-  protected abstract Session implGet (Session.ID sessionId);
+  /**
+   * To be implemented by subclasses. Subclasses do not need to check
+   * timeouts in this method.
+   * 
+   * @param sessionId The session ID.
+   * @return The session, or <code>null</code> if the requested session
+   *  was not found.
+   */
+  protected abstract Session implGet (byte[] sessionId);
 
+  public int getSessionTimeout()
+  {
+    return (int) (timeout / 1000);
+  }
+  
   /**
    * Load this session store from the underlying media, if supported
    * by the implementation.
@@ -132,8 +232,18 @@ public abstract class SessionStore
    *
    * @param sessionId The ID of the session to remove.
    */
-  public abstract void remove (Session.ID sessionId);
+  public abstract void remove (byte[] sessionId);
 
+  /**
+   * 
+   */
+  public final void setSessionTimeout(int seconds)
+  {
+    if (timeout < 0)
+      throw new IllegalArgumentException("timeout may not be negative");
+    this.timeout = (long) seconds * 1000;
+  }
+  
   /**
    * Commit this session store to the underlying media. For session
    * store implementations that support saving sessions across

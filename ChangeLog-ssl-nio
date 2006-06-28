@@ -1,5 +1,23 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* gnu/javax/net/ssl/AbstractSessionContext.java: renamed from
+	`SessionStore.' Implement SessionContext.
+	* gnu/javax/net/ssl/PrivateCredentials.java: genericize
+	collections.
+	* gnu/javax/net/ssl/Session.java (packetBufferSize): new field.
+	(values): genericize.
+	(random): make transient.
+	(truncatedMac, context): new fields.
+	(getLocalPrincipal, getPacketBufferSize, getPeerPrincipal)
+	(getSessionContext): implement.
+	(isTruncatedMac): new method.
+	(repair, privateData, setPrivateData): new abstract methods.
+	(PrivateData.serialVersionUID): new constant.
+	* gnu/javax/net/ssl/SessionStore.java: renamed to
+	`AbstractSessionContext.'
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* gnu/java/security/Requires.java: new annotation.
 	* gnu/java/security/action/GetSecurityPropertyAction.java:
 	implement PrivilegedAction<String>.
