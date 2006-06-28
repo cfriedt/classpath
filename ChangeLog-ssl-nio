@@ -1,3 +1,8 @@
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
+	* java/security/Signature.java (update): new method.
+	* java/security/SignatureSpi.java (engineUpdate): new method.
+
 2006-06-10  Casey Marshall  <csm@gnu.org>
 
 	* jessie-tests/testClientHello.java: update for extensions
