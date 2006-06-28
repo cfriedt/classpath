@@ -1,5 +1,14 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* gnu/classpath/debug/SystemLogger.java: extend Logger.
+	(SYSTEM): declare as instance of SystemLogger; set it to such an
+	instance.
+	(<clinit>): removed debug lines.
+	(<init>): new method.
+	(logv): new method.
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* java/security/Signature.java (update): new method.
 	* java/security/SignatureSpi.java (engineUpdate): new method.
 
