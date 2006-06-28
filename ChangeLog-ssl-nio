@@ -1,5 +1,12 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* gnu/java/security/Requires.java: new annotation.
+	* gnu/java/security/action/GetSecurityPropertyAction.java:
+	implement PrivilegedAction<String>.
+	(run): return String.
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* gnu/java/io/ByteBufferOutputStream.java: new file.
 
 2006-06-28  Casey Marshall  <csm@gnu.org>
