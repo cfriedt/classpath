@@ -68,7 +68,7 @@ final class Finished implements Handshake.Body
 
   public int length ()
   {
-    if (version == ProtocolVersion.TLS_1)
+    if (version.compareTo(ProtocolVersion.TLS_1) >= 0)
       return 12;
     if (version == ProtocolVersion.SSL_3)
       return 36;
@@ -77,14 +77,14 @@ final class Finished implements Handshake.Body
 
   byte[] verifyData()
   {
-    if (version == ProtocolVersion.TLS_1)
+    if (version.compareTo(ProtocolVersion.TLS_1) >= 0)
       {
         byte[] verify = new byte[12];
         buffer.position (0);
         buffer.get (verify);
         return verify;
       }
-    throw new IllegalArgumentException ("not TLSv1");
+    throw new IllegalArgumentException ("not TLSv1.0 or later");
   }
 
   byte[] md5Hash()
@@ -113,7 +113,7 @@ final class Finished implements Handshake.Body
 
   void setVerifyData (final byte[] verifyData, final int offset)
   {
-    if (version != ProtocolVersion.TLS_1)
+    if (version == ProtocolVersion.SSL_3)
       throw new IllegalArgumentException ("not TLSv1");
     buffer.position (0);
     buffer.put (verifyData, offset, 12);
@@ -149,7 +149,7 @@ final class Finished implements Handshake.Body
     out.println ("struct {");
     if (prefix != null)
       out.print (prefix);
-    if (version == ProtocolVersion.TLS_1)
+    if (version.compareTo(ProtocolVersion.TLS_1) >= 0)
       {
         out.print ("  verifyData = ");
         out.print (Util.toHexString (verifyData (), ':'));

@@ -46,6 +46,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * An SSL nonce.
@@ -57,7 +58,7 @@ struct
   opaque random_bytes[28];
 } Random;
  */
-public class Random implements Constructed
+public class Random implements Builder, Constructed
 {
 
   // Fields.
@@ -72,24 +73,29 @@ public class Random implements Constructed
 
   public Random (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
-  public Random copy ()
+  public Random copy()
   {
     ByteBuffer buffer = ByteBuffer.allocate(32);
-    buffer.put (this.buffer);
-    return new Random (buffer);
+    buffer.put(this.buffer);
+    return new Random(buffer);
   }
 
-  public int length ()
+  public int length()
   {
     return RANDOM_LENGTH + 4;
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return ((ByteBuffer) buffer.duplicate().position(0).limit(length())).slice();
   }
 
   public int gmtUnixTime ()
   {
-    return buffer.getInt (0);
+    return buffer.getInt(0);
   }
 
   public byte[] randomBytes()

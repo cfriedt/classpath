@@ -50,6 +50,7 @@ import java.io.StringWriter;
 import java.math.BigInteger;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import java.security.PublicKey;
 import java.security.interfaces.RSAKey;
@@ -74,16 +75,19 @@ final class ClientKeyExchange implements Handshake.Body
 
   private final ByteBuffer buffer;
   private final CipherSuite suite;
+  private final ProtocolVersion version;
 
   // Constructors.
   // -------------------------------------------------------------------------
 
-  ClientKeyExchange (final ByteBuffer buffer, final CipherSuite suite)
+  ClientKeyExchange (final ByteBuffer buffer, final CipherSuite suite,
+                     final ProtocolVersion version)
   {
-    buffer.getClass ();
-    suite.getClass ();
-    this.buffer = buffer;
+    suite.getClass();
+    version.getClass ();
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     this.suite = suite;
+    this.version = version;
   }
 
   // Instance methods.
@@ -91,12 +95,12 @@ final class ClientKeyExchange implements Handshake.Body
 
   ExchangeKeys exchangeKeys ()
   {
-    KeyExchangeAlgorithm alg = suite.keyExchangeAlgorithm ();
+    KeyExchangeAlgorithm alg = suite.keyExchangeAlgorithm();
     if (alg == KeyExchangeAlgorithm.RSA)
-      return new EncryptedPreMasterSecret (buffer, suite.version ());
+      return new EncryptedPreMasterSecret(buffer, version);
     else if (alg == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
-      return new ClientDiffieHellmanPublic (buffer);
-    throw new IllegalArgumentException ("unsupported key exchange");
+      return new ClientDiffieHellmanPublic(buffer);
+    throw new IllegalArgumentException("unsupported key exchange");
   }
 
   public int length ()

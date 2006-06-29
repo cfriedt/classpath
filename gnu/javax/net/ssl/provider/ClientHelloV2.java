@@ -102,13 +102,12 @@ class ClientHelloV2 implements Constructed
   List cipherSpecs ()
   {
     int n = cipherSpecsLength ();
-    List l = new ArrayList (n / 3);
+    List<CipherSuite> l = new ArrayList<CipherSuite>(n / 3);
     ByteBuffer b = (ByteBuffer) buffer.duplicate ().position (9);
-    ProtocolVersion version = version ();
     for (int i = 0; i < n; i += 3)
       {
         if (b.get () == 0)
-          l.add (CipherSuite.forValue (b.getShort ()).resolve (version));
+          l.add (CipherSuite.forValue(b.getShort()).resolve());
         else
           b.getShort ();
       }

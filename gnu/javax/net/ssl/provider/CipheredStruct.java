@@ -40,7 +40,7 @@ package gnu.javax.net.ssl.provider;
 
 import java.nio.ByteBuffer;
 
-abstract class CipheredStruct implements Constructed
+public abstract class CipheredStruct implements Constructed
 {
   /** The content length. */
   protected final int length;
@@ -48,7 +48,7 @@ abstract class CipheredStruct implements Constructed
   /** The MAC length. */
   protected final int macLength;
 
-  protected final ByteBuffer buffer;
+  protected final ByteBuffer[] buffers;
 
   protected CipheredStruct (final ByteBuffer buffer, final int length,
                             final int macLength)
@@ -58,17 +58,17 @@ abstract class CipheredStruct implements Constructed
     this.macLength = macLength;
   }
 
-  ByteBuffer content ()
+  public ByteBuffer[] content ()
   {
-    return ((ByteBuffer) buffer.position (0).limit (length)).slice ();
+    return buffers;
   }
 
-  int contentLength ()
+  public int contentLength ()
   {
     return length;
   }
 
-  byte[] mac ()
+  public byte[] mac ()
   {
     buffer.position (length);
     byte[] mac = new byte[macLength];
@@ -76,7 +76,7 @@ abstract class CipheredStruct implements Constructed
     return mac;
   }
 
-  void setMac (final byte[] mac, final int offset)
+  public void setMac (final byte[] mac, final int offset)
   {
     buffer.position (length);
     buffer.put (mac, offset, macLength);

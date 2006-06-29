@@ -156,6 +156,14 @@ public final class ClientHello implements Handshake.Body
                           .limit (buffer.capacity ())).slice ();
     return new CompressionMethodList (listBuf);
   }
+  
+  public boolean hasExtensions()
+  {
+    int offset = getExtensionsOffset();
+    if (offset + 1 > buffer.limit())
+      return false;
+    return (buffer.getShort(offset) & 0xFFFF) == 0;
+  }
 
   public ExtensionList extensions()
   {

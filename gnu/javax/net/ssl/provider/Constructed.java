@@ -40,6 +40,30 @@ package gnu.javax.net.ssl.provider;
 
 /**
  * The base interface to SSL constructed types.
+ * 
+ * <p><b>Contract for ByteBuffer-based constructed types:</b>
+ * 
+ * <p>Most implementations of this interface supported by this library
+ * take a "view" of an underlying ByteBuffer. The general contract of
+ * such classes is that they <em>will not</em> modify the position or
+ * limit of the buffer when doing read operations. That is, the position
+ * of the underlying buffer <em>should</em> remain at 0 throughout the
+ * lifetime of the object, and the limit should be either set to the
+ * capacity of the buffer, or to the size of the object (in most cases,
+ * the length of the protocol object is determined by the contents of
+ * the object, so the limit isn't useful in such cases. Of course, if the
+ * limit is set to something other than the object's length, it must be
+ * larger than the object length).
+ * 
+ * <p>Setter methods (usually in a class that implements the {@link Builder}
+ * interface) may modify the limit, but the general contract remains that
+ * the position remain at zero, and that the limit be at least as large as
+ * the object length.
+ * 
+ * <p>Thus, very often the code will use <em>absolute</em> getters and setters
+ * for primitive types, or it will use the {@link java.nio.ByteBuffer#duplicate()}
+ * method, and sometimes the {@link java.nio.ByteBuffer#slice()} method, and
+ * will change the position or limit of the duplicate buffer.
  */
 public interface Constructed
 {
@@ -48,7 +72,7 @@ public interface Constructed
    *
    * @return The length of this structure.
    */
-  int length ();
+  int length();
 
   /**
    * Returns a printable representation of this structure, with the
@@ -58,5 +82,5 @@ public interface Constructed
    * output. This value may be <code>null</code>.
    * @return A printable representation of this structure.
    */
-  String toString (String prefix);
+  String toString(String prefix);
 }

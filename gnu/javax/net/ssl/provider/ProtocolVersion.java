@@ -42,7 +42,8 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public final class ProtocolVersion implements Comparable, Constructed
+public final class ProtocolVersion
+  implements Comparable<ProtocolVersion>, Constructed
 {
 
   // Constants and fields.
@@ -150,9 +151,8 @@ public final class ProtocolVersion implements Comparable, Constructed
     return major << 8 | minor;
   }
 
-  public int compareTo(Object o)
+  public int compareTo(ProtocolVersion that)
   {
-    ProtocolVersion that = (ProtocolVersion) o;
     if (major > that.major)
       {
         return 1;

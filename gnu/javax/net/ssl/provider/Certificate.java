@@ -38,21 +38,14 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -61,16 +54,26 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import javax.net.ssl.SSLProtocolException;
+/**
+ * The certificate object. This is used by both the client and the server
+ * to send their certificates (if any) to one another.
+ * 
+ * <pre>opaque ASN.1Cert&lt;1..2^24-1&gt;;
 
-public final class Certificate implements Handshake.Body
+struct {
+  ASN.1Cert certificate_list&lt;0..2^24-1&gt;;
+} Certificate;</pre>
+ *
+ * @author Casey Marshall (csm@gnu.org)
+ */
+public class Certificate implements Handshake.Body
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final ByteBuffer buffer;
-  private final CertificateType type;
+  protected ByteBuffer buffer;
+  protected final CertificateType type;
 
   // Constructors.
   // -------------------------------------------------------------------------
@@ -79,7 +82,7 @@ public final class Certificate implements Handshake.Body
   {
     buffer.getClass ();
     type.getClass ();
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     this.type = type;
   }
 
@@ -92,45 +95,27 @@ public final class Certificate implements Handshake.Body
             | buffer.getShort (1)) + 3;
   }
 
-  public List certificates ()
+  public List<java.security.cert.Certificate> certificates ()
     throws CertificateException, NoSuchAlgorithmException
   {
-    LinkedList list = new LinkedList ();
-    CertificateFactory factory = CertificateFactory.getInstance (type.toString ());
-    int length = (((buffer.get (0) & 0xFF) << 16)
-                  | (buffer.getShort (1) & 0xFFFF));
-    buffer.position (3);
-    for (int i = 0; i < length; )
+    LinkedList<java.security.cert.Certificate> list
+      = new LinkedList<java.security.cert.Certificate>();
+    CertificateFactory factory = CertificateFactory.getInstance(type.toString());
+    int length = (((buffer.get(0) & 0xFF) << 16)
+                  | (buffer.getShort(1) & 0xFFFF));
+    ByteBuffer b = (ByteBuffer) buffer.duplicate().position(3);
+    for (int i = 3; i < length; )
       {
-        int length2 = (((buffer.get () & 0xFF) << 16)
-                       | (buffer.getShort () & 0xFFFF));
+        int length2 = (((b.get () & 0xFF) << 16)
+                       | (b.getShort () & 0xFFFF));
         byte[] buf = new byte[length2];
+        buffer.position(i+3);
         buffer.get (buf);
-        list.add (factory.generateCertificate (new ByteArrayInputStream (buf)));
+        list.add(factory.generateCertificate (new ByteArrayInputStream (buf)));
         i += length2 + 3;
+        buffer.position(i);
       }
     return list;
-  }
-
-  public void setCertificates (final List certificates)
-    throws CertificateException
-  {
-    X509Certificate cert = null;
-    for (Iterator it = certificates.iterator (); it.hasNext (); )
-      cert = (X509Certificate) it.next ();
-    int length = 0;
-    buffer.position (3);
-    for (Iterator it = certificates.iterator (); it.hasNext (); )
-      {
-        cert = (X509Certificate) it.next ();
-        byte[] buf = cert.getEncoded ();
-        buffer.put ((byte) (buf.length >>> 16));
-        buffer.putShort ((short) buf.length);
-        buffer.put (buf);
-        length += buf.length + 3;
-      }
-    buffer.put (0, (byte) (length >>> 16));
-    buffer.putShort (1, (short) length);
   }
 
   public String toString ()

@@ -38,28 +38,108 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import static gnu.javax.net.ssl.provider.Extension.Type.*;
+import static gnu.javax.net.ssl.provider.KeyExchangeAlgorithm.*;
+import static gnu.javax.net.ssl.provider.ServerHandshake.State.*;
+import static gnu.javax.net.ssl.provider.SignatureAlgorithm.*;
+import static gnu.javax.net.ssl.provider.Handshake.Type.*;
+
+import gnu.classpath.Configuration;
+import gnu.classpath.debug.Component;
+import gnu.javax.crypto.key.dh.GnuDHPublicKey;
+import gnu.javax.net.ssl.provider.CertificateRequest.ClientCertificateType;
+import gnu.javax.net.ssl.provider.ServerNameList.ServerName;
+
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.PrivateKey;
+import java.security.SignatureException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyAgreement;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.interfaces.DHPrivateKey;
+import javax.crypto.interfaces.DHPublicKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSessionContext;
+import javax.net.ssl.X509ExtendedKeyManager;
+import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import javax.net.ssl.SSLEngineResult.Status;
+import javax.security.auth.x500.X500Principal;
 
 class ServerHandshake extends AbstractHandshake
-{
-  // State masks.
-  static final int READ_MASK = 1 << 8;
-  static final int WRITE_MASK = 1 << 9;
+{  
+  /**
+   * Handshake state enumeration.
+   */
+  static enum State
+  {
+    WRITE_HELLO_REQUEST (true, false),
+    WRITE_SERVER_HELLO (true, false),
+    WRITE_CERTIFICATE (true, false),
+    WRITE_SERVER_KEY_EXCHANGE (true, false),
+    WRITE_CERTIFICATE_REQUEST (true, false),
+    WRITE_SERVER_HELLO_DONE (true, false),
+    WRITE_FINISHED (true, false),
+    READ_CLIENT_HELLO (false, true),
+    READ_CERTIFICATE (false, true),
+    READ_CLIENT_KEY_EXCHANGE (false, true),
+    READ_CERTIFICATE_VERIFY (false, true),
+    READ_FINISHED (false, true),
+    DONE (false, false);
+    
+    private final boolean isWriteState;
+    private final boolean isReadState;
+    
+    private State(final boolean isWriteState, final boolean isReadState)
+    {
+      this.isWriteState = isWriteState;
+      this.isReadState = isReadState;
+    }
+    
+    boolean isReadState()
+    {
+      return isReadState;
+    }
+    
+    boolean isWriteState()
+    {
+      return isWriteState;
+    }
+  }
 
-  // State values.
-  static final int WRITE_HELLO_REQUEST = WRITE_MASK | 1;
-  static final int READ_CLIENT_HELLO = READ_MASK | 2;
-  static final int WRITE_SERVER_HELLO = WRITE_MASK | 3;
-  static final int DONE = -1;
-
-  private int state;
+  private State state;
 
   private final SSLEngineImpl engine;
 
@@ -69,8 +149,22 @@ class ServerHandshake extends AbstractHandshake
   private CompressionMethod compression;
   private Random clientRandom;
   private Random serverRandom;
+  private ByteBuffer outBuffer;
+  private boolean clientHadExtensions = false;
+  private boolean continuedSession = false;
+  private ServerNameList requestedNames = null;
+  private String keyAlias = null;
+  private X509Certificate clientCert = null;
+  private X509Certificate localCert = null;
+
+  private InputSecurityParameters inParams;
+  private OutputSecurityParameters outParams;
+  
+  private KeyAgreement keyAgreement;
+  private KeyPair dhPair;
 
   ServerHandshake (boolean writeHelloRequest, final SSLEngineImpl engine)
+    throws NoSuchAlgorithmException
   {
     if (writeHelloRequest)
       state = WRITE_HELLO_REQUEST;
@@ -78,16 +172,6 @@ class ServerHandshake extends AbstractHandshake
       state = READ_CLIENT_HELLO;
     this.engine = engine;
     handshakeOffset = 0;
-  }
-
-  private static boolean isWriteState (int state)
-  {
-    return (state & WRITE_MASK) == WRITE_MASK;
-  }
-
-  private static boolean isReadState (final int state)
-  {
-    return (state & READ_MASK) == READ_MASK;
   }
 
   /**
@@ -130,17 +214,14 @@ class ServerHandshake extends AbstractHandshake
     HashSet<CipherSuite> suites = new HashSet<CipherSuite> (enabledSuites.length);
     for (String s : enabledSuites)
       {
-        CipherSuite suite = CipherSuite.forName (s);
+        CipherSuite suite = CipherSuite.forName(s);
         if (suite != null)
-          {
-            suite = suite.resolve (version);
-            suites.add (suite);
-          }
+          suites.add (suite);
       }
     for (CipherSuite suite : clientSuites)
       {
         if (suites.contains (suite))
-          return suite.resolve (version);
+          return suite.resolve();
       }
     throw new AlertException (new Alert (Alert.Level.FATAL,
                                          Alert.Description.INSUFFICIENT_SECURITY));
@@ -171,125 +252,925 @@ class ServerHandshake extends AbstractHandshake
 
     throw new SSLException ("no supported compression method");
   }
+  
+  protected @Override boolean doHash()
+  {
+    return state != WRITE_HELLO_REQUEST;
+  }
 
-  public SSLEngineResult handleInput (Record record) throws SSLException
+  public @Override HandshakeStatus handleInput (ByteBuffer fragment)
+    throws SSLException
   {
     if (state == DONE)
-      return new SSLEngineResult (SSLEngineResult.Status.OK,
-                                  SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING,
-                                  0, 0);
+      return HandshakeStatus.FINISHED;
 
-    if (!isReadState (state) && isWriteState (state))
-      return new SSLEngineResult (SSLEngineResult.Status.OK,
-                                  SSLEngineResult.HandshakeStatus.NEED_WRAP,
-                                  0, 0);
+    if (state.isWriteState() || outBuffer.hasRemaining())
+      return HandshakeStatus.NEED_WRAP;
 
     // If we don't have a message already waiting...
     if (!hasMessage())
       {
         // Try to read another...
-        if (!pollHandshake (record))
-          {
-            // If we have some more data, but not a full handshake
-            // message, return, asking for more.
-            return new SSLEngineResult (SSLEngineResult.Status.OK,
-                                        SSLEngineResult.HandshakeStatus.NEED_UNWRAP,
-                                        record.length () + 5, 0);
-          }
+        if (!pollHandshake (fragment))
+          return HandshakeStatus.NEED_UNWRAP;
 
         // Otherwise, we've got something to process.
       }
 
-    SSLEngineResult.HandshakeStatus status = null;
-
-    while (hasMessage ())
+    while (hasMessage() && state.isReadState())
       {
         // Copy the current buffer, and prepare it for reading.
         ByteBuffer buffer = handshakeBuffer.duplicate ();
-        buffer.flip ();
-        buffer.position (handshakeOffset);
-        Handshake handshake = new Handshake (buffer.slice ());
+        buffer.flip();
+        buffer.position(handshakeOffset);
+        Handshake handshake = new Handshake(buffer.slice());
+        
+        if (Configuration.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE, "processing in state {0}: {1}",
+                      state, handshake);
 
         switch (state)
-          {
+        {
+          // Client Hello.
+          //
+          // This message is sent by the client to initiate a new handshake.
+          // On a new connection, it is the first handshake message sent.
+          //
+          // The state of the handshake, after this message is processed,
+          // will have a protocol version, cipher suite, compression method,
+          // session ID, and various extensions (that the server also
+          // supports).
           case READ_CLIENT_HELLO:
-            if (handshake.type () != Handshake.Type.CLIENT_HELLO)
+            if (handshake.type () != CLIENT_HELLO)
               throw new SSLException ("expecting client hello");
-            // FIXME: we need to ask the caller to call `wrap,' so we can
-            // push an SSL error alert to the remote side. Then, we can
-            // defer throwing the exception until then.
+            // XXX throw better exception.
 
-            {
-              ClientHello hello = (ClientHello) handshake.body ();
-              version = chooseProtocol (hello.version (),
-                                        engine.getEnabledProtocols ());
-              suite = chooseSuite (hello.cipherSuites (),
-                                   engine.getEnabledCipherSuites (), version);
-              compression = chooseCompression (hello.compressionMethods ());
-              clientRandom = hello.random ().copy ();
-              byte[] sessionId = hello.sessionId ();
-              status = SSLEngineResult.HandshakeStatus.NEED_WRAP;
-              state = WRITE_SERVER_HELLO;
-            }
+          {
+            ClientHello hello = (ClientHello) handshake.body ();
+            engine.session().version
+              = chooseProtocol (hello.version (),
+                                engine.getEnabledProtocols ());
+            engine.session().suite
+              = chooseSuite (hello.cipherSuites (),
+                             engine.getEnabledCipherSuites (), version);
+            compression = chooseCompression (hello.compressionMethods ());
+            clientRandom = hello.random ().copy ();
+            byte[] sessionId = hello.sessionId ();
+            if (hello.hasExtensions())
+              {
+                ExtensionList exts = hello.extensions();
+                clientHadExtensions = exts.size() > 0;
+                for (Extension e : hello.extensions())
+                  {
+                    Extension.Type type = e.type();
+                    if (type == null)
+                      continue;
+                    switch (type)
+                    {
+                    case TRUNCATED_HMAC:
+                      engine.session().setTruncatedMac(true);
+                      break;
+
+                    case MAX_FRAGMENT_LENGTH:
+                      MaxFragmentLength len = (MaxFragmentLength) e.value();
+                      engine.session().maxLength = len;
+                      engine.session().setPacketBufferSize(len.maxLength() + 2048);
+                      break;
+                      
+                    case SERVER_NAME:
+                      requestedNames = (ServerNameList) e.value();
+                      List<String> names
+                        = new ArrayList<String>(requestedNames.size());
+                      for (ServerNameList.ServerName name : requestedNames)
+                        names.add(name.name());
+                      engine.session().putValue("gnu.javax.net.ssl.RequestedServerNames", names);
+                      break;
+
+                    default:
+                      logger.log(Level.INFO, "skipping unsupported extension {0}", e);
+                    }
+                  }
+              }
+            SSLSessionContext sessions =
+              engine.contextImpl.engineGetServerSessionContext();
+            SSLSession s = sessions.getSession(sessionId);
+            if (s != null && s.isValid() && (s instanceof SessionImpl))
+              {
+                engine.setSession((SessionImpl) s);
+                continuedSession = true;
+                version = ((SessionImpl) s).version;
+              }
+            state = WRITE_SERVER_HELLO;
           }
+          break;
 
-        handshakeOffset += handshake.length ();
+          // Certificate.
+          //
+          // This message is sent by the client if the server had previously
+          // requested that the client authenticate itself with a certificate,
+          // and if the client has an appropriate certificate available.
+          //
+          // Processing this message will save the client's certificate,
+          // rejecting it if the certificate is not trusted, in preparation
+          // for the certificate verify message that will follow.
+          case READ_CERTIFICATE:
+          {
+            if (handshake.type() != CERTIFICATE)
+              {
+                if (engine.getNeedClientAuth()) // XXX throw better exception.
+                  throw new SSLException("client auth required");
+                state = READ_CLIENT_KEY_EXCHANGE;
+                continue;
+              }
+            
+            Certificate cert = (Certificate) handshake.body();
+            try
+              {
+                engine.session().setPeerVerified(false);
+                X509Certificate[] chain
+                  = cert.certificates().toArray(new X509Certificate[0]);
+                if (chain.length == 0)
+                  throw new CertificateException("no certificates in chain");
+                X509TrustManager tm = engine.contextImpl.trustManager;
+                tm.checkClientTrusted(chain, null);
+                engine.session().setPeerCertificates(chain);
+                clientCert = chain[0];
+                // Delay setting 'peerVerified' until CertificateVerify.
+              }
+            catch (CertificateException ce)
+              {
+                if (engine.getNeedClientAuth())
+                  {
+                    SSLPeerUnverifiedException x
+                      = new SSLPeerUnverifiedException("client certificates could not be verified");
+                    x.initCause(ce);
+                    throw x;
+                  }
+              }
+            catch (NoSuchAlgorithmException nsae)
+              {
+                throw new SSLException(nsae);
+              }
+            state = READ_CLIENT_KEY_EXCHANGE;
+          }
+          break;
+
+          // Client Key Exchange.
+          //
+          // The client's key exchange. This message is sent either following
+          // the certificate message, or if no certificate is available or
+          // requested, following the server's hello done message.
+          //
+          // After receipt of this message, the session keys for this
+          // session will have been created.
+          case READ_CLIENT_KEY_EXCHANGE:
+          {
+            if (handshake.type() != CLIENT_KEY_EXCHANGE)
+              throw new SSLException("expecting client key exchange");
+            ClientKeyExchange kex = (ClientKeyExchange) handshake.body();
+            
+            if (engine.session().suite.keyExchangeAlgorithm() ==
+                KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+              {
+                ClientDiffieHellmanPublic pub = (ClientDiffieHellmanPublic)
+                  kex.exchangeKeys();
+                DHPublicKey myKey = (DHPublicKey) dhPair.getPublic();
+                DHPublicKey clientKey =
+                  new GnuDHPublicKey(null, myKey.getParams().getP(),
+                                     myKey.getParams().getG(),
+                                     pub.publicValue());
+                diffieHellmanPhase2(clientKey);
+              }
+            if (engine.session().suite.keyExchangeAlgorithm() ==
+                KeyExchangeAlgorithm.RSA)
+              {
+                EncryptedPreMasterSecret secret = (EncryptedPreMasterSecret)
+                  kex.exchangeKeys();
+                Cipher rsa = null;
+                try
+                  {
+                    rsa = Cipher.getInstance("RSA");
+                    rsa.init(Cipher.DECRYPT_MODE, localCert);
+                  }
+                catch (InvalidKeyException ike)
+                  {
+                    throw new SSLException(ike);
+                  }
+                catch (NoSuchAlgorithmException nsae)
+                  {
+                    throw new SSLException(nsae);
+                  }
+                catch (NoSuchPaddingException nspe)
+                  {
+                    // Shouldn't happen; RSA only has one padding here.
+                    throw new SSLException(nspe);
+                  }
+                
+                try
+                  {
+                    preMasterSecret = rsa.doFinal(secret.encryptedSecret());
+                  }
+                catch (BadPaddingException bpe)
+                  {
+                    throw new SSLException(bpe);
+                  }
+                catch (IllegalBlockSizeException ibse)
+                  {
+                    throw new SSLException(ibse);
+                  }
+              }
+            // XXX SRP
+            
+            // Generate the master keys.
+            generateMasterSecret(clientRandom, serverRandom, engine.session());
+            
+            // Initialize our security parameters.
+            byte[][] keys = generateKeys(clientRandom, serverRandom,
+                                         engine.session());
+            try
+              {
+                CipherSuite suite = engine.session().suite;
+                Cipher inCipher = suite.cipher();
+                Mac inMac = suite.mac(engine.session().version);
+                Inflater inflater = (compression == CompressionMethod.ZLIB
+                                     ? new Inflater() : null); 
+                inCipher.init(Cipher.DECRYPT_MODE,
+                              new SecretKeySpec(keys[2], suite.cipherAlgorithm().toString()),
+                              new IvParameterSpec(keys[4]));
+                inMac.init(new SecretKeySpec(keys[0], suite.macAlgorithm().toString()));
+                inParams = new InputSecurityParameters(inCipher, inMac,
+                                                       inflater,
+                                                       engine.session());
+                
+                Cipher outCipher = suite.cipher();
+                Mac outMac = suite.mac(engine.session().version);
+                Deflater deflater = (compression == CompressionMethod.ZLIB
+                                     ? new Deflater() : null);
+                outCipher.init(Cipher.ENCRYPT_MODE,
+                               new SecretKeySpec(keys[3], suite.cipherAlgorithm().toString()),
+                               new IvParameterSpec(keys[5]));
+                inMac.init(new SecretKeySpec(keys[1], suite.macAlgorithm().toString()));
+                outParams = new OutputSecurityParameters(outCipher, outMac,
+                                                         deflater,
+                                                         engine.session());
+              }
+            catch (InvalidAlgorithmParameterException iape)
+              {
+                throw new SSLException(iape);
+              }
+            catch (InvalidKeyException ike)
+              {
+                throw new SSLException(ike);
+              }
+            catch (NoSuchAlgorithmException nsae)
+              {
+                throw new SSLException(nsae);
+              }
+            catch (NoSuchPaddingException nspe)
+              {
+                throw new SSLException(nspe);
+              }
+            
+            if (clientCert != null)
+              state = READ_CERTIFICATE_VERIFY;
+            else
+              {
+                engine.changeCipherSpec();
+                state = WRITE_FINISHED;
+              }
+          }
+          break;
+
+          // Certificate Verify.
+          //
+          // This message is sent following the client key exchange message,
+          // but only when the client included its certificate in a previous
+          // message.
+          //
+          // After receipt of this message, the client's certificate (and,
+          // to a degree, the client's identity) will have been verified.
+          case READ_CERTIFICATE_VERIFY:
+          {
+            if (handshake.type() != CERTIFICATE_VERIFY)
+              throw new SSLException("expecting certificate verify message");
+            
+            CertificateVerify verify = (CertificateVerify) handshake.body();
+            try
+              {
+                verifyClient(verify.signature());
+                engine.session().setPeerVerified(true);
+              }
+            catch (SignatureException se)
+              {
+                if (engine.getNeedClientAuth())
+                  throw new SSLException("client auth failed", se);
+              }
+          }
+          break;
+          
+          // Finished.
+          //
+          // This message is sent immediately following the change cipher
+          // spec message (which is sent outside of the handshake layer).
+          // After receipt of this message, the session keys for the client
+          // side will have been verified (this is the first message the
+          // client sends encrypted and authenticated with the newly
+          // negotiated keys).
+          //
+          // In the case of a continued session, the client sends its
+          // finished message first. Otherwise, the server will send its
+          // finished message first.
+          case READ_FINISHED:
+          {
+            if (handshake.type() != FINISHED)
+              {
+                throw new SSLException("expecting FINISHED message");
+              }
+            
+            Finished clientFinished = (Finished) handshake.body();
+            
+            MessageDigest md5copy = null;
+            MessageDigest shacopy = null;
+            try
+              {
+                md5copy = (MessageDigest) md5.clone();
+                shacopy = (MessageDigest) sha.clone();
+              }
+            catch (CloneNotSupportedException cnse)
+              {
+                // We're improperly configured to use a non-cloneable
+                // md5/sha-1, OR there's a runtime bug.
+                throw new SSLException(cnse);
+              }
+            Finished serverFinished =
+              new Finished(generateFinished(md5copy, shacopy,
+                                            true, engine.session()), version);
+
+            if (Configuration.DEBUG)
+              logger.log(Component.SSL_HANDSHAKE, "server finished: {0}",
+                         serverFinished);
+            
+            if (version == ProtocolVersion.SSL_3)
+              {
+                if (!Arrays.equals(clientFinished.md5Hash(),
+                                   serverFinished.md5Hash())
+                    || !Arrays.equals(clientFinished.shaHash(),
+                                      serverFinished.shaHash()))
+                  {
+                    engine.session().invalidate();
+                    throw new SSLException("session verify failed");
+                  }
+              }
+            else
+              {
+                if (!Arrays.equals(clientFinished.verifyData(),
+                                   serverFinished.verifyData()))
+                  {
+                    engine.session().invalidate();
+                    throw new SSLException("session verify failed");
+                  }
+              }
+            
+            if (continuedSession)
+              state = DONE;
+            else
+              {
+                engine.changeCipherSpec();
+                state = WRITE_FINISHED;
+              }
+          }
+          break;
+        }
+
+        handshakeOffset += handshake.length();
       }
 
-    return new SSLEngineResult (SSLEngineResult.Status.OK, status,
-                                record.length () + 5, 0);
+    if (state.isReadState())
+      return HandshakeStatus.NEED_UNWRAP;
+    if (state.isWriteState())
+      return HandshakeStatus.NEED_WRAP;
+
+    return HandshakeStatus.FINISHED; // XXX ???
   }
 
-  public SSLEngineResult handleOutput (Record rec) throws SSLException
+  public @Override HandshakeStatus implHandleOutput (ByteBuffer fragment)
+    throws SSLException
   {
-    if (!isWriteState (state))
+    // Drain the output buffer, if it needs it.
+    if (outBuffer != null && outBuffer.hasRemaining())
       {
-        return new SSLEngineResult (SSLEngineResult.Status.OK,
-                                    SSLEngineResult.HandshakeStatus.NEED_UNWRAP,
-                                    0, 0);
+        int l = Math.min(fragment.remaining(), outBuffer.remaining());
+        fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+        outBuffer.position(outBuffer.position() + l);
       }
-    ByteBuffer out = rec.fragment();
-    int offset = out.position ();
-    int pushed = 0;
-    push_messages: while (true)
+    
+    if (!fragment.hasRemaining())
       {
-        Record outRecord = new Record (((ByteBuffer) out.position (offset)).slice ());
-        outRecord.setContentType (ContentType.HANDSHAKE);
-        outRecord.setVersion (version);
-        outRecord.setLength (out.remaining ());
+        if (state.isWriteState() || outBuffer.hasRemaining())
+          return HandshakeStatus.NEED_WRAP;
+        else
+          return HandshakeStatus.NEED_UNWRAP;
+      }
 
-        Handshake handshake = new Handshake (outRecord.fragment ());
-        boolean pushed_message = false;
-
-        try
+    // XXX what we need to do here is generate a "stream" of handshake
+    // messages, and insert them into fragment amounts that we have available.
+    // A handshake message can span multiple records, and we can put
+    // multiple records into a single record.
+    //
+    // So, we can have one of two states:
+    //
+    // 1) We have enough space in the record we are creating to push out
+    //    everything we need to on this round. This is easy; we just
+    //    repeatedly fill in these messages in the buffer, so we get something
+    //    that looks like this:
+    //                 ________________________________
+    //       records: |________________________________|
+    //    handshakes: |______|__|__________|
+    //
+    // 2) We can put part of one handshake message in the current record,
+    //    but we must put the rest of it in the following record, or possibly
+    //    more than one following record. So here, we'd see this:
+    //
+    //                 ________________________
+    //       records: |_______|_______|________|
+    //    handshakes: |____|_______|_________|
+    //
+    // We *could* make this a lot easier by just only ever emitting one
+    // record per call, but then we would waste potentially a lot of space
+    // and waste a lot of TCP packets by doing it the simple way. What
+    // we desire here is that we *maximize* our usage of the resources
+    // given to us, and to use as much space in the present fragment as
+    // we can.
+    //
+    // Note that we pretty much have to support this, anyway, because SSL
+    // provides no guarantees that the record size is large enough to
+    // admit *even one* handshake message. Also, callers could call on us
+    // with a short buffer, even though they aren't supposed to.
+    //
+    // This is somewhat complicated by the fact that we don't know, a priori,
+    // how large a handshake message will be until we've built it, and our
+    // design builds the message around the byte buffer.
+    //
+    // Some ways to handle this:
+    //
+    //  1. Write our outgoing handshake messages to a private buffer,
+    //     big enough per message (and, if we run out of space, resize that
+    //     buffer) and push (possibly part of) this buffer out to the
+    //     outgoing buffer. This isn't that great because we'd need to
+    //     store and copy things unnecessarily.
+    //
+    //  2. Build outgoing handshake objects “virtually,” that is, store them
+    //     as collections of objects, then compute the length, and then write
+    //     them to a buffer, instead of making the objects views on
+    //     ByteBuffers for both input and output. This would complicate the
+    //     protocol objects a bit (although, it would amount to doing
+    //     separation between client objects and server objects, which is
+    //     pretty OK), and we still need to figure out how exactly to chunk
+    //     those objects across record boundaries.
+    //
+    //  3. Try to build these objects on the buffer we’re given, but detect
+    //     when we run out of space in the output buffer, and split the
+    //     overflow message. This sounds like the best, but also probably
+    //     the hardest to code.
+    while (fragment.remaining() >= 4 && state.isWriteState())
+      {
+        switch (state)
           {
-            switch (state)
-              {
-              case WRITE_SERVER_HELLO:
+            // Hello Request.
+            //
+            // This message is sent by the server to initiate a new
+            // handshake, to establish new session keys.
+            case WRITE_HELLO_REQUEST:
+            {
+              Handshake handshake = new Handshake(fragment);
+              handshake.setType(Handshake.Type.HELLO_REQUEST);
+              handshake.setLength(0);
+              fragment.position(fragment.position() + 4);
+              if (Configuration.DEBUG)
+                logger.log(Component.SSL_HANDSHAKE, "{0}", handshake);
+              state = READ_CLIENT_HELLO;
+            }
+            break;
+            
+            // Server Hello.
+            //
+            // This message is sent immediately following the client hello.
+            // It informs the client of the cipher suite, compression method,
+            // session ID (which may have been a continued session), and any
+            // supported extensions.
+            case WRITE_SERVER_HELLO:
+            {
+              ServerHelloBuilder hello = new ServerHelloBuilder();
+              hello.setVersion (version);
+              hello.setCipherSuite (suite);
+              hello.setCompressionMethod(compression);
+              Random r = hello.random();
+              r.setGmtUnixTime ((int) (System.currentTimeMillis() / 1000));
+              byte[] nonce = new byte[28];
+              engine.session().random().nextBytes(nonce);
+              r.setRandomBytes(nonce);
+              serverRandom = r.copy ();
+              hello.setSessionId(engine.session().getId());
+              if (clientHadExtensions)
                 {
-                  handshake.setType (Handshake.Type.SERVER_HELLO);
-                  ServerHello hello = (ServerHello) handshake.body ();
-                  hello.setVersion (version);
-                  hello.setCipherSuite (suite);
-                  Random r = hello.random ();
-                  r.setGmtUnixTime ((int) (System.currentTimeMillis () / 1000));
-                  byte[] nonce = new byte[28];
-                  engine.session ().random ().nextBytes (nonce);
-                  r.setRandomBytes (nonce);
-                  serverRandom = r.copy ();
-                  
+                  // XXX figure this out.
                 }
-              }
+              
+              if (Configuration.DEBUG)
+                logger.log(Component.SSL_HANDSHAKE, "{0}", hello);
+
+              int typeLen = ((Handshake.Type.SERVER_HELLO.getValue() << 24)
+                  | (hello.length() & 0xFFFFFF));
+              fragment.putInt(typeLen);
+
+              outBuffer = hello.buffer();
+              int l = Math.min(fragment.remaining(), outBuffer.remaining());
+              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+              outBuffer.position(outBuffer.position() + l);
+
+              if (continuedSession)
+                {
+                  engine.changeCipherSpec();
+                  state = WRITE_FINISHED;
+                }
+              else
+                state = WRITE_CERTIFICATE;
+            }
+            break;
+
+            // Certificate.
+            //
+            // This message is sent immediately following the server hello,
+            // IF the cipher suite chosen requires that the server identify
+            // itself (usually, servers must authenticate).
+            case WRITE_CERTIFICATE:
+            {
+              if (suite.keyExchangeAlgorithm() == null)
+                {
+                  state = WRITE_SERVER_KEY_EXCHANGE;
+                  break;
+                }
+              String sigAlg = null;
+              switch (suite.keyExchangeAlgorithm())
+                {
+                  case NONE:
+                    break;
+
+                  case RSA:
+                    sigAlg = "RSA";
+                    break;
+
+                  case DIFFIE_HELLMAN:
+                    if (suite.isEphemeralDH())
+                      sigAlg = "DHE_";
+                    else
+                      sigAlg = "DH_";
+                    switch (suite.signatureAlgorithm())
+                      {
+                        case RSA:
+                          sigAlg += "RSA";
+                          break;
+
+                        case DSA:
+                          sigAlg += "DSS";
+                          break;
+                      }
+
+                  case SRP:
+                    switch (suite.signatureAlgorithm())
+                      {
+                        case RSA:
+                          sigAlg = "SRP_RSA";
+                          break;
+
+                        case DSA:
+                          sigAlg = "SRP_DSS";
+                          break;
+                      }
+                }
+              X509ExtendedKeyManager km = engine.contextImpl.keyManager;
+              Principal[] issuers = null; // XXX use TrustedAuthorities extension.
+              keyAlias = km.chooseEngineServerAlias(sigAlg, issuers, engine);
+              X509Certificate[] chain = km.getCertificateChain(keyAlias);
+
+              CertificateBuilder cert = new CertificateBuilder(CertificateType.X509);
+              try
+                {
+                  cert.setCertificates(Arrays.asList(chain));
+                }
+              catch (CertificateException ce)
+                {
+                  throw new SSLException(ce);
+                }
+              engine.session().setLocalCertificates(chain);
+              localCert = chain[0];
+
+              if (Configuration.DEBUG)
+                logger.log(Component.SSL_HANDSHAKE, "{0}", cert);
+              
+              int typeLen = ((CERTIFICATE.getValue() << 24)
+                             | (cert.length() & 0xFFFFFF));
+              fragment.putInt(typeLen);
+
+              outBuffer = cert.buffer();
+              final int l = Math.min(fragment.remaining(), outBuffer.remaining());
+              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+              outBuffer.position(outBuffer.position() + l);
+
+              state = WRITE_SERVER_KEY_EXCHANGE;
+            }
+            break;
+
+            // Server key exchange.
+            //
+            // This message is sent, following the certificate if sent,
+            // otherwise following the server hello, IF the chosen cipher
+            // suite requires that the server send explicit key exchange
+            // parameters (that is, if the key exchange parameters are not
+            // implicit in the server's certificate).
+            case WRITE_SERVER_KEY_EXCHANGE:
+            {
+              KeyExchangeAlgorithm kex = suite.keyExchangeAlgorithm();
+              
+              if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+                {
+                  genDiffieHellman();
+                  initDiffieHellman((DHPrivateKey) dhPair.getPrivate(),
+                                    engine.session().random());
+                }
+              // XXX handle SRP
+              
+              if (kex != KeyExchangeAlgorithm.NONE
+                  && kex != KeyExchangeAlgorithm.RSA
+                  && suite.isEphemeralDH())
+                {
+                  // This key exchange requires server params; construct them.
+                  ByteBuffer paramBuffer = null;
+                  
+                  if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+                    {
+                      DHPublicKey pubKey = (DHPublicKey) dhPair.getPublic();
+                      ServerDHParams params =
+                        new ServerDHParams(pubKey.getParams().getP(),
+                                           pubKey.getParams().getG(),
+                                           pubKey.getY());
+                      paramBuffer = params.buffer();
+                    }
+                  // XXX handle SRP
+                  
+                  ByteBuffer sigBuffer = signParams(paramBuffer);
+                  ServerKeyExchangeBuilder ske = new ServerKeyExchangeBuilder(suite);
+                  ske.setParams(paramBuffer);
+                  ske.setSignature(sigBuffer);
+                  
+                  if (Configuration.DEBUG)
+                    logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
+                  
+                  fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
+                                  | (paramBuffer.remaining() & 0xFFFFFF));
+                  
+                  outBuffer = ske.buffer();
+                  int l = Math.min(fragment.remaining(), outBuffer.remaining());
+                  fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+                  outBuffer.position(outBuffer.position() + l);
+                }
+              
+              if (engine.getWantClientAuth() || engine.getNeedClientAuth())
+                state = WRITE_CERTIFICATE_REQUEST;
+              else
+                state = WRITE_SERVER_HELLO_DONE;
+            }
+            break;
+
+            // Certificate Request.
+            //
+            // This message is sent when the server desires or requires
+            // client authentication with a certificate; if it is sent, it
+            // will be sent just after the Certificate or Server Key
+            // Exchange messages, whichever is sent. If neither of the
+            // above are sent, it will be the message that follows the
+            // server hello.
+            case WRITE_CERTIFICATE_REQUEST:
+            {
+              CertificateRequestBuilder req = new CertificateRequestBuilder();
+              
+              List<ClientCertificateType> types
+                = new ArrayList<ClientCertificateType>(4);
+              types.add(ClientCertificateType.RSA_SIGN);
+              types.add(ClientCertificateType.RSA_FIXED_DH);
+              types.add(ClientCertificateType.DSS_SIGN);
+              types.add(ClientCertificateType.DSS_FIXED_DH);
+              req.setTypes(types);
+              
+              X509Certificate[] anchors
+                = engine.contextImpl.trustManager.getAcceptedIssuers();
+              List<X500Principal> issuers
+                = new ArrayList<X500Principal>(anchors.length);
+              for (X509Certificate cert : anchors)
+                issuers.add(cert.getIssuerX500Principal());
+              req.setAuthorities(issuers);
+              
+              if (Configuration.DEBUG)
+                logger.log(Component.SSL_HANDSHAKE, "{0}", req);
+              
+              fragment.putInt((CERTIFICATE_REQUEST.getValue() << 24)
+                              | (req.length() & 0xFFFFFF));
+              
+              outBuffer = req.buffer();
+              int l = Math.min(outBuffer.remaining(), fragment.remaining());
+              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+              outBuffer.position(outBuffer.position() + l);
+              
+              state = WRITE_SERVER_HELLO_DONE;
+            }
+            break;
+
+            // Server Hello Done.
+            //
+            // This message is always sent by the server, to terminate its
+            // side of the handshake. Since the server's handshake message
+            // may comprise multiple, optional messages, this sentinel
+            // message lets the client know when the server's message stream
+            // is complete.
+            case WRITE_SERVER_HELLO_DONE:
+            {
+              // ServerHelloDone is zero-length; just put in the type
+              // field.
+              fragment.putInt(SERVER_HELLO_DONE.getValue() << 24);
+              state = READ_CERTIFICATE;
+            }
+            break;
+            
+            // Finished.
+            //
+            // This is always sent by the server to verify the keys that the
+            // server will use to encrypt and authenticate. In a full
+            // handshake, this message will be sent after the client's
+            // finished message; in an abbreviated handshake (with a continued
+            // session) the server sends its finished message first.
+            //
+            // This message follows the change cipher spec message, which is
+            // sent out-of-band in a different SSL content-type.
+            //
+            // This is the first message that the server will send encrypted
+            // and authenticated with the newly negotiated session keys.
+            case WRITE_FINISHED:
+            {
+              MessageDigest md5copy = null;
+              MessageDigest shacopy = null;
+              try
+                {
+                  md5copy = (MessageDigest) md5.clone();
+                  shacopy = (MessageDigest) sha.clone();
+                }
+              catch (CloneNotSupportedException cnse)
+                {
+                  // We're improperly configured to use a non-cloneable
+                  // md5/sha-1, OR there's a runtime bug.
+                  throw new SSLException(cnse);
+                }
+              outBuffer
+                = generateFinished(md5copy, shacopy, false,
+                                   engine.session());
+              
+              fragment.putInt((FINISHED.getValue() << 24)
+                              | outBuffer.remaining() & 0xFFFFFF);
+              
+              int l = Math.min(outBuffer.remaining(), fragment.remaining());
+              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+              outBuffer.position(outBuffer.position() + l);
+
+              if (continuedSession)
+                state = READ_FINISHED;
+              else
+                state = DONE;
+            }
+            break;
           }
-        catch (BufferOverflowException bfe)
+      }
+    return (state.isWriteState() || outBuffer.hasRemaining()
+            ? HandshakeStatus.NEED_WRAP
+            : HandshakeStatus.NEED_UNWRAP);
+  }
+  
+  @Override InputSecurityParameters getInputParams() throws SSLException
+  {
+    if (inParams == null)
+      throw new SSLException("premature usage of input security parameters");
+    return inParams;
+  }
+  
+  @Override OutputSecurityParameters getOutputParams() throws SSLException
+  {
+    if (outParams == null)
+      throw new SSLException("premature usage of output security parameters");
+    return outParams;
+  }
+  
+  /**
+   * Generate, or fetch from our certificate, the Diffie-Hellman exchange
+   * parameters.
+   * 
+   * @throws SSLException
+   */
+  private void genDiffieHellman() throws SSLException
+  {
+    try
+      {
+        if (suite.isEphemeralDH())
           {
-            if (!pushed_message)
-              {
-                return new SSLEngineResult (SSLEngineResult.Status.BUFFER_OVERFLOW,
-                                            SSLEngineResult.HandshakeStatus.NEED_WRAP,
-                                            0, pushed);
-              }
+            KeyPairGenerator dhGen = KeyPairGenerator.getInstance("DH");
+            // XXX figure this out, key size and shit.
+            dhGen.initialize(2048, engine.session().random());
+            dhPair = dhGen.generateKeyPair();
           }
+        else
+          {
+            X509Certificate cert = (X509Certificate)
+              engine.session().getLocalCertificates()[0];
+            PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
+            dhPair = new KeyPair(cert.getPublicKey(), key);
+          }
+
+        if (Configuration.DEBUG)
+          logger.logv(Component.SSL_KEY_EXCHANGE,
+                      "Diffie-Hellman public:{0} private:{1}",
+                      dhPair.getPublic(), dhPair.getPrivate());
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+  }
+  
+  private ByteBuffer signParams(ByteBuffer serverParams) throws SSLException
+  {
+    try
+      {
+        java.security.Signature sig
+          = java.security.Signature.getInstance(suite.signatureAlgorithm().name());
+        PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
+        sig.initSign(key);
+        sig.update(clientRandom.buffer());
+        sig.update(serverRandom.buffer());
+        sig.update(serverParams);
+        byte[] sigVal = sig.sign();
+        Signature signature = new Signature(sigVal, suite.signatureAlgorithm());
+        return signature.buffer();
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (SignatureException se)
+      {
+        throw new SSLException(se);
+      }
+  }
+  
+  private void verifyClient(byte[] sigValue) throws SSLException, SignatureException
+  {
+    MessageDigest md5copy = null;
+    MessageDigest shacopy = null;
+    try
+      {
+        md5copy = (MessageDigest) md5.clone();
+        shacopy = (MessageDigest) sha.clone();
+      }
+    catch (CloneNotSupportedException cnse)
+      {
+        // Mis-configured with non-cloneable digests.
+        throw new SSLException(cnse);
+      }
+    byte[] toSign = null;
+    if (engine.session().version == ProtocolVersion.SSL_3)
+      toSign = genV2CertificateVerify(md5copy, shacopy, engine.session());
+    else
+      {
+        if (engine.session().suite.signatureAlgorithm() == SignatureAlgorithm.RSA)
+          toSign = Util.concat(md5copy.digest(), shacopy.digest());
+        else
+          toSign = shacopy.digest();
+      }
+    
+    try
+      {
+        java.security.Signature sig = java.security.Signature.getInstance(engine.session().suite.signatureAlgorithm().toString());
+        sig.initVerify(clientCert);
+        sig.update(toSign);
+        sig.verify(sigValue);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
       }
   }
 }

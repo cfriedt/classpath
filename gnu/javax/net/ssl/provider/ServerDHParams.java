@@ -55,13 +55,52 @@ struct
 } ServerDHParams;
 </pre>
  */
-public class ServerDHParams implements ServerKeyExchangeParams
+public class ServerDHParams implements Builder, ServerKeyExchangeParams
 {
   private final ByteBuffer buffer;
 
   public ServerDHParams (final ByteBuffer buffer)
   {
     this.buffer = buffer;
+  }
+  
+  public ServerDHParams (final BigInteger p, final BigInteger g,
+                         final BigInteger y)
+  {
+    byte[] p_bytes = p.toByteArray();
+    byte[] g_bytes = g.toByteArray();
+    byte[] y_bytes = y.toByteArray();
+    int len = p_bytes.length + g_bytes.length + y_bytes.length + 6;
+    
+    int p_off = 0;
+    if (p_bytes[0] == 0x00)
+      {
+        p_off = 1;
+        len--;
+      }
+    int g_off = 0;
+    if (g_bytes[0] == 0x00)
+      {
+        g_off = 1;
+        len--;
+      }
+    int y_off = 0;
+    if (y_bytes[0] == 0x00)
+      {
+        y_off = 1;
+        len--;
+      }
+    int p_len = p_bytes.length - p_off;
+    int g_len = g_bytes.length - g_off;
+    int y_len = y_bytes.length - y_off;
+    
+    buffer = ByteBuffer.allocate(len);
+    buffer.putShort((short) p_len);
+    buffer.put(p_bytes, p_off, p_len);
+    buffer.putShort((short) g_len);
+    buffer.put(g_bytes, g_off, g_len);
+    buffer.putShort((short) y_len);
+    buffer.put(y_bytes, y_off, y_len);
   }
 
   public KeyExchangeAlgorithm algorithm ()
@@ -77,6 +116,11 @@ public class ServerDHParams implements ServerKeyExchangeParams
             + offset1 + offset2 + 6);
   }
 
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
+  }
+  
   /**
    * Returns the server's prime modulus.
    *

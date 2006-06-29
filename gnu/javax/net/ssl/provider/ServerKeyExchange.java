@@ -38,21 +38,11 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
-import java.math.BigInteger;
-
 import java.nio.ByteBuffer;
-
-import javax.net.ssl.SSLProtocolException;
+import java.nio.ByteOrder;
 
 /**
  * The server key exchange message.
@@ -78,23 +68,21 @@ struct
 public class ServerKeyExchange implements Handshake.Body
 {
 
-  private final ByteBuffer buffer;
-  private final CipherSuite suite;
+  protected ByteBuffer buffer;
+  protected final CipherSuite suite;
 
-  public ServerKeyExchange (final ByteBuffer buffer, final CipherSuite suite)
+  public ServerKeyExchange(final ByteBuffer buffer, final CipherSuite suite)
   {
-    suite.getClass ();
-    this.buffer = buffer;
+    suite.getClass();
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     this.suite = suite;
-    if (!suite.isResolved ())
-      throw new IllegalArgumentException ("requires resolved cipher suite");
   }
 
   public int length ()
   {
     if (suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
       return 0;
-    return params ().length () + signature ().length ();
+    return params().length() + signature().length();
   }
 
   /**

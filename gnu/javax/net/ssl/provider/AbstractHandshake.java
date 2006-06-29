@@ -38,10 +38,28 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.nio.ByteBuffer;
+import gnu.classpath.ByteArray;
+import gnu.classpath.Configuration;
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
+import gnu.java.security.prng.IRandom;
+import gnu.java.security.prng.LimitReachedException;
 
+import java.nio.ByteBuffer;
+import java.security.DigestException;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.logging.Logger;
+
+import javax.crypto.KeyAgreement;
+import javax.crypto.interfaces.DHPrivateKey;
+import javax.crypto.interfaces.DHPublicKey;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 
 /**
  * The base interface for handshake implementations. Concrete
@@ -50,7 +68,53 @@ import javax.net.ssl.SSLException;
  */
 public abstract class AbstractHandshake
 {
+  protected static final SystemLogger logger = SystemLogger.SYSTEM;
 
+  /**
+   * "server finished" -- TLS 1.0 and later
+   */
+  protected static final byte[] SERVER_FINISHED
+    = new byte[] {
+      115, 101, 114, 118, 101, 114,  32, 102, 105, 110, 105, 115,
+      104, 101, 100   
+    };
+  
+  /**
+   * "client finished" -- TLS 1.0 and later
+   */
+  protected static final byte[] CLIENT_FINISHED
+    = new byte[] {
+       99, 108, 105, 101, 110, 116,  32, 102, 105, 110, 105, 115,
+      104, 101, 100
+    };
+  
+  /**
+   * "key expansion" -- TLS 1.0 and later
+   */
+  private static final byte[] KEY_EXPANSION =
+    new byte[] { 107, 101, 121,  32, 101, 120, 112,
+                  97, 110, 115, 105, 111, 110 };
+  
+  /**
+   * "master secret" -- TLS 1.0 and later
+   */
+  private static final byte[] MASTER_SECRET
+    = new byte[] {
+      109,  97, 115, 116, 101, 114,  32, 115, 101,  99, 114, 101, 116
+    };
+  
+  /**
+   * SSL 3.0
+   */
+  private static final byte[] SENDER_CLIENT
+    = new byte[] { 0x43, 0x4C, 0x4E, 0x54 };
+  
+  /**
+   * SSL 3.0
+   */
+  private static final byte[] SENDER_SERVER
+    = new byte[] { 0x53, 0x52, 0x56, 0x52 };
+  
   /**
    * The currently-read handshake messages. There may be zero, or
    * multiple, handshake messages in this buffer.
@@ -63,6 +127,18 @@ public abstract class AbstractHandshake
    */
   protected int handshakeOffset;
 
+  protected MessageDigest sha;
+  protected MessageDigest md5;
+  
+  protected KeyAgreement keyAgreement;
+  protected byte[] preMasterSecret;
+  
+  protected AbstractHandshake() throws NoSuchAlgorithmException
+  {
+    sha = MessageDigest.getInstance("SHA-1");
+    md5 = MessageDigest.getInstance("MD5");
+  }
+  
   /**
    * Handles the next input message in the handshake. This is called
    * in response to a call to {@link javax.net.ssl.SSLEngine#unwrap}
@@ -73,7 +149,8 @@ public abstract class AbstractHandshake
    * output or temporary storage.
    * @return An {@link SSLEngineResult} describing the result.
    */
-  public abstract SSLEngineResult handleInput (Record record) throws SSLException;
+  public abstract SSLEngineResult.HandshakeStatus handleInput (ByteBuffer fragment)
+    throws SSLException;
 
   /**
    * Produce more handshake output. This is called in response to a
@@ -86,8 +163,50 @@ public abstract class AbstractHandshake
    * appropriately.
    * @return An {@link SSLEngineResult} describing the result.
    */
-  public abstract SSLEngineResult handleOutput (Record record) throws SSLException;
+  public final SSLEngineResult.HandshakeStatus handleOutput (ByteBuffer fragment)
+    throws SSLException
+  {
+    SSLEngineResult.HandshakeStatus status = implHandleOutput(fragment);
+    if (doHash())
+      {
+        sha.update((ByteBuffer) fragment.duplicate().flip());
+        md5.update((ByteBuffer) fragment.duplicate().flip());
+      }
+    return status;
+  }
+  
+  /**
+   * Called to implement the underlying 
+   * @param record
+   * @return
+   * @throws SSLException
+   */
+  protected abstract SSLEngineResult.HandshakeStatus implHandleOutput (ByteBuffer fragment)
+    throws SSLException;
+  
+  /**
+   * Return a new instance of input security parameters, initialized with
+   * the session key. It is, of course, only valid to invoke this method
+   * once the handshake is complete, and the session keys established.
+   * 
+   * <p>In the presence of a well-behaving peer, this should be called once
+   * the <code>ChangeCipherSpec</code> message is recieved.
+   * 
+   * @return The input parameters for the newly established session.
+   * @throws SSLException If the handshake is not complete.
+   */
+  abstract InputSecurityParameters getInputParams() throws SSLException;
 
+  /**
+   * Return a new instance of output security parameters, initialized with
+   * the session key. This should be called after the
+   * <code>ChangeCipherSpec</code> message is sent to the peer.
+   * 
+   * @return The output parameters for the newly established session.
+   * @throws SSLException If the handshake is not complete.
+   */
+  abstract OutputSecurityParameters getOutputParams() throws SSLException;
+  
   /**
    * Attempt to read the next handshake message from the given
    * record. If only a partial handshake message is available, then
@@ -100,8 +219,9 @@ public abstract class AbstractHandshake
    * @return True if a complete handshake is present in the buffer;
    * false if only a partial one.
    */
-  protected boolean pollHandshake (final Record record)
+  protected boolean pollHandshake (final ByteBuffer fragment)
   {
+    Record record = new Record(fragment);
     // Allocate space for the new fragment.
     if (handshakeBuffer == null || handshakeBuffer.remaining () < record.length ())
       {
@@ -111,14 +231,24 @@ public abstract class AbstractHandshake
                    : handshakeBuffer.position () - handshakeOffset);
 
         // Plus room for the incoming record.
-        len += record.length ();
+        len += fragment.remaining();
         reallocateBuffer (len);
       }
 
     // Put the fragment into the buffer.
-    handshakeBuffer.put (record.fragment ());
+    if (doHash())
+      {
+        sha.update(fragment);
+        md5.update(fragment);
+      }
+    handshakeBuffer.put (fragment);
 
     return hasMessage ();
+  }
+  
+  protected boolean doHash()
+  {
+    return true;
   }
 
   /**
@@ -166,5 +296,355 @@ public abstract class AbstractHandshake
     // We just put only unread handshake messages in the new buffer;
     // the offset of the next one is now zero.
     handshakeOffset = 0;
+  }
+
+  /**
+   * Generate a certificate verify message for SSLv3. In SSLv3, a different
+   * algorithm was used to generate this value was subtly different than
+   * that used in TLSv1.0 and later. In TLSv1.0 and later, this value is
+   * just the digest over the handshake messages.
+   * 
+   * <p>SSLv3 uses the algorithm:
+   * 
+   * <pre>
+CertificateVerify.signature.md5_hash
+  MD5(master_secret + pad_2 +
+      MD5(handshake_messages + master_secret + pad_1));
+Certificate.signature.sha_hash
+  SHA(master_secret + pad_2 +
+      SHA(handshake_messages + master_secret + pad_1));</pre>
+   * 
+   * @param md5 The running MD5 hash of the handshake.
+   * @param sha The running SHA-1 hash of the handshake.
+   * @param session The current session being negotiated.
+   * @return The computed to-be-signed value.
+   */
+  protected byte[] genV2CertificateVerify(MessageDigest md5,
+                                          MessageDigest sha,
+                                          SessionImpl session)
+  {
+    byte[] md5value = null;
+    if (session.suite.signatureAlgorithm() == SignatureAlgorithm.RSA)
+      {
+        md5.update(session.privateData.masterSecret);
+        md5.update(SSLHMac.PAD1);
+        byte[] tmp = md5.digest();
+        md5.reset();
+        md5.update(session.privateData.masterSecret);
+        md5.update(SSLHMac.PAD2);
+        md5.update(tmp);
+        md5value = md5.digest();
+      }
+    
+    sha.update(session.privateData.masterSecret);
+    sha.update(SSLHMac.PAD1);
+    byte[] tmp = sha.digest();
+    sha.reset();
+    sha.update(session.privateData.masterSecret);
+    sha.update(SSLHMac.PAD2);
+    sha.update(tmp);
+    byte[] shavalue = sha.digest();
+    
+    if (md5value != null)
+      return Util.concat(md5value, shavalue);
+    
+    return shavalue;
+  }
+  
+  /**
+   * Generate the session keys from the computed master secret.
+   * 
+   * @param clientRandom The client's nonce.
+   * @param serverRandom The server's nonce.
+   * @param session The session being established.
+   * @return The derived keys.
+   */
+  protected byte[][] generateKeys(Random clientRandom, Random serverRandom,
+                                  SessionImpl session)
+  {
+    int maclen = 20; // SHA-1.
+    if (session.suite.macAlgorithm() == MacAlgorithm.MD5)
+      maclen = 16;
+    int ivlen = 0;
+    if (session.suite.cipherAlgorithm() == CipherAlgorithm.DES
+        || session.suite.cipherAlgorithm() == CipherAlgorithm.DESede)
+      ivlen = 8;
+    if (session.suite.cipherAlgorithm() == CipherAlgorithm.AES)
+      ivlen = 16;
+    int keylen = session.suite.keyLength();
+    
+    byte[][] keys = new byte[6][];
+    keys[0] = new byte[maclen]; // client_write_MAC_secret
+    keys[1] = new byte[maclen]; // server_write_MAC_secret
+    keys[2] = new byte[keylen]; // client_write_key
+    keys[3] = new byte[keylen]; // server_write_key
+    keys[4] = new byte[ivlen];  // client_write_iv
+    keys[5] = new byte[ivlen];  // server_write_iv
+    
+    IRandom prf = null;
+    if (session.version == ProtocolVersion.SSL_3)
+      {
+        byte[] seed = new byte[clientRandom.length()
+                               + serverRandom.length()];
+        clientRandom.buffer().get(seed, 0, clientRandom.length());
+        serverRandom.buffer().get(seed, clientRandom.length(),
+                                  serverRandom.length());
+        prf = new SSLRandom();
+        HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
+        attr.put(SSLRandom.SECRET, session.privateData.masterSecret);
+        attr.put(SSLRandom.SEED, seed);
+        prf.init(attr);
+      }
+    else
+      {
+        byte[] seed = new byte[KEY_EXPANSION.length
+                               + clientRandom.length()
+                               + serverRandom.length()];
+        System.arraycopy(KEY_EXPANSION, 0, seed, 0, KEY_EXPANSION.length);
+        clientRandom.buffer().get(seed, KEY_EXPANSION.length,
+                                  clientRandom.length());
+        serverRandom.buffer().get(seed, (KEY_EXPANSION.length
+                                         + clientRandom.length()),
+                                  serverRandom.length());
+        
+        prf = new TLSRandom();
+        HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
+        attr.put(TLSRandom.SECRET, session.privateData.masterSecret);
+        attr.put(TLSRandom.SEED, seed);
+        prf.init(attr);
+      }
+    
+    try
+      {
+        prf.nextBytes(keys[0], 0, keys[0].length);
+        prf.nextBytes(keys[1], 0, keys[1].length);
+        prf.nextBytes(keys[2], 0, keys[2].length);
+        prf.nextBytes(keys[3], 0, keys[3].length);
+        if (session.version.compareTo(ProtocolVersion.TLS_1_1) < 0)
+          {
+            prf.nextBytes(keys[4], 0, keys[4].length);
+            prf.nextBytes(keys[5], 0, keys[5].length);
+          }
+      }
+    catch (LimitReachedException lre)
+      {
+        // Won't happen with our implementation.
+        throw new Error(lre);
+      }
+    
+    return keys;
+  }
+  
+  /**
+   * Generate a "finished" message. The hashes passed in are modified
+   * by this function, so they should be clone copies of the digest if
+   * the hash function needs to be used more.
+   * 
+   * @param md5 The MD5 computation.
+   * @param sha The SHA-1 computation.
+   * @param isClient Whether or not the client-side finished message is
+   *  being computed.
+   * @param session The current session.
+   * @return A byte buffer containing the computed finished message.
+   */
+  protected ByteBuffer generateFinished(MessageDigest md5,
+                                        MessageDigest sha,
+                                        boolean isClient,
+                                        SessionImpl session)
+  {
+    ByteBuffer finishedBuffer = null;
+    if (session.version.compareTo(ProtocolVersion.TLS_1) >= 0)
+      {
+        finishedBuffer = ByteBuffer.allocate(12);
+        TLSRandom prf = new TLSRandom();
+        byte[] md5val = md5.digest();
+        byte[] shaval = sha.digest();
+        byte[] seed = new byte[CLIENT_FINISHED.length
+                               + md5val.length
+                               + shaval.length];
+        if (isClient)
+          System.arraycopy(CLIENT_FINISHED, 0, seed, 0, CLIENT_FINISHED.length);
+        else
+          System.arraycopy(SERVER_FINISHED, 0, seed, 0, SERVER_FINISHED.length);
+        System.arraycopy(md5val, 0,
+                         seed, CLIENT_FINISHED.length,
+                         md5val.length);
+        System.arraycopy(shaval, 0,
+                         seed, CLIENT_FINISHED.length + md5val.length,
+                         shaval.length);
+        HashMap<String, Object> params = new HashMap<String, Object>(2);
+        params.put(TLSRandom.SECRET, session.privateData.masterSecret);
+        params.put(TLSRandom.SEED, seed);
+        prf.init(params);
+        byte[] buf = new byte[12];
+        prf.nextBytes(buf, 0, buf.length);
+        finishedBuffer.put(buf).position(0);
+      }
+    else
+      {
+        // The SSLv3 algorithm is:
+        //
+        //   enum { client(0x434C4E54), server(0x53525652) } Sender;
+        //
+        //   struct {
+        //     opaque md5_hash[16];
+        //     opaque sha_hash[20];
+        //   } Finished;
+        //
+        //   md5_hash       MD5(master_secret + pad2 +
+        //                      MD5(handshake_messages + Sender +
+        //                          master_secret + pad1));
+        //   sha_hash        SHA(master_secret + pad2 +
+        //                       SHA(handshake_messages + Sender +
+        //                           master_secret + pad1));
+        //
+
+        finishedBuffer = ByteBuffer.allocate(36);
+        
+        md5.update(isClient ? SENDER_CLIENT : SENDER_SERVER);
+        md5.update(session.privateData.masterSecret);
+        md5.update(SSLHMac.PAD1);
+        
+        byte[] tmp = md5.digest();
+        md5.reset();
+        md5.update(session.privateData.masterSecret);
+        md5.update(SSLHMac.PAD2);
+        md5.update(tmp);
+        finishedBuffer.put(md5.digest());
+        
+        sha.update(isClient ? SENDER_CLIENT : SENDER_SERVER);
+        sha.update(session.privateData.masterSecret);
+        sha.update(SSLHMac.PAD1);
+        
+        tmp = sha.digest();
+        sha.reset();
+        sha.update(session.privateData.masterSecret);
+        sha.update(SSLHMac.PAD2);
+        sha.update(tmp);
+        finishedBuffer.put(sha.digest()).position(0);
+      }
+    return finishedBuffer;
+  }
+  
+  protected void initDiffieHellman(DHPrivateKey dhKey, SecureRandom random)
+    throws SSLException
+  {
+    try
+      {
+        keyAgreement = KeyAgreement.getInstance("DH");
+        keyAgreement.init(dhKey, random);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+  }
+  
+  protected void diffieHellmanPhase1(DHPublicKey dhKey) throws SSLException
+  {
+    try
+      {
+        keyAgreement.doPhase(dhKey, false);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+  }
+  
+  protected void diffieHellmanPhase2(DHPublicKey dhKey) throws SSLException
+  {
+    try
+      {
+        keyAgreement.doPhase(dhKey, true);
+        preMasterSecret = keyAgreement.generateSecret();
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+  }
+  
+  protected void generateMasterSecret(Random clientRandom,
+                                      Random serverRandom,
+                                      SessionImpl session)
+    throws SSLException
+  {
+    if (session.version == ProtocolVersion.SSL_3)
+      {
+        try
+          {
+            MessageDigest _md5 = MessageDigest.getInstance("MD5");
+            MessageDigest _sha = MessageDigest.getInstance("SHA");
+            session.privateData.masterSecret = new byte[48];
+            
+            _sha.update((byte) 'A');
+            _sha.update(preMasterSecret);
+            _sha.update(clientRandom.buffer());
+            _sha.update(serverRandom.buffer());
+            _md5.update(preMasterSecret);
+            _md5.update(_sha.digest());
+            _md5.digest(session.privateData.masterSecret, 0, 16);
+            
+            _sha.update((byte) 'B');
+            _sha.update((byte) 'B');
+            _sha.update(preMasterSecret);
+            _sha.update(clientRandom.buffer());
+            _sha.update(serverRandom.buffer());
+            _md5.update(preMasterSecret);
+            _md5.update(_sha.digest());
+            _md5.digest(session.privateData.masterSecret, 16, 16);
+
+            _sha.update((byte) 'C');
+            _sha.update((byte) 'C');
+            _sha.update((byte) 'C');
+            _sha.update(preMasterSecret);
+            _sha.update(clientRandom.buffer());
+            _sha.update(serverRandom.buffer());
+            _md5.update(preMasterSecret);
+            _md5.update(_sha.digest());
+            _md5.digest(session.privateData.masterSecret, 32, 16);
+          }
+        catch (DigestException de)
+          {
+            throw new SSLException(de);
+          }
+        catch (NoSuchAlgorithmException nsae)
+          {
+            throw new SSLException(nsae);
+          }
+      }
+    else // TLSv1.0 and later
+      {
+        byte[] seed = new byte[clientRandom.length()
+                               + serverRandom.length()
+                               + MASTER_SECRET.length];
+        clientRandom.buffer().get(seed, 0, clientRandom.length());
+        serverRandom.buffer().get(seed, clientRandom.length(),
+                                  serverRandom.length());
+        System.arraycopy(MASTER_SECRET, 0, seed,
+                         clientRandom.length() + serverRandom.length(),
+                         MASTER_SECRET.length);
+        TLSRandom prf = new TLSRandom();
+        HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
+        attr.put(TLSRandom.SECRET, preMasterSecret);
+        attr.put(TLSRandom.SEED, seed);
+        prf.init(attr);
+        
+        session.privateData.masterSecret = new byte[48];
+        prf.nextBytes(session.privateData.masterSecret, 0, 48);
+      }
+    
+    if (Configuration.DEBUG)
+      logger.log(Component.SSL_KEY_EXCHANGE, "master_secret: {0}",
+                 new ByteArray(session.privateData.masterSecret));
+    
+    // Wipe out the preMasterSecret.
+    for (int i = 0; i < preMasterSecret.length; i++)
+      preMasterSecret[i] = 0;
   }
 }

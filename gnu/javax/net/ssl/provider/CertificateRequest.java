@@ -38,23 +38,11 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-
 import java.nio.ByteBuffer;
-
-import java.util.LinkedList;
-import java.security.Principal;
+import java.nio.ByteOrder;
 
 /**
  * A request by the server for a client certificate.
@@ -67,20 +55,20 @@ struct
 } CertificateRequest;
 </pre>
  */
-public final class CertificateRequest implements Handshake.Body
+public class CertificateRequest implements Handshake.Body
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final ByteBuffer buffer;
-
+  protected ByteBuffer buffer;
+  
   // Constructor.
   // -------------------------------------------------------------------------
 
-  public CertificateRequest (final ByteBuffer buffer)
+  public CertificateRequest(final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   // Instance methods.
@@ -94,13 +82,13 @@ public final class CertificateRequest implements Handshake.Body
 
   public ClientCertificateTypeList types ()
   {
-    return new ClientCertificateTypeList (buffer.duplicate ());
+    return new ClientCertificateTypeList(buffer.duplicate());
   }
 
   public X500PrincipalList authorities ()
   {
     int offset = (buffer.get (0) & 0xFF) + 1;
-    return new X500PrincipalList (((ByteBuffer) buffer.position (offset)).slice ());
+    return new X500PrincipalList (((ByteBuffer) buffer.position(offset)).slice());
   }
 
   public String toString()

@@ -88,8 +88,7 @@ public final class CipherSuiteList implements Iterable<CipherSuite>
     if (index < 0 || index >= size)
       throw new IndexOutOfBoundsException ("limit: " + size
                                            + "; requested: " + index);
-    return CipherSuite.forValue (buffer.getShort (2 + (index << 1)))
-      .resolve (version);
+    return CipherSuite.forValue(buffer.getShort(2 + (index << 1))).resolve();
   }
 
   /**

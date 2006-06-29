@@ -43,5 +43,5 @@ package gnu.javax.net.ssl.provider;
  */
 public enum MacAlgorithm
 {
-  NULL, SSLMAC_MD5, SSLMAC_SHA, HMAC_MD5, HMAC_SHA, HMAC_RMD;
+  NULL, MD5, SHA;
 }

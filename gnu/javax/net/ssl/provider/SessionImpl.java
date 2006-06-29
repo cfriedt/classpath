@@ -38,13 +38,155 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.javax.crypto.key.GnuPBEKey;
 import gnu.javax.net.ssl.Session;
-import java.security.SecureRandom;
+import gnu.javax.net.ssl.Session.ID;
 
-public abstract class SessionImpl extends Session
+import java.io.IOException;
+import java.io.Serializable;
+
+import java.security.Certificate;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SealedObject;
+import javax.crypto.spec.PBEKeySpec;
+import javax.net.ssl.SSLException;
+
+public class SessionImpl extends Session
 {
+  static final long serialVersionUID = 8932976607588442485L;
+  CipherSuite suite;
+  ProtocolVersion version;
+  byte[] privateDataSalt;
+  SealedObject sealedPrivateData;
+  MaxFragmentLength maxLength;
+  
+  transient PrivateData privateData;
+  
   SecureRandom random ()
   {
     return random;
+  }
+  
+  public String getProtocol()
+  {
+    return version.toString();
+  }
+  
+  public void prepare(char[] passwd) throws SSLException
+  {
+    try
+      {
+        privateDataSalt = new byte[32];
+        random.nextBytes(privateDataSalt);
+        GnuPBEKey key = new GnuPBEKey(passwd, privateDataSalt, 1000);
+        Cipher cipher = Cipher.getInstance("PBEWithHMacSHA256AndAES/OFB/PKCS7Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        sealedPrivateData = new SealedObject(privateData, cipher);
+      }
+    catch (IllegalBlockSizeException ibse)
+      {
+        throw new SSLException(ibse);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (IOException ioe)
+      {
+        throw new SSLException(ioe);
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+    catch (NoSuchPaddingException nspe)
+      {
+        throw new SSLException(nspe);
+      }
+  }
+  
+  public void repair(char[] passwd) throws SSLException
+  {
+    try
+      {
+        GnuPBEKey key = new GnuPBEKey(passwd, privateDataSalt, 1000);
+        privateData = (PrivateData) sealedPrivateData.getObject(key);
+      }
+    catch (ClassNotFoundException cnfe)
+      {
+        throw new SSLException(cnfe);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (IOException ioe)
+      {
+        throw new SSLException(ioe);
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+  }
+  
+  public SealedObject privateData() throws SSLException
+  {
+    if (privateData == null)
+      throw new SSLException("this session has not been prepared");
+    return sealedPrivateData;
+  }
+  
+  public void setPrivateData(SealedObject so) throws SSLException
+  {
+    this.sealedPrivateData = so;
+  }
+  
+  void setRandom(SecureRandom random)
+  {
+    this.random = random;
+  }
+  
+  void setPacketBufferSize(int size)
+  {
+    this.packetBufferSize = size;
+  }
+  
+  void setTruncatedMac(boolean truncatedMac)
+  {
+    this.truncatedMac = truncatedMac;
+  }
+  
+  void setId(Session.ID id)
+  {
+    this.sessionId = id;
+  }
+  
+  void setLocalCertificates(java.security.cert.Certificate[] chain)
+  {
+    this.localCerts = chain;
+  }
+  
+  void setPeerCertificates(java.security.cert.Certificate[] chain)
+  {
+    this.peerCerts = chain;
+  }
+  
+  void setPeerVerified(boolean peerVerified)
+  {
+    this.peerVerified = peerVerified;
+  }
+  
+  static class PrivateData implements Serializable
+  {
+    static final long serialVersionUID = -8040597659545984581L;
+    byte[] masterSecret;
   }
 }

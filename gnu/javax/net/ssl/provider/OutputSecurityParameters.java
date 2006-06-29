@@ -38,6 +38,8 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.java.io.ByteBufferOutputStream;
+
 import java.nio.ByteBuffer;
 
 import java.util.zip.DataFormatException;
@@ -49,146 +51,234 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
 
-class OutputSecurityParameters
+public class OutputSecurityParameters
 {
   private final Cipher cipher;
   private final Mac mac;
   private final Deflater deflater;
-  private final CipherSuite suite;
+  private final SessionImpl session;
   private long sequence;
 
-  OutputSecurityParameters (final Cipher cipher, final Mac mac,
-                            final Deflater deflater, final CipherSuite suite)
+  public OutputSecurityParameters (final Cipher cipher, final Mac mac,
+                                   final Deflater deflater, SessionImpl session)
   {
     this.cipher = cipher;
     this.mac = mac;
     this.deflater = deflater;
-    this.suite = suite;
+    this.session = session;
     sequence = 0;
   }
 
   /**
    * Encrypt a record, storing the result in the given output buffer.
    *
-   * @return The number of bytes stored into `output;' that is, the
-   * size of the encrypted fragment, plus the encoding for the record.
+   * @return The number of bytes taken from the input, and the number stored
+   * into `output;' that is, the size of the encrypted fragment, plus the
+   * encoding for the record.
    */
-  int encrypt (final Record record, final ByteBuffer output)
+  public int[] encrypt (final ByteBuffer[] input, int offset, int length,
+                        final ContentType contentType, final ByteBuffer output)
     throws DataFormatException, IllegalBlockSizeException, ShortBufferException
   {
-    int macLen = 0;
+    if (offset < 0 || offset >= input.length
+        || length <= 0 || offset + length > input.length)
+      throw new IndexOutOfBoundsException();
+    
+    int maclen = 0;
     if (mac != null)
-      macLen = mac.getMacLength ();
+      maclen = session.isTruncatedMac() ? 10 : mac.getMacLength ();
 
-    int padLen = 0;
-    if (!suite.isStreamCipher ())
+    int ivlen = 0;
+    byte[] iv = null;
+    if (session.version.compareTo(ProtocolVersion.TLS_1_1) >= 0
+        && !session.suite.isStreamCipher())
       {
-        padLen = (cipher.getBlockSize() -
-                  ((record.length () + macLen + 1) % cipher.getBlockSize()));
-        // For TLSv1 or later, we can use a random amout of padding.
-//         if (version != ProtocolVersion.SSL_3 && session.random != null)
-//           {
-//             padLen += (Math.abs(session.random.nextInt ()) & 7) *
-//               outCipher.currentBlockSize();
-//             while (padLen > 255)
-//               padLen -= outCipher.currentBlockSize();
-//           }
+        ivlen = cipher.getBlockSize();
+        iv = new byte[ivlen];
+        session.random().nextBytes(iv);
+      }
+        
+    int padaddlen = 0;
+    if (!session.suite.isStreamCipher()
+        && session.version.compareTo(ProtocolVersion.TLS_1) >= 0)
+      {
+        padaddlen = (session.random().nextInt(255 / cipher.getBlockSize())
+                     * cipher.getBlockSize());
       }
 
     int fragmentLength = 0;
-    ByteBuffer fragment = null;
+    ByteBuffer[] fragments = null;
     // Compress the content, if needed.
     if (deflater != null)
       {
-        ByteBuffer in = record.fragment ();
-        fragment = ByteBuffer.allocate (record.length () + macLen + padLen + 1024);
+        ByteBufferOutputStream deflated = new ByteBufferOutputStream();
+
         byte[] inbuf = new byte[4096];
         byte[] outbuf = new byte[4096];
+        int written = 0;
+        int limit = output.remaining() - (maclen + ivlen + padaddlen) - 1024;
 
-        in.position (0);
-        while (in.hasRemaining ())
+        for (int i = offset; i < length; i++)
           {
-            int l = Math.min (in.remaining (), inbuf.length);
-            in.get (inbuf, 0, l);
-            deflater.setInput (inbuf, 0, l);
-            if (!in.hasRemaining ())
-              deflater.finish ();
-            l = deflater.deflate (outbuf);
-            fragment.put (outbuf, 0, l);
+            ByteBuffer in = input[i];
+            while (in.hasRemaining() && written < limit)
+              {
+                int l = Math.min(in.remaining (), inbuf.length);
+                in.get(inbuf, 0, l);
+                deflater.setInput(inbuf, 0, l);
+                l = deflater.deflate(outbuf);
+                deflated.write(outbuf, 0, l);
+                written += l;
+              }
           }
-        fragmentLength = deflater.getTotalOut () + macLen + padLen;
-        fragment = ((ByteBuffer) fragment.position (0).limit (fragmentLength)).slice ();
+        deflater.finish();
+        while (!deflater.finished())
+          {
+            int l = deflater.deflate(outbuf);
+            deflated.write(outbuf, 0, l);
+            written += l;
+          }
+        fragments = new ByteBuffer[] { deflated.buffer() };
+        fragmentLength = ((int) deflater.getBytesWritten()) + maclen + ivlen;
+        offset = 0;
+        length = 1;
       }
     else
       {
-        fragmentLength = record.length () + macLen + padLen;
-        fragment = ByteBuffer.allocate (fragmentLength);
-        fragment.put (record.fragment ());
+        int limit = output.remaining() - (maclen + ivlen + padaddlen);
+        fragments = input;
+        for (int i = offset; i < length && fragmentLength < limit; i++)
+          {
+            int l = Math.min(limit - fragmentLength, fragments[i].remaining());
+            fragmentLength += l;
+          }
+        fragmentLength += maclen + ivlen;
       }
-
-    CipheredStruct plaintext = null;
-    if (suite.isStreamCipher ())
-      plaintext = new GenericStreamCipher (fragment, fragmentLength - macLen - padLen,
-                                           macLen);
-    else
-      plaintext = new GenericBlockCipher (fragment, fragmentLength - macLen - padLen,
-                                          macLen);
+    
+    // XXX Compute padding...
+    int padlen = 0;
+    byte[] pad = null;
+    if (!session.suite.isStreamCipher())
+      {
+        int bs = cipher.getBlockSize();
+        padlen = bs - ((fragmentLength + bs - 1) % bs);
+        if (session.version.compareTo(ProtocolVersion.TLS_1) >= 0)
+          {
+            // TLS 1.0 and later uses a random amount of padding, up to
+            // 255 bytes. Each byte of the pad is equal to the padding
+            // length, minus one.
+            padlen += session.random().nextInt(256 / bs) * bs;
+            while (padlen > 255)
+              padlen -= bs;
+            pad = new byte[padlen];
+            for (int i = 0; i < padlen; i++)
+              pad[i] = (byte) (padlen - 1);
+          }
+        else
+          {
+            // SSL 3 uses a pad only as large as the block size, but the
+            // pad may contain any values.
+            pad = new byte[padlen];
+            session.random().nextBytes(pad);
+            pad[padlen - 1] = (byte) (padlen - 1);
+          }
+      }
 
     // If there is a MAC, compute it.
+    byte[] macValue = null;
     if (mac != null)
       {
-        mac.update ((byte) (sequence >>> 56));
-        mac.update ((byte) (sequence >>> 48));
-        mac.update ((byte) (sequence >>> 40));
-        mac.update ((byte) (sequence >>> 32));
-        mac.update ((byte) (sequence >>> 24));
-        mac.update ((byte) (sequence >>> 16));
-        mac.update ((byte) (sequence >>>  8));
-        mac.update ((byte)  sequence);
-        mac.update ((byte) record.contentType ().getValue ());
-        ProtocolVersion version = record.version ();
-        if (version != ProtocolVersion.SSL_3)
+        mac.update((byte) (sequence >>> 56));
+        mac.update((byte) (sequence >>> 48));
+        mac.update((byte) (sequence >>> 40));
+        mac.update((byte) (sequence >>> 32));
+        mac.update((byte) (sequence >>> 24));
+        mac.update((byte) (sequence >>> 16));
+        mac.update((byte) (sequence >>>  8));
+        mac.update((byte)  sequence);
+        mac.update((byte) contentType.getValue());
+        if (session.version != ProtocolVersion.SSL_3)
           {
-            mac.update ((byte) version.major ());
-            mac.update ((byte) version.minor ());
+            mac.update((byte) session.version.major ());
+            mac.update((byte) session.version.minor ());
           }
-        mac.update ((byte) (plaintext.contentLength () >>> 8));
-        mac.update ((byte)  plaintext.contentLength ());
-        mac.update (plaintext.content ());
-        plaintext.setMac (mac.doFinal (), 0);
+        mac.update((byte) (fragmentLength >>> 8));
+        mac.update((byte)  fragmentLength);
+        if (iv != null)
+          {
+            mac.update(iv);
+          }
+        int toWrite = fragmentLength - maclen - ivlen - padlen;
+        int written = 0;
+        for (int i = offset; i < length && written < toWrite; i++)
+          {
+            ByteBuffer fragment = fragments[i].slice();
+            int l = Math.min(fragment.remaining(), toWrite - written);
+            fragment.limit(fragment.position() + l);
+            mac.update(fragment);
+          }
+        if (pad != null)
+          {
+            mac.update(pad);
+          }
+        macValue = mac.doFinal();
       }
 
-    Record outrecord = new Record (output);
-    outrecord.setContentType (record.contentType ());
-    outrecord.setVersion (record.version ());
-    outrecord.setLength (fragmentLength);
+    Record outrecord = new Record(output);
+    outrecord.setContentType(contentType);
+    outrecord.setVersion(session.version);
+    outrecord.setLength(fragmentLength);
+    
+    int consumed = 0;
+    ByteBuffer outfragment = outrecord.fragment();
 
     if (cipher != null)
       {
-        if (padLen > 0)
+        if (iv != null)
+          cipher.update(ByteBuffer.wrap(iv), outfragment);
+        int toWrite = fragmentLength - maclen - ivlen - padlen;
+        for (int i = offset; i < offset + length && consumed < toWrite; i++)
           {
-            int x = padLen - 1;
-            byte[] padding = new byte[x];
-            for (int i = 0; i < padding.length; i++)
-              padding[i] = (byte) x;
-            ((GenericBlockCipher) plaintext).setPaddingLength (x);
-            ((GenericBlockCipher) plaintext).setPadding (padding);
+            ByteBuffer fragment = fragments[i].slice();
+            int l = Math.min(fragment.remaining(), toWrite - consumed);
+            fragment.limit(fragment.position() + l);
+            cipher.update(fragment, outfragment);
+            fragments[i].position(fragments[i].position() + l);
+            consumed += l;
           }
-
+        if (macValue != null)
+          cipher.update(ByteBuffer.wrap(macValue), outfragment);
+        if (pad != null)
+          cipher.update(ByteBuffer.wrap(pad), outfragment);
         try
           {
-            cipher.doFinal (fragment, outrecord.fragment ());
+            cipher.doFinal(ByteBuffer.wrap(new byte[0]), outfragment);
           }
         catch (BadPaddingException bpe)
           {
-            throw new RuntimeException ("caught BadPaddingException; this should not happen", bpe);
+            // Should never happen; we are encrypting.
+            throw new Error("bad padding while encrypting", bpe);
           }
       }
     else
-      outrecord.fragment ().put (fragment);
-
+      {
+        // iv and pad are only used if we have a block cipher.
+        int toWrite = fragmentLength - maclen;
+        for (int i = offset; i < offset + length && consumed < toWrite; i++)
+          {
+            ByteBuffer fragment = fragments[i].slice();
+            int l = Math.min(fragment.remaining(), toWrite - consumed);
+            fragment.limit(fragment.position() + l);
+            outfragment.put(fragment);
+            fragments[i].position(fragments[i].position() + l);
+            consumed += l;
+          }
+        if (macValue != null)
+          outfragment.put(macValue);
+      }
+    
     sequence++;
 
-    return fragmentLength + 5;
+    return new int[] { consumed, fragmentLength + 5 };
   }
 }

@@ -38,23 +38,10 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
-import javax.net.ssl.SSLProtocolException;
 
 /**
  * The server hello message.
@@ -81,11 +68,11 @@ public class ServerHello implements Handshake.Body
   // Fields.
   // -------------------------------------------------------------------------
 
-  private static final int RANDOM_OFFSET = 2;
-  private static final int SESSID_OFFSET = 32 + RANDOM_OFFSET;
-  private static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
+  protected static final int RANDOM_OFFSET = 2;
+  protected static final int SESSID_OFFSET = 32 + RANDOM_OFFSET;
+  protected static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
 
-  private final ByteBuffer buffer;
+  protected ByteBuffer buffer;
 
   /** The total length of the message, including the extensions. */
   private int totalLength;
@@ -100,7 +87,13 @@ public class ServerHello implements Handshake.Body
 
   public int length ()
   {
-    return totalLength;
+    int sessionLen = buffer.get(SESSID_OFFSET) & 0xFF;
+    int len = SESSID_OFFSET2 + sessionLen + 3;
+    int elen = 0;
+    if (len + 1 < buffer.limit()
+        && (elen = buffer.getShort(len)) != 0)
+      len += 2 + elen;
+    return len;
   }
 
   /**
@@ -154,11 +147,10 @@ public class ServerHello implements Handshake.Body
    *
    * @return The server's chosen cipher suite.
    */
-  public CipherSuite cipherSuite ()
+  public CipherSuite cipherSuite()
   {
-    int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 1;
-    return (CipherSuite.forValue (buffer.getShort (offset))
-            .resolve (version ()));
+    int offset = SESSID_OFFSET2 + (buffer.get(SESSID_OFFSET) & 0xFF);
+    return CipherSuite.forValue(buffer.getShort(offset)).resolve();
   }
 
   /**
@@ -166,70 +158,36 @@ public class ServerHello implements Handshake.Body
    *
    * @return The chosen compression method.
    */
-  public CompressionMethod compressionMethod ()
+  public CompressionMethod compressionMethod()
   {
-    int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 3;
-    return CompressionMethod.getInstance (buffer.get (offset) & 0xFF);
+    int offset = SESSID_OFFSET2 + (buffer.get(SESSID_OFFSET) & 0xFF) + 2;
+    return CompressionMethod.getInstance(buffer.get(offset) & 0xFF);
   }
 
+  public int extensionsLength()
+  {
+    int offset = SESSID_OFFSET2 + (buffer.get (SESSID_OFFSET) & 0xFF) + 3;
+    if (offset + 1 >= buffer.limit())
+      return 0;
+    return buffer.getShort(offset) & 0xFFFF;
+  }
+  
   public ExtensionList extensions ()
   {
-    int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 4;
-    if (offset == totalLength)
-      return null;
-    if (buffer.limit() <= offset)
+    int offset = SESSID_OFFSET2 + (buffer.get (SESSID_OFFSET) & 0xFF) + 3;
+    if (offset + 1 >= buffer.limit())
       return null;
     int len = buffer.getShort(offset) & 0xFFFF;
     if (len == 0)
       len = buffer.limit() - offset - 2;
-    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate ().position (offset)
-                       .limit (offset + len + 2)).slice ();
-    return new ExtensionList (ebuf);
+    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate().position(offset)
+                       .limit(offset + len + 2)).slice();
+    return new ExtensionList(ebuf);
   }
 
-  public void setVersion (final ProtocolVersion version)
+  public String toString()
   {
-    buffer.putShort (0, (short) version.rawValue ());
-  }
-
-  public void setSessionId (final byte[] sessionId)
-  {
-    setSessionId (sessionId, 0, sessionId.length);
-  }
-
-  public void setSessionId (final byte[] sessionId, final int offset,
-                            final int length)
-  {
-    int len = Math.min (length, 32);
-    buffer.put (SESSID_OFFSET, (byte) len);
-    buffer.position (SESSID_OFFSET2);
-    buffer.put (sessionId, offset, len);
-  }
-
-  public void setCipherSuite (final CipherSuite suite)
-  {
-    int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 1;
-    buffer.position (offset);
-    buffer.put (suite.id ());
-  }
-
-  public void setCompressionMethod (final CompressionMethod comp)
-  {
-    int offset = SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 3;
-    buffer.put (offset, (byte) comp.getValue ());
-  }
-
-  public void setExtensionsLength (final int length)
-  {
-    totalLength = (SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF)
-                   + 4 + length + 4);
-    buffer.putShort (SESSID_OFFSET + (buffer.get (SESSID_OFFSET) & 0xFF) + 4,
-                     (short) length);
-  }
-
-  public String toString ()
-  {
-    return toString (null);
+    return toString(null);
   }
 
   public String toString (final String prefix)

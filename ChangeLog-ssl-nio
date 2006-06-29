@@ -1,5 +1,85 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* gnu/javax/net/ssl/provider/AbstractHandshake.java: implement
+	numerous "common" methods in server and client handshakes.
+	* gnu/javax/net/ssl/provider/AlertException.java: made public; add
+	cause constructors.
+	* gnu/javax/net/ssl/provider/Builder.java: new file.
+	* gnu/javax/net/ssl/provider/Certificate.java: make subclassable.
+	* gnu/javax/net/ssl/provider/CertificateBuilder.java: new file.
+	* gnu/javax/net/ssl/provider/CertificateRequest.java: make
+	subclassable.
+	* gnu/javax/net/ssl/provider/CertificateRequestBuilder.java: new
+	file.
+	* gnu/javax/net/ssl/provider/CipherSuite.java: remove dependence
+	on protocol version.
+	* gnu/javax/net/ssl/provider/ClientHello.java (hasExtensions): new
+	method.
+	* gnu/javax/net/ssl/provider/ClientHelloV2.java (cipherSpecs):
+	genericize collections.
+	* gnu/javax/net/ssl/provider/ClientKeyExchange.java: make version
+	argument explicit, instead of implied by the cipher suite.
+	* gnu/javax/net/ssl/provider/Constructed.java: expand JavaDocs.
+	* gnu/javax/net/ssl/provider/Finished.java: accept TLS 1.1 version
+	numbers, too.
+	* gnu/javax/net/ssl/provider/Handshake.java: make version
+	explicit, instead of implied by the cipher suite.
+	* gnu/javax/net/ssl/provider/InputSecurityParameters.java: made
+	public.
+	(suite): removed.
+	(session): new field (replaces/encapsulates `suite').
+	(<init>): made public; take a SessionImpl, not a CipherSuite.
+	(decrypt, decrypt, decrypt): add support for growable buffers AND
+	a fixed-size array of buffers (we use the former internally; the
+	latter is used to implement the scatter/gather model of
+	SSLEngine.
+	* gnu/javax/net/ssl/provider/Jessie.java: update algorithms.
+	* gnu/javax/net/ssl/provider/MacAlgorithm.java: just specify
+	NULL/MD5/SHA, not version-specific algorithms.
+	* gnu/javax/net/ssl/provider/OutputSecurityParameters.java:
+	replace suite with session; support scatter/gather operation.
+	* gnu/javax/net/ssl/provider/ProtocolVersion.java: implement
+	Comparable<ProtocolVersion>.
+	* gnu/javax/net/ssl/provider/Random.java: implement Builder.
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/SSLContextImpl.java: new file.
+	* gnu/javax/net/ssl/provider/SSLEngineImpl.java: numerous changes;
+	largely implemented now.
+	* gnu/javax/net/ssl/provider/SSLv3HMacMD5Impl.java: new file.
+	* gnu/javax/net/ssl/provider/SSLv3HMacSHAImpl.java: new file.
+	* gnu/javax/net/ssl/provider/ServerDHParams.java: implement
+	Builder.
+	(<init>): new constructor that takes known parameters.
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/ServerHandshake.java: numerous
+	changes; largely implemented now.
+	* gnu/javax/net/ssl/provider/ServerHello.java: make subclassable.
+	* gnu/javax/net/ssl/provider/ServerHelloBuilder.java: new file.
+	* gnu/javax/net/ssl/provider/ServerKeyExchange.java: make
+	subclassable.
+	* gnu/javax/net/ssl/provider/ServerKeyExchangeBuilder.java: new
+	file.
+	* gnu/javax/net/ssl/provider/SessionImpl.java: expanded.
+	* gnu/javax/net/ssl/provider/Signature.java: implement Builder.
+	(<init>): new method, that takes a pre-computed signature.
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/SimpleSessionContext.java: new file.
+	* gnu/javax/net/ssl/provider/X509KeyManagerFactory.java:
+	genericize Collections usage.
+	(Manager): extend X509ExtendedKeyManager; genericize fields.
+	(Manager.chooseEngineClientAlias): new method.
+	(Manager.chooseEngineServerAlias): new method.
+	* gnu/javax/net/ssl/provider/X509TrustManagerFactory.java (sep):
+	new constant; use it instead of constantly calling getProperty.
+	(init): genericize lists.
+	(Manager.trusted): removed.
+	(Manager.anchors): new field (replacement for above).
+	(<init>): handle changes to fields.
+	(getAcceptedIssuers): use `anchors.toArray().'
+	(checkTrusted): use a PKIX CertPathVerifier.
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* gnu/javax/net/ssl/AbstractSessionContext.java: renamed from
 	`SessionStore.' Implement SessionContext.
 	* gnu/javax/net/ssl/PrivateCredentials.java: genericize

@@ -90,19 +90,22 @@ public final class Handshake implements Constructed
 
   private final ByteBuffer buffer;
   private final CipherSuite suite;
+  private final ProtocolVersion version;
 
   // Constructors.
   // -------------------------------------------------------------------------
 
   public Handshake (final ByteBuffer buffer)
   {
-    this (buffer, null);
+    this (buffer, null, ProtocolVersion.TLS_1_1);
   }
 
-  public Handshake (final ByteBuffer buffer, final CipherSuite suite)
+  public Handshake (final ByteBuffer buffer, final CipherSuite suite,
+                    final ProtocolVersion version)
   {
     this.buffer = buffer;
     this.suite = suite;
+    this.version = version;
   }
 
   // Instance methods.
@@ -166,10 +169,10 @@ public final class Handshake implements Constructed
         return new CertificateVerify (bodyBuffer, suite.signatureAlgorithm ());
 
       case CLIENT_KEY_EXCHANGE:
-        return new ClientKeyExchange (bodyBuffer, suite);
+        return new ClientKeyExchange (bodyBuffer, suite, version);
 
       case FINISHED:
-        return new Finished (bodyBuffer, suite.version ());
+        return new Finished (bodyBuffer, version);
 
       case CERTIFICATE_URL:
       case CERTIFICATE_STATUS:

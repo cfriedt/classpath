@@ -79,7 +79,7 @@ case dsa:
   };
 } Signature;</pre>
  */
-public class Signature implements Constructed
+public class Signature implements Builder, Constructed
 {
 
   // Fields.
@@ -96,6 +96,15 @@ public class Signature implements Constructed
     this.buffer = buffer;
     this.alg = alg;
   }
+  
+  public Signature (final byte[] sigValue, final SignatureAlgorithm alg)
+  {
+    buffer = ByteBuffer.allocate(sigValue.length + 2);
+    buffer.putShort((short) sigValue.length);
+    buffer.put(sigValue);
+    buffer.position(0);
+    this.alg = alg;
+  }
 
   // Instance methods.
   // -------------------------------------------------------------------------
@@ -106,6 +115,11 @@ public class Signature implements Constructed
       return 0;
     return (buffer.getShort (0) & 0xFFFF) + 2;
   }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
+  }
 
   public byte[] signature ()
   {
@@ -113,8 +127,7 @@ public class Signature implements Constructed
       return new byte[0];
     int length = buffer.getShort (0) & 0xFFFF;
     byte[] buf = new byte[length];
-    buffer.position (2);
-    buffer.get (buf);
+    ((ByteBuffer) buffer.duplicate().position(2)).get(buf);
     return buf;
   }
 
