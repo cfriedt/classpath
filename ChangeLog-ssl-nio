@@ -1,5 +1,9 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* gnu/javax/crypto/key/GnuPBEKey.java: new file.
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* gnu/javax/net/ssl/provider/AbstractHandshake.java: implement
 	numerous "common" methods in server and client handshakes.
 	* gnu/javax/net/ssl/provider/AlertException.java: made public; add
