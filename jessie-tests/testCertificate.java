@@ -1,6 +1,9 @@
 
 
+import gnu.java.security.x509.Util;
 import gnu.javax.net.ssl.provider.Certificate;
+import gnu.javax.net.ssl.provider.CertificateBuilder;
+import gnu.javax.net.ssl.provider.CertificateType;
 import gnu.javax.net.ssl.provider.Handshake;
 
 import java.io.ByteArrayInputStream;
@@ -53,12 +56,15 @@ class testCertificate
     handshake.setType (Handshake.Type.CERTIFICATE);
     handshake.setLength (alloc_len - 4);
 
-    Certificate _cert = (Certificate) handshake.body ();
+    CertificateBuilder _cert = new CertificateBuilder(CertificateType.X509);
     _cert.setCertificates (Collections.singletonList (cert));
     System.err.println (_cert.certificates ());
     System.err.println (_cert);
     handshake.setLength (_cert.length ());
+    handshake.bodyBuffer().put(_cert.buffer());
 
+    System.err.println(handshake);
+    
     Handshake handshake2 = new Handshake (buffer);
     Certificate _cert2 = (Certificate) handshake2.body ();
     List certs = _cert2.certificates ();

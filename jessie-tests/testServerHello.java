@@ -7,6 +7,7 @@ import gnu.javax.net.ssl.provider.Handshake;
 import gnu.javax.net.ssl.provider.ProtocolVersion;
 import gnu.javax.net.ssl.provider.Random;
 import gnu.javax.net.ssl.provider.ServerHello;
+import gnu.javax.net.ssl.provider.ServerHelloBuilder;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -35,7 +36,7 @@ class testServerHello
     handshake.setType (Handshake.Type.SERVER_HELLO);
     handshake.setLength (alloc_len - 4);
 
-    ServerHello hello = (ServerHello) handshake.body ();
+    ServerHelloBuilder hello = new ServerHelloBuilder();
 
     hello.setVersion (ProtocolVersion.TLS_1);
     Random random = hello.random ();
@@ -60,26 +61,27 @@ class testServerHello
     exts.get(1).setValue(new byte[3]);
 
     handshake.setLength (hello.length ());
+    handshake.bodyBuffer().put(hello.buffer());
     System.err.println (handshake);
 
     handshake = new Handshake (buffer);
-    hello = (ServerHello) handshake.body ();
-    if (Arrays.equals (sessionId, hello.sessionId ()))
+    ServerHello hello2 = (ServerHello) handshake.body ();
+    if (Arrays.equals (sessionId, hello2.sessionId ()))
       System.out.println ("PASS: sessionId");
     else
       System.out.println ("FAIL: sessionId");
 
-    if (hello.cipherSuite () == CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA)
+    if (hello2.cipherSuite () == CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA)
       System.out.println ("PASS: cipherSuite");
     else
       System.out.println ("FAIL: cipherSuite");
 
-    if (hello.compressionMethod () == CompressionMethod.ZLIB)
+    if (hello2.compressionMethod () == CompressionMethod.ZLIB)
       System.out.println ("PASS: compressionMethod");
     else
       System.out.println ("FAIL: compressionMethod");
     
-    exts = hello.extensions();
+    exts = hello2.extensions();
     Extension e = exts.get(0);
     if (e.type() == Extension.Type.MAX_FRAGMENT_LENGTH)
       System.out.println ("PASS: extensions().get(0).type");
@@ -107,7 +109,7 @@ class testServerHello
     handshake.setType (Handshake.Type.SERVER_HELLO);
     handshake.setLength (70);
 
-    hello = (ServerHello) handshake.body ();
+    hello = new ServerHelloBuilder();
 
     hello.setVersion (ProtocolVersion.TLS_1); // 2
     random = hello.random ();
@@ -122,9 +124,11 @@ class testServerHello
     hello.setSessionId (sessionId);           // + 33
     hello.setCipherSuite (CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA); // + 2
     hello.setCompressionMethod (CompressionMethod.ZLIB); // + 1
+    handshake.setLength(hello.length());
+    handshake.bodyBuffer().put(hello.buffer());
     
     handshake = new Handshake (buffer);
-    hello = (ServerHello) handshake.body();
+    hello2 = (ServerHello) handshake.body();
     if (hello.extensions() == null)
       System.out.println ("PASS: hello.extensions() == null");
     else

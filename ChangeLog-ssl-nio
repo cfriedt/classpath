@@ -1,5 +1,12 @@
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
+	* jessie-tests/testCertificate.java: update for Builder
+	interface and API changes.
+	* jessie-tests/testServerHello.java: likewise.
+	* jessie-tests/testServerKeyExchange.java: likewise.
+
+2006-06-28  Casey Marshall  <csm@gnu.org>
+
 	* gnu/javax/crypto/key/GnuPBEKey.java: new file.
 
 2006-06-28  Casey Marshall  <csm@gnu.org>

@@ -1,5 +1,6 @@
 import gnu.javax.net.ssl.provider.CipherSuite;
 import gnu.javax.net.ssl.provider.Handshake;
+import gnu.javax.net.ssl.provider.ProtocolVersion;
 import gnu.javax.net.ssl.provider.ServerKeyExchange;
 import gnu.javax.net.ssl.provider.ServerRSAParams;
 import gnu.javax.net.ssl.provider.Signature;
@@ -26,7 +27,7 @@ class testServerKeyExchange
   static void check () throws Exception
   {
     ByteBuffer buffer = ByteBuffer.allocate (1024);
-    Handshake handshake = new Handshake (buffer, CipherSuite.SSL_RSA_WITH_NULL_MD5);
+    Handshake handshake = new Handshake (buffer, CipherSuite.TLS_RSA_WITH_NULL_MD5, ProtocolVersion.TLS_1_1);
 
     handshake.setType (Handshake.Type.SERVER_KEY_EXCHANGE);
     handshake.setLength (1019);
@@ -46,7 +47,7 @@ class testServerKeyExchange
 
     handshake.setLength (kex.length ());
 
-    handshake = new Handshake (buffer, CipherSuite.SSL_RSA_WITH_NULL_MD5);
+    handshake = new Handshake (buffer, CipherSuite.TLS_RSA_WITH_NULL_MD5, ProtocolVersion.TLS_1_1);
     kex = (ServerKeyExchange) handshake.body ();
     params = (ServerRSAParams) kex.params ();
     sig = kex.signature ();
