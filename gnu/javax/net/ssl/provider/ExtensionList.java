@@ -3,6 +3,7 @@ package gnu.javax.net.ssl.provider;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.ListIterator;
@@ -23,7 +24,7 @@ public class ExtensionList implements Iterable<Extension>
 
   public ExtensionList (ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     modCount = 0;
   }
 

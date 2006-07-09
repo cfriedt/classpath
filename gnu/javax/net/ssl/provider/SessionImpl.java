@@ -69,6 +69,12 @@ public class SessionImpl extends Session
   
   transient PrivateData privateData;
   
+  public SessionImpl()
+  {
+    super();
+    privateData = new PrivateData();
+  }
+  
   SecureRandom random ()
   {
     return random;
@@ -148,15 +154,15 @@ public class SessionImpl extends Session
   {
     this.sealedPrivateData = so;
   }
+
+  void setApplicationBufferSize(int size)
+  {
+    applicationBufferSize = size;
+  }
   
   void setRandom(SecureRandom random)
   {
     this.random = random;
-  }
-  
-  void setPacketBufferSize(int size)
-  {
-    this.packetBufferSize = size;
   }
   
   void setTruncatedMac(boolean truncatedMac)

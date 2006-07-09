@@ -46,13 +46,18 @@ import static gnu.javax.net.ssl.provider.Handshake.Type.*;
 
 import gnu.classpath.Configuration;
 import gnu.classpath.debug.Component;
+import gnu.java.security.action.GetSecurityPropertyAction;
 import gnu.javax.crypto.key.dh.GnuDHPublicKey;
+import gnu.javax.net.ssl.AbstractSessionContext;
+import gnu.javax.net.ssl.Session;
+import gnu.javax.net.ssl.Session.ID;
 import gnu.javax.net.ssl.provider.CertificateRequest.ClientCertificateType;
 import gnu.javax.net.ssl.provider.ServerNameList.ServerName;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
+import java.security.AccessController;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
@@ -66,12 +71,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
@@ -83,19 +85,16 @@ import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
+import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSessionContext;
 import javax.net.ssl.X509ExtendedKeyManager;
-import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
-import javax.net.ssl.SSLEngineResult.Status;
 import javax.security.auth.x500.X500Principal;
 
 class ServerHandshake extends AbstractHandshake
@@ -144,8 +143,6 @@ class ServerHandshake extends AbstractHandshake
   private final SSLEngineImpl engine;
 
   /* Handshake result fields. */
-  private ProtocolVersion version;
-  private CipherSuite suite;
   private CompressionMethod compression;
   private Random clientRandom;
   private Random serverRandom;
@@ -156,6 +153,14 @@ class ServerHandshake extends AbstractHandshake
   private String keyAlias = null;
   private X509Certificate clientCert = null;
   private X509Certificate localCert = null;
+  private boolean helloV2 = false;
+  
+  /**
+   * We remember this to ensure that we use a different one if the client's
+   * session ID happens to be the same as our random one (this is possible,
+   * if the random we're initialized with is predictable).
+   */
+  private Session.ID clientSessionID;
 
   private InputSecurityParameters inParams;
   private OutputSecurityParameters outParams;
@@ -206,16 +211,27 @@ class ServerHandshake extends AbstractHandshake
    * Choose the first cipher suite in the client's requested list that
    * we have enabled.
    */
-  private static CipherSuite chooseSuite (final CipherSuiteList clientSuites,
-                                          final String[] enabledSuites,
-                                          final ProtocolVersion version)
+  private CipherSuite chooseSuite (final CipherSuiteList clientSuites,
+                                   final String[] enabledSuites,
+                                   final ProtocolVersion version)
     throws SSLException
   {
-    HashSet<CipherSuite> suites = new HashSet<CipherSuite> (enabledSuites.length);
+    // Figure out which SignatureAlgorithms we can support.
+    HashSet<SignatureAlgorithm> sigs = new HashSet<SignatureAlgorithm>(2);
+    X509ExtendedKeyManager km = engine.contextImpl.keyManager;
+    if (km.getServerAliases(SignatureAlgorithm.DSA.name(), null).length != 0)
+      sigs.add(SignatureAlgorithm.DSA);
+    if (km.getServerAliases(SignatureAlgorithm.RSA.name(), null).length != 0)
+      sigs.add(SignatureAlgorithm.RSA);
+    
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE, "we have certs for signature algorithms {0}", sigs);
+    
+    HashSet<CipherSuite> suites = new HashSet<CipherSuite>(enabledSuites.length);
     for (String s : enabledSuites)
       {
         CipherSuite suite = CipherSuite.forName(s);
-        if (suite != null)
+        if (suite != null && sigs.contains(suite.signatureAlgorithm()))
           suites.add (suite);
       }
     for (CipherSuite suite : clientSuites)
@@ -238,11 +254,17 @@ class ServerHandshake extends AbstractHandshake
   private static CompressionMethod chooseCompression (final CompressionMethodList comps)
     throws SSLException
   {
+    GetSecurityPropertyAction gspa
+      = new GetSecurityPropertyAction("jessie.enable.compression");
+    String enable = AccessController.doPrivileged(gspa);
     // Scan for ZLIB first.
-    for (CompressionMethod cm : comps)
+    if (Boolean.valueOf(enable))
       {
-        if (cm.equals (CompressionMethod.ZLIB))
-          return CompressionMethod.ZLIB;
+        for (CompressionMethod cm : comps)
+          {
+            if (cm.equals (CompressionMethod.ZLIB))
+              return CompressionMethod.ZLIB;
+          }
       }
     for (CompressionMethod cm : comps)
       {
@@ -255,67 +277,66 @@ class ServerHandshake extends AbstractHandshake
   
   protected @Override boolean doHash()
   {
-    return state != WRITE_HELLO_REQUEST;
+    boolean b = helloV2;
+    helloV2 = false;
+    return (state != WRITE_HELLO_REQUEST) && !b;
   }
 
-  public @Override HandshakeStatus handleInput (ByteBuffer fragment)
+  public @Override HandshakeStatus implHandleInput()
     throws SSLException
-  {
+  {    
     if (state == DONE)
       return HandshakeStatus.FINISHED;
 
-    if (state.isWriteState() || outBuffer.hasRemaining())
+    if (state.isWriteState()
+        || (outBuffer != null && outBuffer.hasRemaining()))
       return HandshakeStatus.NEED_WRAP;
 
-    // If we don't have a message already waiting...
-    if (!hasMessage())
-      {
-        // Try to read another...
-        if (!pollHandshake (fragment))
-          return HandshakeStatus.NEED_UNWRAP;
-
-        // Otherwise, we've got something to process.
-      }
-
-    while (hasMessage() && state.isReadState())
-      {
-        // Copy the current buffer, and prepare it for reading.
-        ByteBuffer buffer = handshakeBuffer.duplicate ();
-        buffer.flip();
-        buffer.position(handshakeOffset);
-        Handshake handshake = new Handshake(buffer.slice());
+    // Copy the current buffer, and prepare it for reading.
+    ByteBuffer buffer = handshakeBuffer.duplicate ();
+    buffer.flip();
+    buffer.position(handshakeOffset);
+    Handshake handshake = new Handshake(buffer.slice(),
+                                        engine.session().suite,
+                                        engine.session().version);
         
-        if (Configuration.DEBUG)
-          logger.logv(Component.SSL_HANDSHAKE, "processing in state {0}: {1}",
-                      state, handshake);
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE, "processing in state {0}:\n{1}",
+                  state, handshake);
 
-        switch (state)
-        {
-          // Client Hello.
-          //
-          // This message is sent by the client to initiate a new handshake.
-          // On a new connection, it is the first handshake message sent.
-          //
-          // The state of the handshake, after this message is processed,
-          // will have a protocol version, cipher suite, compression method,
-          // session ID, and various extensions (that the server also
-          // supports).
-          case READ_CLIENT_HELLO:
-            if (handshake.type () != CLIENT_HELLO)
-              throw new SSLException ("expecting client hello");
-            // XXX throw better exception.
+    switch (state)
+      {
+        // Client Hello.
+        //
+        // This message is sent by the client to initiate a new handshake.
+        // On a new connection, it is the first handshake message sent.
+        //
+        // The state of the handshake, after this message is processed,
+        // will have a protocol version, cipher suite, compression method,
+        // session ID, and various extensions (that the server also
+        // supports).
+        case READ_CLIENT_HELLO:
+          if (handshake.type () != CLIENT_HELLO)
+            throw new SSLException ("expecting client hello");
+          // XXX throw better exception.
 
           {
             ClientHello hello = (ClientHello) handshake.body ();
             engine.session().version
               = chooseProtocol (hello.version (),
                                 engine.getEnabledProtocols ());
-            engine.session().suite
-              = chooseSuite (hello.cipherSuites (),
-                             engine.getEnabledCipherSuites (), version);
+            engine.session().suite =
+              chooseSuite (hello.cipherSuites (),
+                           engine.getEnabledCipherSuites (),
+                           engine.session().version);
             compression = chooseCompression (hello.compressionMethods ());
-            clientRandom = hello.random ().copy ();
-            byte[] sessionId = hello.sessionId ();
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_HANDSHAKE,
+                          "chose version:{0} suite:{1} compression:{2}",
+                          engine.session().version, engine.session().suite,
+                          compression);
+            clientRandom = hello.random().copy();
+            byte[] sessionId = hello.sessionId();
             if (hello.hasExtensions())
               {
                 ExtensionList exts = hello.extensions();
@@ -334,7 +355,7 @@ class ServerHandshake extends AbstractHandshake
                     case MAX_FRAGMENT_LENGTH:
                       MaxFragmentLength len = (MaxFragmentLength) e.value();
                       engine.session().maxLength = len;
-                      engine.session().setPacketBufferSize(len.maxLength() + 2048);
+                      engine.session().setApplicationBufferSize(len.maxLength());
                       break;
                       
                     case SERVER_NAME:
@@ -351,36 +372,50 @@ class ServerHandshake extends AbstractHandshake
                     }
                   }
               }
-            SSLSessionContext sessions =
+            AbstractSessionContext sessions = (AbstractSessionContext)
               engine.contextImpl.engineGetServerSessionContext();
             SSLSession s = sessions.getSession(sessionId);
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_HANDSHAKE, "looked up saved session {0}", s);
             if (s != null && s.isValid() && (s instanceof SessionImpl))
               {
                 engine.setSession((SessionImpl) s);
                 continuedSession = true;
-                version = ((SessionImpl) s).version;
+              }
+            else
+              {
+                // We *may* wind up with a badly seeded PRNG, and emit the
+                // same session ID over and over (this did happen to me,
+                // so we add this sanity check just in case).
+                if (engine.session().id().equals(new Session.ID(sessionId)))
+                  {
+                    byte[] newId = new byte[32];
+                    engine.session().random().nextBytes(newId);
+                    engine.session().setId(new Session.ID(newId));
+                  }
+                sessions.put(engine.session());
               }
             state = WRITE_SERVER_HELLO;
           }
           break;
 
-          // Certificate.
-          //
-          // This message is sent by the client if the server had previously
-          // requested that the client authenticate itself with a certificate,
-          // and if the client has an appropriate certificate available.
-          //
-          // Processing this message will save the client's certificate,
-          // rejecting it if the certificate is not trusted, in preparation
-          // for the certificate verify message that will follow.
-          case READ_CERTIFICATE:
+        // Certificate.
+        //
+        // This message is sent by the client if the server had previously
+        // requested that the client authenticate itself with a certificate,
+        // and if the client has an appropriate certificate available.
+        //
+        // Processing this message will save the client's certificate,
+        // rejecting it if the certificate is not trusted, in preparation
+        // for the certificate verify message that will follow.
+        case READ_CERTIFICATE:
           {
             if (handshake.type() != CERTIFICATE)
               {
                 if (engine.getNeedClientAuth()) // XXX throw better exception.
                   throw new SSLException("client auth required");
                 state = READ_CLIENT_KEY_EXCHANGE;
-                continue;
+                return HandshakeStatus.NEED_UNWRAP;
               }
             
             Certificate cert = (Certificate) handshake.body();
@@ -415,15 +450,15 @@ class ServerHandshake extends AbstractHandshake
           }
           break;
 
-          // Client Key Exchange.
-          //
-          // The client's key exchange. This message is sent either following
-          // the certificate message, or if no certificate is available or
-          // requested, following the server's hello done message.
-          //
-          // After receipt of this message, the session keys for this
-          // session will have been created.
-          case READ_CLIENT_KEY_EXCHANGE:
+        // Client Key Exchange.
+        //
+        // The client's key exchange. This message is sent either following
+        // the certificate message, or if no certificate is available or
+        // requested, following the server's hello done message.
+        //
+        // After receipt of this message, the session keys for this
+        // session will have been created.
+        case READ_CLIENT_KEY_EXCHANGE:
           {
             if (handshake.type() != CLIENT_KEY_EXCHANGE)
               throw new SSLException("expecting client key exchange");
@@ -489,30 +524,34 @@ class ServerHandshake extends AbstractHandshake
                                          engine.session());
             try
               {
-                CipherSuite suite = engine.session().suite;
-                Cipher inCipher = suite.cipher();
-                Mac inMac = suite.mac(engine.session().version);
+                CipherSuite s = engine.session().suite;
+                Cipher inCipher = s.cipher();
+                Mac inMac = s.mac(engine.session().version);
                 Inflater inflater = (compression == CompressionMethod.ZLIB
                                      ? new Inflater() : null); 
                 inCipher.init(Cipher.DECRYPT_MODE,
-                              new SecretKeySpec(keys[2], suite.cipherAlgorithm().toString()),
+                              new SecretKeySpec(keys[2],
+                                                s.cipherAlgorithm().toString()),
                               new IvParameterSpec(keys[4]));
-                inMac.init(new SecretKeySpec(keys[0], suite.macAlgorithm().toString()));
+                inMac.init(new SecretKeySpec(keys[0],
+                                             inMac.getAlgorithm()));
                 inParams = new InputSecurityParameters(inCipher, inMac,
                                                        inflater,
-                                                       engine.session());
+                                                       engine.session(), s);
                 
-                Cipher outCipher = suite.cipher();
-                Mac outMac = suite.mac(engine.session().version);
+                Cipher outCipher = s.cipher();
+                Mac outMac = s.mac(engine.session().version);
                 Deflater deflater = (compression == CompressionMethod.ZLIB
                                      ? new Deflater() : null);
                 outCipher.init(Cipher.ENCRYPT_MODE,
-                               new SecretKeySpec(keys[3], suite.cipherAlgorithm().toString()),
+                               new SecretKeySpec(keys[3],
+                                                 s.cipherAlgorithm().toString()),
                                new IvParameterSpec(keys[5]));
-                inMac.init(new SecretKeySpec(keys[1], suite.macAlgorithm().toString()));
+                outMac.init(new SecretKeySpec(keys[1],
+                                              outMac.getAlgorithm()));
                 outParams = new OutputSecurityParameters(outCipher, outMac,
                                                          deflater,
-                                                         engine.session());
+                                                         engine.session(), s);
               }
             catch (InvalidAlgorithmParameterException iape)
               {
@@ -535,21 +574,26 @@ class ServerHandshake extends AbstractHandshake
               state = READ_CERTIFICATE_VERIFY;
             else
               {
-                engine.changeCipherSpec();
-                state = WRITE_FINISHED;
+                if (continuedSession)
+                  {
+                    engine.changeCipherSpec();
+                    state = WRITE_FINISHED;
+                  }
+                else
+                  state = READ_FINISHED;
               }
           }
           break;
 
-          // Certificate Verify.
-          //
-          // This message is sent following the client key exchange message,
-          // but only when the client included its certificate in a previous
-          // message.
-          //
-          // After receipt of this message, the client's certificate (and,
-          // to a degree, the client's identity) will have been verified.
-          case READ_CERTIFICATE_VERIFY:
+        // Certificate Verify.
+        //
+        // This message is sent following the client key exchange message,
+        // but only when the client included its certificate in a previous
+        // message.
+        //
+        // After receipt of this message, the client's certificate (and,
+        // to a degree, the client's identity) will have been verified.
+        case READ_CERTIFICATE_VERIFY:
           {
             if (handshake.type() != CERTIFICATE_VERIFY)
               throw new SSLException("expecting certificate verify message");
@@ -565,22 +609,29 @@ class ServerHandshake extends AbstractHandshake
                 if (engine.getNeedClientAuth())
                   throw new SSLException("client auth failed", se);
               }
+            if (continuedSession)
+              {
+                engine.changeCipherSpec();
+                state = WRITE_FINISHED;
+              }
+            else
+              state = READ_FINISHED;
           }
           break;
           
-          // Finished.
-          //
-          // This message is sent immediately following the change cipher
-          // spec message (which is sent outside of the handshake layer).
-          // After receipt of this message, the session keys for the client
-          // side will have been verified (this is the first message the
-          // client sends encrypted and authenticated with the newly
-          // negotiated keys).
-          //
-          // In the case of a continued session, the client sends its
-          // finished message first. Otherwise, the server will send its
-          // finished message first.
-          case READ_FINISHED:
+        // Finished.
+        //
+        // This message is sent immediately following the change cipher
+        // spec message (which is sent outside of the handshake layer).
+        // After receipt of this message, the session keys for the client
+        // side will have been verified (this is the first message the
+        // client sends encrypted and authenticated with the newly
+        // negotiated keys).
+        //
+        // In the case of a continued session, the client sends its
+        // finished message first. Otherwise, the server will send its
+        // finished message first.
+        case READ_FINISHED:
           {
             if (handshake.type() != FINISHED)
               {
@@ -604,13 +655,14 @@ class ServerHandshake extends AbstractHandshake
               }
             Finished serverFinished =
               new Finished(generateFinished(md5copy, shacopy,
-                                            true, engine.session()), version);
+                                            true, engine.session()),
+                                            engine.session().version);
 
-            if (Configuration.DEBUG)
+            if (Debug.DEBUG)
               logger.log(Component.SSL_HANDSHAKE, "server finished: {0}",
                          serverFinished);
             
-            if (version == ProtocolVersion.SSL_3)
+            if (engine.session().version == ProtocolVersion.SSL_3)
               {
                 if (!Arrays.equals(clientFinished.md5Hash(),
                                    serverFinished.md5Hash())
@@ -640,10 +692,9 @@ class ServerHandshake extends AbstractHandshake
               }
           }
           break;
-        }
-
-        handshakeOffset += handshake.length();
       }
+
+    handshakeOffset += handshake.length() + 4;
 
     if (state.isReadState())
       return HandshakeStatus.NEED_UNWRAP;
@@ -656,6 +707,11 @@ class ServerHandshake extends AbstractHandshake
   public @Override HandshakeStatus implHandleOutput (ByteBuffer fragment)
     throws SSLException
   {
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE,
+                  "handle output state: {0}; output fragment: {1}",
+                  state, fragment);
+    
     // Drain the output buffer, if it needs it.
     if (outBuffer != null && outBuffer.hasRemaining())
       {
@@ -671,7 +727,7 @@ class ServerHandshake extends AbstractHandshake
         else
           return HandshakeStatus.NEED_UNWRAP;
       }
-
+    
     // XXX what we need to do here is generate a "stream" of handshake
     // messages, and insert them into fragment amounts that we have available.
     // A handshake message can span multiple records, and we can put
@@ -732,6 +788,7 @@ class ServerHandshake extends AbstractHandshake
     //     when we run out of space in the output buffer, and split the
     //     overflow message. This sounds like the best, but also probably
     //     the hardest to code.
+output_loop:
     while (fragment.remaining() >= 4 && state.isWriteState())
       {
         switch (state)
@@ -746,11 +803,11 @@ class ServerHandshake extends AbstractHandshake
               handshake.setType(Handshake.Type.HELLO_REQUEST);
               handshake.setLength(0);
               fragment.position(fragment.position() + 4);
-              if (Configuration.DEBUG)
+              if (Debug.DEBUG)
                 logger.log(Component.SSL_HANDSHAKE, "{0}", handshake);
               state = READ_CLIENT_HELLO;
             }
-            break;
+            break output_loop; // XXX temporary
             
             // Server Hello.
             //
@@ -761,9 +818,7 @@ class ServerHandshake extends AbstractHandshake
             case WRITE_SERVER_HELLO:
             {
               ServerHelloBuilder hello = new ServerHelloBuilder();
-              hello.setVersion (version);
-              hello.setCipherSuite (suite);
-              hello.setCompressionMethod(compression);
+              hello.setVersion (engine.session().version);
               Random r = hello.random();
               r.setGmtUnixTime ((int) (System.currentTimeMillis() / 1000));
               byte[] nonce = new byte[28];
@@ -771,12 +826,16 @@ class ServerHandshake extends AbstractHandshake
               r.setRandomBytes(nonce);
               serverRandom = r.copy ();
               hello.setSessionId(engine.session().getId());
+              hello.setCipherSuite (engine.session().suite);
+              hello.setCompressionMethod(compression);
               if (clientHadExtensions)
                 {
                   // XXX figure this out.
                 }
+              else // Don't send any extensions.
+                hello.setDisableExtensions(true);
               
-              if (Configuration.DEBUG)
+              if (Debug.DEBUG)
                 logger.log(Component.SSL_HANDSHAKE, "{0}", hello);
 
               int typeLen = ((Handshake.Type.SERVER_HELLO.getValue() << 24)
@@ -796,7 +855,7 @@ class ServerHandshake extends AbstractHandshake
               else
                 state = WRITE_CERTIFICATE;
             }
-            break;
+            break output_loop; // XXX temporary
 
             // Certificate.
             //
@@ -805,13 +864,13 @@ class ServerHandshake extends AbstractHandshake
             // itself (usually, servers must authenticate).
             case WRITE_CERTIFICATE:
             {
-              if (suite.keyExchangeAlgorithm() == null)
+              if (engine.session().suite.keyExchangeAlgorithm() == null)
                 {
                   state = WRITE_SERVER_KEY_EXCHANGE;
                   break;
                 }
               String sigAlg = null;
-              switch (suite.keyExchangeAlgorithm())
+              switch (engine.session().suite.keyExchangeAlgorithm())
                 {
                   case NONE:
                     break;
@@ -821,11 +880,11 @@ class ServerHandshake extends AbstractHandshake
                     break;
 
                   case DIFFIE_HELLMAN:
-                    if (suite.isEphemeralDH())
+                    if (engine.session().suite.isEphemeralDH())
                       sigAlg = "DHE_";
                     else
                       sigAlg = "DH_";
-                    switch (suite.signatureAlgorithm())
+                    switch (engine.session().suite.signatureAlgorithm())
                       {
                         case RSA:
                           sigAlg += "RSA";
@@ -837,7 +896,7 @@ class ServerHandshake extends AbstractHandshake
                       }
 
                   case SRP:
-                    switch (suite.signatureAlgorithm())
+                    switch (engine.session().suite.signatureAlgorithm())
                       {
                         case RSA:
                           sigAlg = "SRP_RSA";
@@ -865,8 +924,11 @@ class ServerHandshake extends AbstractHandshake
               engine.session().setLocalCertificates(chain);
               localCert = chain[0];
 
-              if (Configuration.DEBUG)
-                logger.log(Component.SSL_HANDSHAKE, "{0}", cert);
+              if (Debug.DEBUG)
+                {
+                  logger.logv(Component.SSL_HANDSHAKE, "my cert:\n{0}", localCert);
+                  logger.logv(Component.SSL_HANDSHAKE, "{0}", cert);
+                }
               
               int typeLen = ((CERTIFICATE.getValue() << 24)
                              | (cert.length() & 0xFFFFFF));
@@ -879,7 +941,7 @@ class ServerHandshake extends AbstractHandshake
 
               state = WRITE_SERVER_KEY_EXCHANGE;
             }
-            break;
+            break output_loop; // XXX temporary
 
             // Server key exchange.
             //
@@ -890,7 +952,7 @@ class ServerHandshake extends AbstractHandshake
             // implicit in the server's certificate).
             case WRITE_SERVER_KEY_EXCHANGE:
             {
-              KeyExchangeAlgorithm kex = suite.keyExchangeAlgorithm();
+              KeyExchangeAlgorithm kex = engine.session().suite.keyExchangeAlgorithm();
               
               if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
                 {
@@ -902,7 +964,7 @@ class ServerHandshake extends AbstractHandshake
               
               if (kex != KeyExchangeAlgorithm.NONE
                   && kex != KeyExchangeAlgorithm.RSA
-                  && suite.isEphemeralDH())
+                  && engine.session().suite.isEphemeralDH())
                 {
                   // This key exchange requires server params; construct them.
                   ByteBuffer paramBuffer = null;
@@ -915,22 +977,25 @@ class ServerHandshake extends AbstractHandshake
                                            pubKey.getParams().getG(),
                                            pubKey.getY());
                       paramBuffer = params.buffer();
+                      if (Debug.DEBUG)
+                        logger.logv(Component.SSL_HANDSHAKE, "server DH params:\n{0}",
+                                    Util.hexDump(paramBuffer));
                     }
                   // XXX handle SRP
                   
-                  ByteBuffer sigBuffer = signParams(paramBuffer);
-                  ServerKeyExchangeBuilder ske = new ServerKeyExchangeBuilder(suite);
+                  ByteBuffer sigBuffer = signParams(paramBuffer.duplicate());
+                  ServerKeyExchangeBuilder ske
+                    = new ServerKeyExchangeBuilder(engine.session().suite);
                   ske.setParams(paramBuffer);
                   ske.setSignature(sigBuffer);
                   
-                  if (Configuration.DEBUG)
+                  if (Debug.DEBUG)
                     logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
-                  
-                  fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
-                                  | (paramBuffer.remaining() & 0xFFFFFF));
                   
                   outBuffer = ske.buffer();
                   int l = Math.min(fragment.remaining(), outBuffer.remaining());
+                  fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
+                                  | (ske.length() & 0xFFFFFF));
                   fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
                   outBuffer.position(outBuffer.position() + l);
                 }
@@ -940,7 +1005,7 @@ class ServerHandshake extends AbstractHandshake
               else
                 state = WRITE_SERVER_HELLO_DONE;
             }
-            break;
+            break output_loop; // XXX temporary
 
             // Certificate Request.
             //
@@ -970,7 +1035,7 @@ class ServerHandshake extends AbstractHandshake
                 issuers.add(cert.getIssuerX500Principal());
               req.setAuthorities(issuers);
               
-              if (Configuration.DEBUG)
+              if (Debug.DEBUG)
                 logger.log(Component.SSL_HANDSHAKE, "{0}", req);
               
               fragment.putInt((CERTIFICATE_REQUEST.getValue() << 24)
@@ -983,7 +1048,7 @@ class ServerHandshake extends AbstractHandshake
               
               state = WRITE_SERVER_HELLO_DONE;
             }
-            break;
+            break output_loop; // XXX temporary
 
             // Server Hello Done.
             //
@@ -997,9 +1062,11 @@ class ServerHandshake extends AbstractHandshake
               // ServerHelloDone is zero-length; just put in the type
               // field.
               fragment.putInt(SERVER_HELLO_DONE.getValue() << 24);
+              if (Debug.DEBUG)
+                logger.logv(Component.SSL_HANDSHAKE, "writing ServerHelloDone");
               state = READ_CERTIFICATE;
             }
-            break;
+            break output_loop; // XXX temporary
             
             // Finished.
             //
@@ -1048,9 +1115,22 @@ class ServerHandshake extends AbstractHandshake
             break;
           }
       }
-    return (state.isWriteState() || outBuffer.hasRemaining()
-            ? HandshakeStatus.NEED_WRAP
-            : HandshakeStatus.NEED_UNWRAP);
+    if (state.isWriteState() || outBuffer.hasRemaining())
+      return HandshakeStatus.NEED_WRAP;
+    if (state.isReadState())
+      return HandshakeStatus.NEED_UNWRAP;
+    
+    return HandshakeStatus.FINISHED;
+  }
+  
+  @Override HandshakeStatus status()
+  {
+    if (state.isReadState())
+      return HandshakeStatus.NEED_UNWRAP;
+    if (state.isWriteState())
+      return HandshakeStatus.NEED_WRAP;
+    
+    return HandshakeStatus.FINISHED;
   }
   
   @Override InputSecurityParameters getInputParams() throws SSLException
@@ -1067,6 +1147,14 @@ class ServerHandshake extends AbstractHandshake
     return outParams;
   }
   
+  @Override void handleV2Hello(ByteBuffer hello)
+  {
+    int len = hello.getShort(0) & 0x7FFF;
+    md5.update((ByteBuffer) hello.duplicate().position(2).limit(len+2));
+    sha.update((ByteBuffer) hello.duplicate().position(2).limit(len+2));
+    helloV2 = true;
+  }
+  
   /**
    * Generate, or fetch from our certificate, the Diffie-Hellman exchange
    * parameters.
@@ -1077,11 +1165,18 @@ class ServerHandshake extends AbstractHandshake
   {
     try
       {
-        if (suite.isEphemeralDH())
+        // XXX generating a DH key, especially given a large prime, can
+        // take a while. We should perhaps look into making this a delegated
+        // task, so we don't block other connections when generating keys.
+        //
+        // Also, I should investigate whether or not these DH parameters are
+        // "secure" or not; I mean, I'm not really worried, because SSH uses
+        // similar static parameters, but this *could* be a potential hole.
+        if (engine.session().suite.isEphemeralDH())
           {
             KeyPairGenerator dhGen = KeyPairGenerator.getInstance("DH");
-            // XXX figure this out, key size and shit.
-            dhGen.initialize(2048, engine.session().random());
+            DHParameterSpec dhparams = DiffieHellman.getParams().getParams();
+            dhGen.initialize(dhparams, engine.session().random());
             dhPair = dhGen.generateKeyPair();
           }
         else
@@ -1092,10 +1187,14 @@ class ServerHandshake extends AbstractHandshake
             dhPair = new KeyPair(cert.getPublicKey(), key);
           }
 
-        if (Configuration.DEBUG)
+        if (Debug.DEBUG_KEY_EXCHANGE)
           logger.logv(Component.SSL_KEY_EXCHANGE,
                       "Diffie-Hellman public:{0} private:{1}",
                       dhPair.getPublic(), dhPair.getPrivate());
+      }
+    catch (InvalidAlgorithmParameterException iape)
+      {
+        throw new SSLException(iape);
       }
     catch (NoSuchAlgorithmException nsae)
       {
@@ -1107,15 +1206,18 @@ class ServerHandshake extends AbstractHandshake
   {
     try
       {
+        SignatureAlgorithm alg = engine.session().suite.signatureAlgorithm();
         java.security.Signature sig
-          = java.security.Signature.getInstance(suite.signatureAlgorithm().name());
+          = java.security.Signature.getInstance(alg.algorithm());
         PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
+        if (Debug.DEBUG_KEY_EXCHANGE)
+          logger.logv(Component.SSL_HANDSHAKE, "server key: {0}", key);
         sig.initSign(key);
         sig.update(clientRandom.buffer());
         sig.update(serverRandom.buffer());
         sig.update(serverParams);
         byte[] sigVal = sig.sign();
-        Signature signature = new Signature(sigVal, suite.signatureAlgorithm());
+        Signature signature = new Signature(sigVal, engine.session().suite.signatureAlgorithm());
         return signature.buffer();
       }
     catch (NoSuchAlgorithmException nsae)
@@ -1148,7 +1250,7 @@ class ServerHandshake extends AbstractHandshake
       }
     byte[] toSign = null;
     if (engine.session().version == ProtocolVersion.SSL_3)
-      toSign = genV2CertificateVerify(md5copy, shacopy, engine.session());
+      toSign = genV3CertificateVerify(md5copy, shacopy, engine.session());
     else
       {
         if (engine.session().suite.signatureAlgorithm() == SignatureAlgorithm.RSA)

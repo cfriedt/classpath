@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.NoSuchElementException;
 
@@ -42,12 +43,12 @@ public class ServerNameList extends Value implements Iterable<ServerNameList.Ser
   
   public ServerNameList (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   public int length()
   {
-    return buffer.getShort(0) & 0xFFFF;
+    return (buffer.getShort(0) & 0xFFFF) + 2;
   }
   
   public int size()
@@ -70,7 +71,7 @@ public class ServerNameList extends Value implements Iterable<ServerNameList.Ser
       throw new IndexOutOfBoundsException("0; " + index);
     int n = 0;
     int i;
-    int l = 0;
+    int l = buffer.getShort(3);
     for (i = 2; i < len && n < index; )
       {
         l = buffer.getShort(i+1);
@@ -156,7 +157,7 @@ public class ServerNameList extends Value implements Iterable<ServerNameList.Ser
     
     public ServerName(final ByteBuffer buffer)
     {
-      this.buffer = buffer;
+      this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     }
     
     public int length()

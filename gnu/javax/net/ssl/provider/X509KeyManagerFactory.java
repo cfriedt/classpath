@@ -339,15 +339,16 @@ public class X509KeyManagerFactory extends KeyManagerFactorySpi
                   !(pubKey instanceof RSAPublicKey))
                 continue;
             }
-          if (keyType.equalsIgnoreCase("DHE_DSS")
+          else if (keyType.equalsIgnoreCase("DHE_DSS")
               || keyType.equalsIgnoreCase("dss_sign")
-              || keyType.equalsIgnoreCase("SRP_DSS"))
+              || keyType.equalsIgnoreCase("SRP_DSS")
+              || keyType.equalsIgnoreCase("DSA"))
             {
               if (!(privKey instanceof DSAPrivateKey) ||
                   !(pubKey instanceof DSAPublicKey))
                 continue;
             }
-          if (keyType.equalsIgnoreCase("DH_RSA")
+          else if (keyType.equalsIgnoreCase("DH_RSA")
               || keyType.equalsIgnoreCase("rsa_fixed_dh"))
             {
               if (!(privKey instanceof DHPrivateKey) ||
@@ -356,7 +357,7 @@ public class X509KeyManagerFactory extends KeyManagerFactorySpi
               if (!chain[0].getSigAlgName().equalsIgnoreCase("RSA"))
                 continue;
             }
-          if (keyType.equalsIgnoreCase("DH_DSS")
+          else if (keyType.equalsIgnoreCase("DH_DSS")
               || keyType.equalsIgnoreCase("dss_fixed_dh"))
             {
               if (!(privKey instanceof DHPrivateKey) ||
@@ -365,6 +366,8 @@ public class X509KeyManagerFactory extends KeyManagerFactorySpi
               if (!chain[0].getSigAlgName().equalsIgnoreCase("DSA"))
                 continue;
             }
+          else // Unknown key type; ignore it.
+            continue;
           if (issuers == null || issuers.length == 0)
             {
               l.add(alias);

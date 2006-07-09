@@ -1,8 +1,128 @@
+2006-07-09  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/AbstractSessionContext.java (newInstance):
+	return `AbstractSessionContext.'
+	(getSession): check if the session is null.
+	* gnu/javax/net/ssl/Session.java (packetBufferSize): removed.
+	(<init>): initialize `applicationBufferSize.'
+	(getPacketBufferSize): return application buffer size, plus 2048.
+	* gnu/javax/net/ssl/provider/AbstractHandshake.java (PAD1, PAD2):
+	new constants.
+	(handleInput): implement; call `implHandleOutput,' and hash
+	messages as they are consumed.
+	(implHandleInput): new abstract method.
+	(handleOutput): fix hashing of produced bytes.
+	(status, handleV2Hello): new abstract methods.
+	(pollHandshake): don't hash the input here; add logging.
+	(hasMessage): add logging.
+	(reallocateBuffer): shift the existing contents down in the
+	buffer, if it is, on the whole, large enough for new input.
+	(genV2CertificateVerify): renamed...
+	(genV3CertificateVerify): to this, which is correct.
+	(generateKeys): fix PRF setup; generate an IV for 1.1; add
+	logging.
+	(generateFinished): add logging; update with correct padding.
+	(generateMasterSecret): add logging; fix PRF initialization.
+	* gnu/javax/net/ssl/provider/CipherSuite.java (mac): use mac
+	algorithm name "HMac-SHA1".
+	* gnu/javax/net/ssl/provider/ClientHello.java: make extendable.
+	* gnu/javax/net/ssl/provider/ClientHelloBuilder.java: new file.
+	* gnu/javax/net/ssl/provider/ClientHelloV2.java (<init>): order
+	the input buffer BIG_ENDIAN.
+	(cipherSpecs): made public; use qualified return type.
+	* gnu/javax/net/ssl/provider/Debug.java: new file.
+	* gnu/javax/net/ssl/provider/Extension.java (<init>): order the
+	input buffer BIG_ENDIAN.
+	(length): return the total length, including the length field.
+	(toString): add prefix to value.
+	* gnu/javax/net/ssl/provider/ExtensionList.java (<init>): order
+	the input buffer BIG_ENDIAN.
+	* gnu/javax/net/ssl/provider/InputSecurityParameters.java
+	(logger): new constant.
+	(suite): new field.
+	(<init>): also take a `CipherSuite' argument.
+	(decrypt): use `update,' not `doFinal' for decryption; add debug
+	logging; fix mac computation; fix copying fragment to output.
+	(cipherSuite): return `suite' field.
+	* gnu/javax/net/ssl/provider/Jessie.java (<init>): add
+	"TLSv1.1-RSA" signature.
+	* gnu/javax/net/ssl/provider/OutputSecurityParameters.java
+	(logger): new constant.
+	(suite): new field.
+	(<init>): take additional `CipherSuite' argument.
+	(encrypt): add debug logging; fix mac computation; various little
+	fixes.
+	(suite): new method.
+	* gnu/javax/net/ssl/provider/ProtocolVersion.java (forName): also
+	recognize "TLSv1.1".
+	* gnu/javax/net/ssl/provider/Random.java (copy): fix copying the
+	internal buffer.
+	* gnu/javax/net/ssl/provider/Record.java (<init>): order the input
+	buffer BIG_ENDIAN.
+	(toString): include length in output.
+	* gnu/javax/net/ssl/provider/SSLContextImpl.java (serverContext,
+	clientContext): declare both as `AbstractSessionContext.'
+	* gnu/javax/net/ssl/provider/SSLEngineImpl.java (logger): make an
+	instance of `SystemLogger.'
+	(mode): declare as a Mode.
+	(Mode): new enum.
+	(<init>): add logging; initialize `enabledProtocols' and
+	`enabledSuites.'
+	(beginHandshake): debug logging; handle Mode enum.
+	(closeOutbound): prepare `lastAlert' to carry the close alert.
+	(isInboundDone, isOutboundDone): implement.
+	(setUseClientMode): use Mode enum.
+	(unwrap): fix V2 hello handling; optimize calls when the cipher
+	suite is TLS_NULL_WITH_NULL_NULL; add debug logging; handle closue
+	alerts properly; fix record length reporting.
+	(wrap): set `outClosed' if we are sending a closure alert here;
+	delay changing output security params until we emit the change
+	notification; optimize initial handshake; fix input buffer
+	consumption; handle end of handshake.
+	* gnu/javax/net/ssl/provider/SSLRSASignatureImpl.java: new file.
+	* gnu/javax/net/ssl/provider/ServerDHParams.java (buffer): set
+	position to 0 in the buffer we return.
+	* gnu/javax/net/ssl/provider/ServerHandshake.java (version,
+	suite): removed.
+	(chooseSuite): make non-static; only choose a cipher suite that we
+	have a compatible certificate for.
+	(chooseCompression): use properties to enable/disable zlib.
+	(doHash): say no if we are handling a V2 hello.
+	(handleInput): rename to...
+	(implHandleInput): this; only handle a single handshake message in
+	this method (handleInput from the superclass will call us
+	repeatedly to drain the input buffer); various other fixes.
+	(implHandleOutput): debug logging; temporarily disable packing
+	more than one handshake per record; various little fixes.
+	(status, handleV2Hello): new methods.
+	(genDiffieHellman): use static parameters from the DiffieHellman
+	class.
+	(signParams): use correct signature algorithm.
+	* gnu/javax/net/ssl/provider/ServerHello.java (totalLength):
+	removed.
+	(disableExtensions): new field.
+	(length): don't query extensions if `disableExtensions' is true.
+	* gnu/javax/net/ssl/provider/ServerHelloBuilder.java
+	(setDisableExtensions): new method.
+	* gnu/javax/net/ssl/provider/ServerNameList.java: various parsing
+	fixes.
+	* gnu/javax/net/ssl/provider/SessionImpl.java (<init>): new
+	constructor.
+	(setApplicationBufferSize): new method.
+	(setPacketBufferSize): new method.
+	* gnu/javax/net/ssl/provider/SignatureAlgorithm.java
+	(getAlgorithm): new method.
+	* gnu/javax/net/ssl/provider/Util.java: make public; mark
+	security-sensitive methods deprecated.
+	* gnu/javax/net/ssl/provider/X509KeyManagerFactory.java
+	(chooseAliases): handle DSA; handle unrecognized signature
+	algorithms.
+
 2006-06-28  Casey Marshall  <csm@gnu.org>
 
 	* jessie-tests/testCertificate.java: update for Builder
 	interface and API changes.
-	* jessie-tests/testServerHello.java: likewise.
+	* jesasie-tests/testServerHello.java: likewise.
 	* jessie-tests/testServerKeyExchange.java: likewise.
 
 2006-06-28  Casey Marshall  <csm@gnu.org>

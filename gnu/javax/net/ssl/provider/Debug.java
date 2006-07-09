@@ -1,4 +1,4 @@
-/* SignatureAlgorithm.java -- Signature algorithm enumeration.
+/* Debug.java -- Jessie debug constants.
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -33,30 +33,34 @@ module.  An independent module is a module which is not derived from
 or based on this library.  If you modify this library, you may extend
 this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.  */
+exception statement from your version. */
 
 
 package gnu.javax.net.ssl.provider;
 
-public enum SignatureAlgorithm
+/**
+ * Debug constants for Jessie.
+ * 
+ * @author Casey Marshall (csm@gnu.org)
+ */
+public final class Debug
 {
-  ANONYMOUS, RSA, DSA;
+  /**
+   * Set to true to dump out traces of SSL connections to the system
+   * logger.
+   */
+  public static final boolean DEBUG = true;
   
   /**
-   * Returns the algorithm name for this signature algorithm, which can
-   * be used with the JCA API to get a {@link java.security.Signature} for
-   * that algorithm.
-   * 
-   * @return The algorithm name.
+   * Set to true to dump out info about the SSL key exchange. Since this
+   * MAY contain sensitive data, it is a separate value.
    */
-  public String algorithm()
-  {
-    switch (this)
-      {
-        case ANONYMOUS: return null;
-        case RSA: return "TLSv1.1-RSA";
-        case DSA: return "DSS";
-      }
-    return null;
-  }
+  public static final boolean DEBUG_KEY_EXCHANGE = true;
+  
+  /**
+   * Set to true to turn on dumping of decrypted packets. Since this will
+   * log potentially-sensitive information (i.e., decrypted messages), only
+   * enable this in debug scenarios.
+   */
+  public static final boolean DEBUG_DECRYPTION = true;
 }

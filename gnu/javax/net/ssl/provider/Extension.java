@@ -42,6 +42,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * An SSL hello extension.
@@ -67,7 +68,7 @@ public final class Extension implements Constructed
 
   Extension(final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   // Instance methods.
@@ -75,7 +76,7 @@ public final class Extension implements Constructed
 
   public int length ()
   {
-    return (buffer.getShort (2) & 0xFFFF);
+    return (buffer.getShort (2) & 0xFFFF) + 2;
   }
 
   public Type type()
@@ -171,9 +172,10 @@ public final class Extension implements Constructed
     if (prefix != null) out.print (prefix);
     out.println("  type = " + type () + ";");
     if (prefix != null) out.print (prefix);
+    String subprefix = "  ";
+    if (prefix != null) subprefix = prefix + subprefix;
     out.println("  value =");
-//    out.println(Util.hexDump(value (), (prefix != null) ? prefix + "    " : "    "));
-    out.println(value());
+    out.println(value().toString(subprefix));
     if (prefix != null) out.print (prefix);
     out.print("} Extension;");
     return str.toString();

@@ -38,12 +38,16 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.classpath.ByteArray;
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
 import gnu.java.io.ByteBufferOutputStream;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 import java.util.Arrays;
+import java.util.logging.Level;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -57,20 +61,24 @@ import javax.net.ssl.SSLException;
 
 public class InputSecurityParameters
 {
+  private static final SystemLogger logger = SystemLogger.SYSTEM;
   private final Cipher cipher;
   private final Mac mac;
   private final Inflater inflater;
   private SessionImpl session;
+  private final CipherSuite suite;
   private long sequence;
 
   public InputSecurityParameters (final Cipher cipher, final Mac mac,
                                   final Inflater inflater,
-                                  final SessionImpl session)
+                                  final SessionImpl session,
+                                  final CipherSuite suite)
   {
     this.cipher = cipher;
     this.mac = mac;
     this.inflater = inflater;
     this.session = session;
+    this.suite = suite;
     sequence = 0;
   }
 
@@ -127,29 +135,28 @@ public class InputSecurityParameters
     if (cipher != null)
       {
         ByteBuffer input = record.fragment();
-        fragment = ByteBuffer.allocate (input.remaining());
-        try
-          {
-            cipher.doFinal(input, fragment);
-          }
-        catch (BadPaddingException bpe)
-          {
-            // Should not happen, because we're doing the padding ourselves
-            // (the cipher itself should use NoPadding.
-            badPadding = true;
-          }
+        fragment = ByteBuffer.allocate(input.remaining());
+        cipher.update(input, fragment);
       }
     else
       fragment = record.fragment();
 
+    if (Debug.DEBUG_DECRYPTION)
+      logger.logv(Component.SSL_RECORD_LAYER, "decrypted fragment:\n{0}",
+                  Util.hexDump((ByteBuffer) fragment.duplicate().position(0), " >> "));
+    
+    int fragmentLength = record.length();
     int maclen = 0;
     if (mac != null)
       maclen = mac.getMacLength();
+    fragmentLength -= maclen;
 
     int padlen = 0;
-    if (!session.suite.isStreamCipher ())
+    if (!suite.isStreamCipher ())
       {
         padlen = fragment.get(record.length() - 1) & 0xFF;
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "padlen:{0}", padlen);
 
         if (record.version() == ProtocolVersion.SSL_3)
           {
@@ -167,8 +174,22 @@ public class InputSecurityParameters
             for (int i = 0; i < pad.length; i++)
               if ((pad[i] & 0xFF) != padlen)
                 badPadding = true;
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_RECORD_LAYER, "TLSv1.x padding\n{0}",
+                          new ByteArray(pad));
           }
+        
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "padding bad? {0}",
+                      badPadding);
+        if (!badPadding)
+          fragmentLength = fragmentLength - padlen - 1;
       }
+    
+    int ivlen = 0;
+    if (session.version.compareTo(ProtocolVersion.TLS_1_1) >= 0
+        && !suite.isStreamCipher())
+      ivlen = cipher.getBlockSize();
 
     // Compute and check the MAC.
     if (mac != null)
@@ -188,14 +209,18 @@ public class InputSecurityParameters
             mac.update((byte) version.major());
             mac.update((byte) version.minor());
           }
-        mac.update((byte) ((record.length() - maclen) >>> 8));
-        mac.update((byte)  (record.length() - maclen));
+        mac.update((byte) ((fragmentLength - ivlen) >>> 8));
+        mac.update((byte)  (fragmentLength - ivlen));
         ByteBuffer content =
-          (ByteBuffer) fragment.duplicate().limit(record.length() - maclen - padlen - 1);
+          (ByteBuffer) fragment.duplicate().position(ivlen).limit(fragmentLength);
         mac.update(content);
         byte[] mac1 = mac.doFinal ();
         byte[] mac2 = new byte[maclen];
-        ((ByteBuffer) fragment.duplicate().position(record.length() - maclen - padlen - 1)).get(mac2);
+        mac.reset();
+        ((ByteBuffer) fragment.duplicate().position(fragmentLength)).get(mac2);
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "mac1:{0} mac2:{1}",
+                      Util.toHexString(mac1, ':'), Util.toHexString(mac2, ':'));
         if (!Arrays.equals (mac1, mac2))
           badPadding = true;
       }
@@ -210,11 +235,11 @@ public class InputSecurityParameters
     if (inflater != null)
       {
         ByteBufferOutputStream out = new ByteBufferOutputStream(record.length());
-        byte[] inbuffer = new byte[4096];
-        byte[] outbuffer = new byte[4096];
+        byte[] inbuffer = new byte[1024];
+        byte[] outbuffer = new byte[1024];
         boolean done = false;
         if (record.version().compareTo(ProtocolVersion.TLS_1_1) >= 0
-            && !session.suite.isStreamCipher())
+            && !suite.isStreamCipher())
           fragment.position (cipher.getBlockSize());
         else
           fragment.position(0);
@@ -237,7 +262,7 @@ public class InputSecurityParameters
         ByteBuffer outbuf = out.buffer();
         if (outputStream != null)
           {
-            byte[] buf = new byte[4096];
+            byte[] buf = new byte[1024];
             while (outbuf.hasRemaining())
               {
                 int l = Math.min(outbuf.remaining(), buf.length);
@@ -265,13 +290,13 @@ public class InputSecurityParameters
     else
       {
         ByteBuffer outbuf = (ByteBuffer)
-          fragment.duplicate().limit(record.length() - maclen - padlen - 1);
+          fragment.duplicate().position(0).limit(record.length() - maclen - padlen - 1);
         if (record.version().compareTo(ProtocolVersion.TLS_1_1) >= 0
-            && !session.suite.isStreamCipher())
+            && !suite.isStreamCipher())
           outbuf.position(cipher.getBlockSize());
         if (outputStream != null)
           {
-            byte[] buf = new byte[4096];
+            byte[] buf = new byte[1024];
             while (outbuf.hasRemaining())
               {
                 int l = Math.min(outbuf.remaining(), buf.length);
@@ -303,6 +328,6 @@ public class InputSecurityParameters
   
   CipherSuite cipherSuite ()
   {
-    return session.suite;
+    return suite;
   }
 }

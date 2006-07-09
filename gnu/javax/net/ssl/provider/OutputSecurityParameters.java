@@ -38,10 +38,14 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.classpath.ByteArray;
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
 import gnu.java.io.ByteBufferOutputStream;
 
 import java.nio.ByteBuffer;
 
+import java.util.logging.Level;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 
@@ -53,19 +57,23 @@ import javax.crypto.ShortBufferException;
 
 public class OutputSecurityParameters
 {
+  private static final SystemLogger logger = SystemLogger.SYSTEM;
   private final Cipher cipher;
   private final Mac mac;
   private final Deflater deflater;
   private final SessionImpl session;
+  private final CipherSuite suite;
   private long sequence;
 
   public OutputSecurityParameters (final Cipher cipher, final Mac mac,
-                                   final Deflater deflater, SessionImpl session)
+                                   final Deflater deflater, SessionImpl session,
+                                   CipherSuite suite)
   {
     this.cipher = cipher;
     this.mac = mac;
     this.deflater = deflater;
     this.session = session;
+    this.suite = suite;
     sequence = 0;
   }
 
@@ -84,6 +92,11 @@ public class OutputSecurityParameters
         || length <= 0 || offset + length > input.length)
       throw new IndexOutOfBoundsException();
     
+    if (Debug.DEBUG)
+      for (int i = offset; i < offset+length; i++)
+        logger.logv(Component.SSL_RECORD_LAYER, "encrypting record [{0}]: {1}",
+                    i-offset, input[i]);
+    
     int maclen = 0;
     if (mac != null)
       maclen = session.isTruncatedMac() ? 10 : mac.getMacLength ();
@@ -91,7 +104,7 @@ public class OutputSecurityParameters
     int ivlen = 0;
     byte[] iv = null;
     if (session.version.compareTo(ProtocolVersion.TLS_1_1) >= 0
-        && !session.suite.isStreamCipher())
+        && !suite.isStreamCipher())
       {
         ivlen = cipher.getBlockSize();
         iv = new byte[ivlen];
@@ -99,13 +112,13 @@ public class OutputSecurityParameters
       }
         
     int padaddlen = 0;
-    if (!session.suite.isStreamCipher()
+    if (!suite.isStreamCipher()
         && session.version.compareTo(ProtocolVersion.TLS_1) >= 0)
       {
         padaddlen = (session.random().nextInt(255 / cipher.getBlockSize())
                      * cipher.getBlockSize());
       }
-
+    
     int fragmentLength = 0;
     ByteBuffer[] fragments = null;
     // Compress the content, if needed.
@@ -113,17 +126,22 @@ public class OutputSecurityParameters
       {
         ByteBufferOutputStream deflated = new ByteBufferOutputStream();
 
-        byte[] inbuf = new byte[4096];
-        byte[] outbuf = new byte[4096];
+        byte[] inbuf = new byte[1024];
+        byte[] outbuf = new byte[1024];
         int written = 0;
+        
+        // Here we use the guarantee that the deflater won't increase the
+        // output size by more than 1K -- we resign ourselves to only deflate
+        // as much data as we have space for *uncompressed*, 
         int limit = output.remaining() - (maclen + ivlen + padaddlen) - 1024;
 
-        for (int i = offset; i < length; i++)
+        for (int i = offset; i < length && written < limit; i++)
           {
             ByteBuffer in = input[i];
             while (in.hasRemaining() && written < limit)
               {
-                int l = Math.min(in.remaining (), inbuf.length);
+                int l = Math.min(in.remaining(), inbuf.length);
+                l = Math.min(limit - written, l);
                 in.get(inbuf, 0, l);
                 deflater.setInput(inbuf, 0, l);
                 l = deflater.deflate(outbuf);
@@ -140,6 +158,7 @@ public class OutputSecurityParameters
           }
         fragments = new ByteBuffer[] { deflated.buffer() };
         fragmentLength = ((int) deflater.getBytesWritten()) + maclen + ivlen;
+        deflater.reset();
         offset = 0;
         length = 1;
       }
@@ -154,20 +173,24 @@ public class OutputSecurityParameters
           }
         fragmentLength += maclen + ivlen;
       }
-    
-    // XXX Compute padding...
+
+    // Compute padding...
     int padlen = 0;
     byte[] pad = null;
-    if (!session.suite.isStreamCipher())
+    if (!suite.isStreamCipher())
       {
         int bs = cipher.getBlockSize();
-        padlen = bs - ((fragmentLength + bs - 1) % bs);
+        padlen = bs - (fragmentLength % bs);
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER,
+                      "framentLen:{0} padlen:{1} blocksize:{2}",
+                      fragmentLength, padlen, bs);
         if (session.version.compareTo(ProtocolVersion.TLS_1) >= 0)
           {
             // TLS 1.0 and later uses a random amount of padding, up to
             // 255 bytes. Each byte of the pad is equal to the padding
             // length, minus one.
-            padlen += session.random().nextInt(256 / bs) * bs;
+            padlen += padaddlen;
             while (padlen > 255)
               padlen -= bs;
             pad = new byte[padlen];
@@ -182,6 +205,7 @@ public class OutputSecurityParameters
             session.random().nextBytes(pad);
             pad[padlen - 1] = (byte) (padlen - 1);
           }
+        fragmentLength += pad.length;
       }
 
     // If there is a MAC, compute it.
@@ -202,24 +226,16 @@ public class OutputSecurityParameters
             mac.update((byte) session.version.major ());
             mac.update((byte) session.version.minor ());
           }
-        mac.update((byte) (fragmentLength >>> 8));
-        mac.update((byte)  fragmentLength);
-        if (iv != null)
-          {
-            mac.update(iv);
-          }
         int toWrite = fragmentLength - maclen - ivlen - padlen;
+        mac.update((byte) (toWrite >>> 8));
+        mac.update((byte)  toWrite);
         int written = 0;
         for (int i = offset; i < length && written < toWrite; i++)
           {
-            ByteBuffer fragment = fragments[i].slice();
+            ByteBuffer fragment = fragments[i].duplicate();
             int l = Math.min(fragment.remaining(), toWrite - written);
             fragment.limit(fragment.position() + l);
             mac.update(fragment);
-          }
-        if (pad != null)
-          {
-            mac.update(pad);
           }
         macValue = mac.doFinal();
       }
@@ -266,19 +282,25 @@ public class OutputSecurityParameters
         int toWrite = fragmentLength - maclen;
         for (int i = offset; i < offset + length && consumed < toWrite; i++)
           {
-            ByteBuffer fragment = fragments[i].slice();
+            ByteBuffer fragment = fragments[i];
             int l = Math.min(fragment.remaining(), toWrite - consumed);
             fragment.limit(fragment.position() + l);
             outfragment.put(fragment);
-            fragments[i].position(fragments[i].position() + l);
             consumed += l;
           }
         if (macValue != null)
           outfragment.put(macValue);
       }
     
+    // Advance the output buffer's position.
+    output.position(output.position() + outrecord.length() + 5);
     sequence++;
 
     return new int[] { consumed, fragmentLength + 5 };
+  }
+  
+  CipherSuite suite()
+  {
+    return suite;
   }
 }

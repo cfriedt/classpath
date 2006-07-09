@@ -57,7 +57,7 @@ import java.security.Security;
  *
  * @author Casey Marshall (rsdio@metastatic.org)
  */
-final class Util
+public final class Util
 {
 
   // Constants.
@@ -77,7 +77,7 @@ final class Util
    * @param hex The hexadecimal string.
    * @return The converted bytes.
    */
-  static byte[] toByteArray(String hex)
+  public static byte[] toByteArray(String hex)
   {
     hex = hex.toLowerCase();
     byte[] buf = new byte[hex.length() / 2];
@@ -99,7 +99,7 @@ final class Util
    * @param len The number of bytes to format.
    * @return A hexadecimal representation of the specified bytes.
    */
-  static String toHexString(byte[] buf, int off, int len)
+  public static String toHexString(byte[] buf, int off, int len)
   {
     StringBuffer str = new StringBuffer();
     for (int i = 0; i < len; i++)
@@ -113,7 +113,7 @@ final class Util
   /**
    * See {@link #toHexString(byte[],int,int)}.
    */
-  static String toHexString(byte[] buf)
+  public static String toHexString(byte[] buf)
   {
     return Util.toHexString(buf, 0, buf.length);
   }
@@ -128,7 +128,7 @@ final class Util
    * @param sep The character to insert between octets.
    * @return A hexadecimal representation of the specified bytes.
    */
-  static String toHexString(byte[] buf, int off, int len, char sep)
+  public static String toHexString(byte[] buf, int off, int len, char sep)
   {
     StringBuffer str = new StringBuffer();
     for (int i = 0; i < len; i++)
@@ -144,7 +144,7 @@ final class Util
   /**
    * See {@link #toHexString(byte[],int,int,char)}.
    */
-  static String toHexString(byte[] buf, char sep)
+  public static String toHexString(byte[] buf, char sep)
   {
     return Util.toHexString(buf, 0, buf.length, sep);
   }
@@ -164,7 +164,7 @@ final class Util
    * @param prefix A string to prepend to every line.
    * @return The formatted string.
    */
-  static String hexDump(byte[] buf, int off, int len, String prefix)
+  public static String hexDump(byte[] buf, int off, int len, String prefix)
   {
     String nl = getProperty("line.separator");
     StringBuffer str = new StringBuffer();
@@ -192,48 +192,49 @@ final class Util
     return str.toString();
   }
 
-  static String hexDump (ByteBuffer buf)
+  public static String hexDump (ByteBuffer buf)
   {
     return hexDump (buf, null);
   }
 
-  static String hexDump (ByteBuffer buf, String prefix)
+  public static String hexDump (ByteBuffer buf, String prefix)
   {
+    buf = buf.duplicate();
     StringWriter str = new StringWriter ();
     PrintWriter out = new PrintWriter (str);
     int i = 0;
-    int len = buf.limit ();
+    int len = buf.remaining();
     byte[] line = new byte[16];
     while (i < len)
       {
         if (prefix != null)
-          out.print (prefix);
-        out.print (Util.formatInt (i, 16, 8));
-        out.print ("  ");
-        int l = Math.min (16, len - i);
-        buf.get (line, 0, l);
-        String s = Util.toHexString (line, 0, l, ' ');
-        out.print (s);
-        for (int j = s.length (); j < 49; j++)
-          out.print (' ');
+          out.print(prefix);
+        out.print(Util.formatInt (i, 16, 8));
+        out.print("  ");
+        int l = Math.min(16, len - i);
+        buf.get(line, 0, l);
+        String s = Util.toHexString(line, 0, l, ' ');
+        out.print(s);
+        for (int j = s.length(); j < 49; j++)
+          out.print(' ');
         for (int j = 0; j < l; j++)
           {
             int c = line[j] & 0xFF;
             if (c < 0x20 || c > 0x7E)
-              out.print ('.');
+              out.print('.');
             else
-              out.print ((char) c);
+              out.print((char) c);
           }
-        out.println ();
+        out.println();
         i += 16;
       }
-    return str.toString ();
+    return str.toString();
   }
 
   /**
    * See {@link #hexDump(byte[],int,int,String)}.
    */
-  static String hexDump(byte[] buf, int off, int len)
+  public static String hexDump(byte[] buf, int off, int len)
   {
     return hexDump(buf, off, len, "");
   }
@@ -241,7 +242,7 @@ final class Util
   /**
    * See {@link #hexDump(byte[],int,int,String)}.
    */
-  static String hexDump(byte[] buf, String prefix)
+  public static String hexDump(byte[] buf, String prefix)
   {
     return hexDump(buf, 0, buf.length, prefix);
   }
@@ -249,7 +250,7 @@ final class Util
   /**
    * See {@link #hexDump(byte[],int,int,String)}.
    */
-  static String hexDump(byte[] buf)
+  public static String hexDump(byte[] buf)
   {
     return hexDump(buf, 0, buf.length);
   }
@@ -263,7 +264,7 @@ final class Util
    *   zero-padded to this length, but may be longer.
    * @return The formatted integer.
    */
-  static String formatInt(int i, int radix, int len)
+  public static String formatInt(int i, int radix, int len)
   {
     String s = Integer.toString(i, radix);
     StringBuffer buf = new StringBuffer();
@@ -280,7 +281,7 @@ final class Util
    * @param b2 The second byte array.
    * @return The concatenation of b1 and b2.
    */
-  static byte[] concat(byte[] b1, byte[] b2)
+  public static byte[] concat(byte[] b1, byte[] b2)
   {
     byte[] b3 = new byte[b1.length+b2.length];
     System.arraycopy(b1, 0, b3, 0, b1.length);
@@ -291,7 +292,7 @@ final class Util
   /**
    * See {@link #trim(byte[],int,int)}.
    */
-  static byte[] trim(byte[] buffer, int len)
+  public static byte[] trim(byte[] buffer, int len)
   {
     return trim(buffer, 0, len);
   }
@@ -309,7 +310,7 @@ final class Util
    *         length.
    * @return The trimmed byte array.
    */
-  static byte[] trim(byte[] buffer, int off, int len)
+  public static byte[] trim(byte[] buffer, int off, int len)
   {
     if (off < 0 || len < 0 || off > buffer.length)
       throw new IndexOutOfBoundsException("max=" + buffer.length +
@@ -329,7 +330,7 @@ final class Util
    * @return The byte representation of the big integer, with any leading
    *   zero removed.
    */
-  static byte[] trim(BigInteger bi)
+  public static byte[] trim(BigInteger bi)
   {
     byte[] buf = bi.toByteArray();
     if (buf[0] == 0x00 && !bi.equals(BigInteger.ZERO))
@@ -348,7 +349,7 @@ final class Util
    *
    * @return The current time, in seconds.
    */
-  static int unixTime()
+  public static int unixTime()
   {
     return (int) (System.currentTimeMillis() / 1000L);
   }
@@ -428,7 +429,7 @@ final class Util
    * @throws SecurityException If the Jessie code still does not have
    *   permission to read the property.
    */
-  static String getProperty(final String name)
+  @Deprecated static String getProperty(final String name)
   {
     return (String) AccessController.doPrivileged(
       new PrivilegedAction()
@@ -450,7 +451,7 @@ final class Util
    * @throws SecurityException If the Jessie code still does not have
    *   permission to read the property.
    */
-  static String getSecurityProperty(final String name)
+  @Deprecated static String getSecurityProperty(final String name)
   {
     return (String) AccessController.doPrivileged(
       new PrivilegedAction()

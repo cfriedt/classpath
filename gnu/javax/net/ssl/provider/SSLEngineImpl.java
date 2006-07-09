@@ -49,8 +49,10 @@ import gnu.javax.net.ssl.provider.Alert.Level;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.zip.DataFormatException;
@@ -71,7 +73,7 @@ public final class SSLEngineImpl extends SSLEngine
 {
   final SSLContextImpl contextImpl;
   private SSLRecordHandler[] handlers;
-  private static final Logger logger = SystemLogger.SYSTEM;
+  private static final SystemLogger logger = SystemLogger.SYSTEM;
   private SessionImpl session;
   private InputSecurityParameters insec;
   private OutputSecurityParameters outsec;
@@ -101,12 +103,15 @@ public final class SSLEngineImpl extends SSLEngine
    */
   private final ByteBuffer alertBuffer;
 
-  private int mode;
-  private static final int MODE_NONE = 0, MODE_SERVER = 1, MODE_CLIENT = 2;
+  private Mode mode;
 
+  private enum Mode { SERVER, CLIENT };
+  
   SSLEngineImpl (SSLContextImpl contextImpl, String host, int port)
   {
     super(host, port);
+    logger.logv(java.util.logging.Level.INFO, "creating SSLEngine {0} {1}:{2}",
+                this, host, port);
     this.contextImpl = contextImpl;
     handlers = new SSLRecordHandler[256];
     session = new SessionImpl();
@@ -117,9 +122,15 @@ public final class SSLEngineImpl extends SSLEngine
     session.setId(new Session.ID(sid));
     session.setRandom(contextImpl.random);
     
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_RECORD_LAYER, "generated session ID {0} with random {1}",
+                  session.id(), contextImpl.random);
+    
     // Begin with no encryption.
-    insec = new InputSecurityParameters (null, null, null, session);
-    outsec = new OutputSecurityParameters (null, null, null, session);
+    insec = new InputSecurityParameters (null, null, null, session,
+                                         CipherSuite.TLS_NULL_WITH_NULL_NULL);
+    outsec = new OutputSecurityParameters (null, null, null, session,
+                                           CipherSuite.TLS_NULL_WITH_NULL_NULL);
     inClosed = false;
     outClosed = false;
     needClientAuth = false;
@@ -127,10 +138,49 @@ public final class SSLEngineImpl extends SSLEngine
     createSessions = true;
     initialHandshakeDone = false;
     alertBuffer = ByteBuffer.wrap (new byte[2]);
-    mode = MODE_NONE;
+    mode = null;
     lastAlert = null;
     handshakeStatus = SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING;
     changeCipherSpec = false;
+    
+    // Set up default protocols and suites.
+    enabledProtocols = new String[] {
+      ProtocolVersion.TLS_1_1.toString(),
+      ProtocolVersion.TLS_1.toString(),
+      ProtocolVersion.SSL_3.toString()
+    };
+    enabledSuites = new String[] {
+      CipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_DSS_WITH_AES_256_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_RSA_WITH_AES_256_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_DSS_WITH_AES_128_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_DSS_WITH_AES_128_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_RSA_WITH_AES_128_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_DSS_WITH_3DES_EDE_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_RSA_WITH_3DES_EDE_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_RC4_128_MD5.toString(),
+      CipherSuite.TLS_RSA_WITH_RC4_128_SHA.toString(),
+      CipherSuite.TLS_DHE_DSS_WITH_DES_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_RSA_WITH_DES_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_DSS_WITH_DES_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_RSA_WITH_DES_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_DES_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_DSS_EXPORT_WITH_DES40_CBC_SHA.toString(),
+      CipherSuite.TLS_DH_RSA_EXPORT_WITH_DES40_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_EXPORT_WITH_DES40_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_EXPORT_WITH_RC4_40_MD5.toString(),
+      CipherSuite.TLS_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA.toString(),
+      CipherSuite.TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA.toString(),
+      CipherSuite.TLS_RSA_WITH_NULL_MD5.toString(),
+      CipherSuite.TLS_RSA_WITH_NULL_SHA.toString()
+    };
   }
 
   // XXX implement?
@@ -152,9 +202,15 @@ public final class SSLEngineImpl extends SSLEngine
   @Override
   public void beginHandshake () throws SSLException
   {
+    if (Debug.DEBUG)
+      logger.log(Component.SSL_HANDSHAKE, "{0} handshake begins", mode);
+
+    if (mode == null)
+      throw new IllegalStateException("setUseClientMode was never used");
+    
     switch (mode)
       {
-      case MODE_SERVER:
+      case SERVER:
         if (getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING)
           throw new SSLException("handshake already in progress");
         try
@@ -167,12 +223,9 @@ public final class SSLEngineImpl extends SSLEngine
           }
         break;
         
-      case MODE_CLIENT:
+      case CLIENT:
         throw new UnsupportedOperationException("client handshake not yet implemented");
         //break;
-        
-      case MODE_NONE:
-        throw new IllegalStateException ("setUseClientMode was never called");
       }
   }
 
@@ -185,7 +238,7 @@ public final class SSLEngineImpl extends SSLEngine
   @Override
   public void closeOutbound()
   {
-    outClosed = true;
+    lastAlert = new Alert(Alert.Level.WARNING, Alert.Description.CLOSE_NOTIFY);
   }
   
   @Override
@@ -233,7 +286,7 @@ public final class SSLEngineImpl extends SSLEngine
   @Override
   public boolean getUseClientMode ()
   {
-    return (mode == MODE_CLIENT);
+    return (mode == Mode.CLIENT);
   }
   
   @Override
@@ -245,13 +298,13 @@ public final class SSLEngineImpl extends SSLEngine
   @Override
   public boolean isInboundDone()
   {
-    return false; // XXX
+    return inClosed;
   }
   
   @Override
   public boolean isOutboundDone()
   {
-    return false; // XXX
+    return outClosed;
   }
   
   @Override
@@ -303,9 +356,9 @@ public final class SSLEngineImpl extends SSLEngine
   public void setUseClientMode (final boolean clientMode)
   {
     if (clientMode)
-      mode = MODE_CLIENT;
+      mode = Mode.CLIENT;
     else
-      mode = MODE_SERVER;
+      mode = Mode.SERVER;
   }
   
   public @Override void setWantClientAuth(final boolean wantClientAuth)
@@ -318,49 +371,51 @@ public final class SSLEngineImpl extends SSLEngine
                                            final int offset, final int length)
     throws SSLException
   {
-    if (mode == MODE_NONE)
+    if (mode == null)
       throw new IllegalStateException ("setUseClientMode was never called");
 
-    Record record = new Record (source.slice ());
-    ContentType type = record.contentType ();
+    if (inClosed)
+      return new SSLEngineResult(SSLEngineResult.Status.CLOSED,
+                                 handshakeStatus, 0, 0);
+    
+    if (source.remaining() < 5)
+      {
+        return new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW,
+                                   handshakeStatus, 0, 0);
+      }
+    
+    Record record = null;
+    boolean helloV2 = false;
 
     // XXX: messages may be chunked across multiple records; does this
     // include the SSLv2 message? I don't think it does, but we should
     // make sure.
-    if (!getUseClientMode () && type == ContentType.CLIENT_HELLO_V2)
+    if (!getUseClientMode() && (source.get(source.position()) & 0x80) == 0x80)
       {
-        if (!insec.cipherSuite ().equals (CipherSuite.TLS_NULL_WITH_NULL_NULL))
-          throw new SSLException ("received SSLv2 client hello in encrypted session; this is invalid.");
-        logger.log (Component.SSL_RECORD_LAYER, "converting SSLv2 client hello to version 3 hello");
-        ClientHelloV2 v2 = new ClientHelloV2 (source.slice ());
-        List suites = v2.cipherSpecs ();
+        if (handshake == null)
+          beginHandshake();
+        int hellolen = source.getShort(source.position()) & 0x7FFF;
+        this.handshake.handleV2Hello(source.slice());
+        if (!insec.cipherSuite().equals (CipherSuite.TLS_NULL_WITH_NULL_NULL))
+          throw new SSLException ("received SSLv2 client hello in encrypted "
+                                  + "session; this is invalid.");
+        if (Debug.DEBUG)
+          logger.log (Component.SSL_RECORD_LAYER,
+                      "converting SSLv2 client hello to version 3 hello");
+        
+        source.getShort(); // skip length
+        ClientHelloV2 v2 = new ClientHelloV2(source.slice());
+        
+        if (Debug.DEBUG)
+          logger.log(Component.SSL_RECORD_LAYER, "v2 hello: {0}", v2);
+        
+        List<CipherSuite> suites = v2.cipherSpecs();
+        
+        ClientHelloBuilder hello = new ClientHelloBuilder();
+        hello.setVersion(v2.version ());
 
-        // For the length of the "fake" v3 hello we need:
-        //   1   for the content type
-        //   2   for the protocol version
-        //   2   for the record length
-        //   2   for the client version
-        //  32   for the random value
-        //  33   for the session ID
-        //   2   for the cipher suites length
-        // 2*n   for the n cipher suites
-        //   2   for the singleton compression method list, with length
-        int len = 76 + 2 * suites.size ();
-        ByteBuffer buf = ByteBuffer.allocate (len);
-        Record rec = new Record (buf);
-        rec.setContentType (ContentType.HANDSHAKE);
-        rec.setVersion (v2.version ());
-        rec.setLength (len - 5);
-
-        Handshake handshake = new Handshake (rec.fragment ());
-        handshake.setType (Handshake.Type.CLIENT_HELLO);
-        handshake.setLength (len - 9);
-
-        ClientHello hello = (ClientHello) handshake.body ();
-        hello.setVersion (v2.version ());
-
-        Random random = hello.random ();
-        byte[] challenge = v2.challenge ();
+        Random random = hello.random();
+        byte[] challenge = v2.challenge();
         if (challenge.length < 32)
           {
             byte[] b = new byte[32];
@@ -368,28 +423,39 @@ public final class SSLEngineImpl extends SSLEngine
                              challenge.length);
             challenge = b;
           }
-        random.setGmtUnixTime ((challenge[0] & 0xFF) << 24
-                               | (challenge[1] & 0xFF) << 16
-                               | (challenge[2] & 0xFF) <<  8
-                               | (challenge[3] & 0xFF));
-        random.setRandomBytes (challenge, 4);
+        random.setGmtUnixTime((challenge[0] & 0xFF) << 24
+                              | (challenge[1] & 0xFF) << 16
+                              | (challenge[2] & 0xFF) <<  8
+                              | (challenge[3] & 0xFF));
+        random.setRandomBytes(challenge, 4);
 
-        byte[] sessionId = v2.sessionId ();
-        hello.setSessionId (sessionId, 0, sessionId.length);
+        byte[] sessionId = v2.sessionId();
+        hello.setSessionId(sessionId, 0, sessionId.length);
+        hello.setCipherSuites(suites);
+        ArrayList<CompressionMethod> comps = new ArrayList<CompressionMethod>(1);
+        comps.add(CompressionMethod.NULL);
+        hello.setCompressionMethods(comps);
 
-        CipherSuiteList mySuites = hello.cipherSuites ();
-        mySuites.setSize (2 * suites.size ());
-        for (int i = 0; i < suites.size (); i++)
-          mySuites.put (i, (CipherSuite) suites.get (i));
-
-        CompressionMethodList comps = hello.compressionMethods ();
-        comps.setSize (1);
-        comps.put (0, CompressionMethod.NULL);
-
-        record = rec;
+        record = new Record(ByteBuffer.allocate(hello.length() + 9));
+        record.setContentType(ContentType.HANDSHAKE);
+        record.setVersion(v2.version());
+        record.setLength(hello.length() + 4);
+        
+        Handshake handshake = new Handshake(record.fragment());
+        handshake.setLength(hello.length());
+        handshake.setType(Handshake.Type.CLIENT_HELLO);
+        
+        handshake.bodyBuffer().put(hello.buffer());
+        source.position(source.position() + hellolen);
+        helloV2 = true;
       }
-
-    logger.log (Component.SSL_RECORD_LAYER, "read record {0}", record);
+    else
+      record = new Record(source);
+    
+    ContentType type = record.contentType ();
+    
+    if (Debug.DEBUG)
+      logger.log(Component.SSL_RECORD_LAYER, "input record:\n{0}", record);
     
     if (record.length() > session.getPacketBufferSize() - 5)
       {
@@ -398,12 +464,8 @@ public final class SSLEngineImpl extends SSLEngine
         throw new AlertException(lastAlert);
       }
     
-    ByteBufferOutputStream sysMsg = null;
-    
-    // We will get a message, when decompressed, that does not exceed
-    // 2^14 bytes.
-    if (record.contentType() != ContentType.APPLICATION_DATA)
-      sysMsg = new ByteBufferOutputStream();
+    ByteBufferOutputStream sysMsg = null;    
+    ByteBuffer msg = null;
 
     int produced = 0;
     try
@@ -413,12 +475,25 @@ public final class SSLEngineImpl extends SSLEngine
         if (record.contentType() == ContentType.APPLICATION_DATA)
           produced = insec.decrypt(record, sinks, offset, length);
         else
-          insec.decrypt(record, sysMsg);
+          {
+            if (insec.cipherSuite() == CipherSuite.TLS_NULL_WITH_NULL_NULL)
+              msg = record.fragment();
+            else
+              {
+                sysMsg = new ByteBufferOutputStream();
+                insec.decrypt(record, sysMsg);
+              }
+          }
+        
+        // Advance the input buffer past the record we just read.
+        if (!helloV2)
+          source.position(source.position() + record.length() + 5);
       }
     catch (BufferOverflowException boe)
       {
         // We throw this if the output buffers are not large enough; signal
         // the caller about this.
+        logger.log(Component.SSL_RECORD_LAYER, "buffer overflow when decrypting", boe);
         return new SSLEngineResult(SSLEngineResult.Status.BUFFER_OVERFLOW,
                                    handshakeStatus, 0, 0);
       }
@@ -452,9 +527,12 @@ public final class SSLEngineImpl extends SSLEngine
     
     // If we need to handle the output here, do it. Otherwise, the output
     // has been stored in the supplied output buffers.
-    ByteBuffer msg = null;
     if (sysMsg != null)
-      msg = sysMsg.buffer();
+      {
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "sysmessage {0}", sysMsg);
+        msg = sysMsg.buffer();
+      }
     
     if (type == ContentType.CHANGE_CIPHER_SPEC)
       {
@@ -464,7 +542,7 @@ public final class SSLEngineImpl extends SSLEngine
           {
             result = new SSLEngineResult (SSLEngineResult.Status.OK,
                                           handshakeStatus,
-                                          record.length(), 0);
+                                          record.length() + 5, 0);
           }
         else
           {
@@ -474,11 +552,11 @@ public final class SSLEngineImpl extends SSLEngine
             InputSecurityParameters params = handshake.getInputParams();
             logger.log (Component.SSL_RECORD_LAYER,
                         "switching to input security parameters {0}",
-                        params.cipherSuite ());
+                        params.cipherSuite());
             insec = params;
             result = new SSLEngineResult (SSLEngineResult.Status.OK,
-                                          SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING,
-                                          record.length(), 0); // XXXX
+                                          handshakeStatus,
+                                          record.length() + 5, 0); // XXXX
           }
       }
     else if (type == ContentType.ALERT)
@@ -508,28 +586,35 @@ public final class SSLEngineImpl extends SSLEngine
           {
             if (alerts[i].level () == Alert.Level.FATAL)
               throw new AlertException (alerts[i]);
-            logger.log (java.util.logging.Level.WARNING, "received alert: {0}", alerts[i]);
-            if (alerts[i].description () == Alert.Description.CLOSE_NOTIFY)
+            logger.log (java.util.logging.Level.WARNING,
+                        "received alert: {0}", alerts[i]);
+            if (alerts[i].description() == Alert.Description.CLOSE_NOTIFY)
               inClosed = true;
           }
 
-        if (msg.hasRemaining ())
-          alertBuffer.position (0).limit (2);
+        if (msg.hasRemaining())
+          alertBuffer.position(0).limit(2);
 
-        result = new SSLEngineResult (inClosed ? SSLEngineResult.Status.CLOSED
-                                      : SSLEngineResult.Status.OK,
-                                      SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING,
-                                      record.length (), 0);
+        result = new SSLEngineResult (SSLEngineResult.Status.OK,
+                                      handshakeStatus,
+                                      record.length() + 5, 0);
       }
     else if (type == ContentType.HANDSHAKE)
       {
         if (handshake == null)
           beginHandshake();
         handshakeStatus = handshake.handleInput(msg);
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE, "handshake status {0}", handshakeStatus);
         result = new SSLEngineResult(SSLEngineResult.Status.OK,
                                      handshakeStatus,
                                      record.length() + 5,
                                      0);
+        if (handshakeStatus == HandshakeStatus.FINISHED)
+          {
+            handshake = null;
+            handshakeStatus = HandshakeStatus.NOT_HANDSHAKING;
+          }
       }
     else if (type == ContentType.APPLICATION_DATA)
       {
@@ -554,6 +639,9 @@ public final class SSLEngineImpl extends SSLEngine
           throw new SSLException ("unknown content type: " + type);
       }
 
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_RECORD_LAYER, "return result: {0}", result);
+    
     return result;
   }
 
@@ -561,9 +649,13 @@ public final class SSLEngineImpl extends SSLEngine
                                          ByteBuffer sink)
     throws SSLException
   {
-    if (mode == MODE_NONE)
+    if (mode == null)
       throw new IllegalStateException ("setUseClientMode was never called");
 
+    if (outClosed)
+      return new SSLEngineResult(SSLEngineResult.Status.CLOSED,
+                                 handshakeStatus, 0, 0);
+    
     ContentType type = null;
     ByteBuffer sysMessage = null;
     
@@ -574,21 +666,54 @@ public final class SSLEngineImpl extends SSLEngine
         Alert alert = new Alert(sysMessage);
         alert.setDescription(lastAlert.description());
         alert.setLevel(lastAlert.level());
+        if (lastAlert.description() == Alert.Description.CLOSE_NOTIFY)
+          outClosed = true;
       }
     else if (changeCipherSpec)
       {
         type = ContentType.CHANGE_CIPHER_SPEC;
         sysMessage = ByteBuffer.allocate(1);
         sysMessage.put(0, (byte) 1);
-        outsec = handshake.getOutputParams();
-        changeCipherSpec = false;
       }
     else if (handshakeStatus == SSLEngineResult.HandshakeStatus.NEED_WRAP)
       {
+        // If we are not encrypting, optimize the handshake to fill
+        // the buffer directly.
+        if (outsec.suite() == CipherSuite.TLS_NULL_WITH_NULL_NULL)
+          {
+            int orig = sink.position();
+            sink.order(ByteOrder.BIG_ENDIAN);
+            sink.put((byte) ContentType.HANDSHAKE.getValue());
+            sink.putShort((short) session.version.rawValue());
+            sink.putShort((short) 0);
+            handshakeStatus = handshake.handleOutput(sink);
+            int produced = sink.position() - orig;
+            sink.putShort(orig + 3, (short) (produced - 5));
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_RECORD_LAYER, "emitting record:\n{0}",
+                          new Record((ByteBuffer) sink.duplicate().position(orig)));
+            SSLEngineResult result =  new SSLEngineResult(SSLEngineResult.Status.OK,
+                                                          handshakeStatus, 0, produced);
+            
+            // Note, this will only happen if we transition from
+            // TLS_NULL_WITH_NULL_NULL *to* TLS_NULL_WITH_NULL_NULL, which
+            // doesn't make a lot of sense, but we support it anyway.
+            if (handshakeStatus == HandshakeStatus.FINISHED)
+              {
+                handshake = null; // finished with it.
+                handshakeStatus = HandshakeStatus.NOT_HANDSHAKING;
+              }
+            return result;
+          }
+       
         // Rough guideline; XXX.
         sysMessage = ByteBuffer.allocate(sink.remaining() - 2048);
         type = ContentType.HANDSHAKE;
         handshakeStatus = handshake.handleOutput(sysMessage);
+        sysMessage.flip();
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE, "handshake status {0}",
+                      handshakeStatus);
       }
 
     int produced = 0;
@@ -596,20 +721,27 @@ public final class SSLEngineImpl extends SSLEngine
     
     try
       {
+        int orig = sink.position();
         int[] inout = null;
         if (sysMessage != null)
           {
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_RECORD_LAYER, "encrypt system message {0} to {1}", sysMessage, sink);
             inout = outsec.encrypt(new ByteBuffer[] { sysMessage }, 0, 1,
-                                 type, sink);
+                                   type, sink);
             produced = inout[1];
           }
         else
           {
             inout = outsec.encrypt(sources, offset, length,
-                                 ContentType.APPLICATION_DATA, sink);
+                                   ContentType.APPLICATION_DATA, sink);
             consumed = inout[0];
             produced = inout[1];
           }
+        
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "emitting record:\n{0}",
+                      new Record((ByteBuffer) sink.duplicate().position(orig).limit(produced)));
       }
     catch (ShortBufferException sbe)
       {
@@ -638,8 +770,22 @@ public final class SSLEngineImpl extends SSLEngine
         lastAlert = null;
         throw ae;
       }
-    return new SSLEngineResult(SSLEngineResult.Status.OK,
-                               handshakeStatus, consumed, produced);
+    
+    if (changeCipherSpec)
+      {
+        outsec = handshake.getOutputParams();
+        changeCipherSpec = false;
+      }
+    SSLEngineResult result
+      = new SSLEngineResult(outClosed ? SSLEngineResult.Status.CLOSED
+                                      : SSLEngineResult.Status.OK,
+                            handshakeStatus, consumed, produced);
+    if (handshakeStatus == HandshakeStatus.FINISHED)
+      {
+        handshake = null; // done with it.
+        handshakeStatus = HandshakeStatus.NOT_HANDSHAKING;
+      }
+    return result;
   }
 
   // Package-private methods.

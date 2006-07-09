@@ -105,7 +105,7 @@ public abstract class AbstractSessionContext implements SSLSessionContext
    * @return The new session context.
    * @throws SSLException If an error occurs in creating the instance.
    */
-  public static SSLSessionContext newInstance () throws SSLException
+  public static AbstractSessionContext newInstance () throws SSLException
   {
     try
       {
@@ -173,7 +173,8 @@ public abstract class AbstractSessionContext implements SSLSessionContext
   public final SSLSession getSession (byte[] sessionId)
   {
     Session s = implGet (sessionId);
-    if (System.currentTimeMillis () - s.getLastAccessedTime () > timeout)
+    if (s != null
+        && System.currentTimeMillis () - s.getLastAccessedTime () > timeout)
       {
         remove (sessionId);
         return null;

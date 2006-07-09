@@ -48,6 +48,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -71,7 +72,7 @@ struct
 } ClientHello;
 </pre>
  */
-public final class ClientHello implements Handshake.Body
+public class ClientHello implements Handshake.Body
 {
 
   // Fields.
@@ -79,22 +80,20 @@ public final class ClientHello implements Handshake.Body
 
   // To help track offsets into the message:
   // The location of the 'random' field.
-  private static final int RANDOM_OFFSET = 2;
+  protected static final int RANDOM_OFFSET = 2;
   // The location of the sesion_id length.
-  private static final int SESSID_OFFSET = 32 + RANDOM_OFFSET;
+  protected static final int SESSID_OFFSET = 32 + RANDOM_OFFSET;
   // The location of the session_id bytes (if any).
-  private static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
+  protected static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
 
-  private final ByteBuffer buffer;
-  private int totalLength;
+  protected ByteBuffer buffer;
 
   // Constructor.
   // -------------------------------------------------------------------------
 
   public ClientHello (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
-    totalLength = buffer.limit ();
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   // Instance methods.
@@ -102,7 +101,12 @@ public final class ClientHello implements Handshake.Body
 
   public int length ()
   {
-    return totalLength;
+    int len = SESSID_OFFSET2 + buffer.get(SESSID_OFFSET);
+    len += (buffer.getShort(len) & 0xFFFF) + 2;
+    len += (buffer.get(len) & 0xFF) + 1;
+    if (hasExtensions())
+      len += (buffer.get(len) & 0xFFFF) + 2;
+    return len;
   }
 
   /**
@@ -177,45 +181,27 @@ public final class ClientHello implements Handshake.Body
                        .limit (offset + len + 2)).slice ();
     return new ExtensionList (ebuf);
   }
-
-  public void setVersion (final ProtocolVersion version)
+  
+  public int extensionsLength()
   {
-    buffer.putShort (0, (short) version.rawValue ());
+    if (hasExtensions())
+      return 0;
+    return buffer.getShort(getExtensionsOffset()) & 0xFFFF;
   }
 
-  public void setSessionId (final byte[] buffer)
-  {
-    setSessionId (buffer, 0, buffer.length);
-  }
-
-  public void setSessionId (final byte[] buffer, final int offset, final int length)
-  {
-    int len = Math.min (32, length);
-    this.buffer.put (SESSID_OFFSET, (byte) len);
-    this.buffer.position (SESSID_OFFSET2);
-    this.buffer.put (buffer, offset, len);
-  }
-
-  public void setExtensionsLength (final int length)
-  {
-    int offset = getExtensionsOffset();
-    this.totalLength = offset + length + 4;
-    buffer.putShort(offset, (short) length);
-  }
-
-  private int getCipherSuitesOffset ()
+  protected int getCipherSuitesOffset ()
   {
     return (SESSID_OFFSET2 + (buffer.get (SESSID_OFFSET) & 0xFF));
   }
 
-  private int getCompressionMethodsOffset ()
+  protected int getCompressionMethodsOffset ()
   {
     int csOffset = getCipherSuitesOffset ();
     int csLen = buffer.getShort (csOffset) & 0xFFFF;
     return csOffset + csLen + 2;
   }
 
-  private int getExtensionsOffset ()
+  protected int getExtensionsOffset ()
   {
     int cmOffset = getCompressionMethodsOffset ();
     return (buffer.get (cmOffset) & 0xFF) + cmOffset + 1;

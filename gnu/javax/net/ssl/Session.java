@@ -68,8 +68,6 @@ public abstract class Session implements SSLSession, Serializable
   protected long lastAccessedTime;
   protected int applicationBufferSize;
   
-  // Default to 2^14 + 5 -- the maximum size for a record.
-  protected int packetBufferSize = 16389;
   protected ID sessionId;
   protected Certificate[] localCerts;
   protected Certificate[] peerCerts;
@@ -87,6 +85,7 @@ public abstract class Session implements SSLSession, Serializable
   {
     creationTime = System.currentTimeMillis();
     values = new HashMap<String, Object>();
+    applicationBufferSize = (1 << 14);
   }
 
   public void access()
@@ -143,7 +142,7 @@ public abstract class Session implements SSLSession, Serializable
   
   public int getPacketBufferSize()
   {
-    return packetBufferSize;
+    return applicationBufferSize + 2048;
   }
   
   public Certificate[] getPeerCertificates() throws SSLPeerUnverifiedException

@@ -41,6 +41,7 @@ package gnu.javax.net.ssl.provider;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,7 +72,7 @@ class ClientHelloV2 implements Constructed
 
   ClientHelloV2 (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   public int length ()
@@ -99,7 +100,7 @@ class ClientHelloV2 implements Constructed
     return buffer.getShort (7) & 0xFFFF;
   }
 
-  List cipherSpecs ()
+  public List<CipherSuite> cipherSpecs ()
   {
     int n = cipherSpecsLength ();
     List<CipherSuite> l = new ArrayList<CipherSuite>(n / 3);

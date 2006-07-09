@@ -560,7 +560,7 @@ public final class CipherSuite implements Constructed
         if (macAlgorithm == MacAlgorithm.MD5)
           macAlg = "HMac-MD5";
         if (macAlgorithm == MacAlgorithm.SHA)
-          macAlg = "HMac-SHA-1";
+          macAlg = "HMac-SHA1";
       }
     
     GetSecurityPropertyAction gspa =

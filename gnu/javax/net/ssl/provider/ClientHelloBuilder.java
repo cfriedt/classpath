@@ -1,4 +1,4 @@
-/* ServerHelloBuilder.java -- 
+/* ClientHelloBuilder.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -39,93 +39,94 @@ exception statement from your version. */
 package gnu.javax.net.ssl.provider;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 
 /**
- * @author csm
- *
+ * Builder for {@link ClientHello} objects.
+ * 
+ * @author Casey Marshall (csm@gnu.org)
  */
-public class ServerHelloBuilder extends ServerHello implements Builder
+public class ClientHelloBuilder extends ClientHello implements Builder
 {
-  public ServerHelloBuilder()
+  public ClientHelloBuilder()
   {
-    // Allocate a large enough buffer to hold a hello with the maximum
-    // size session ID, and no extensions.
-    super(ByteBuffer.allocate(SESSID_OFFSET2 + 35));
+    super(ByteBuffer.allocate(256));
   }
 
+  /* (non-Javadoc)
+   * @see gnu.javax.net.ssl.provider.Builder#buffer()
+   */
   public ByteBuffer buffer()
   {
-    return ((ByteBuffer) buffer.duplicate().position(0).limit(length())).slice();
+    return (ByteBuffer) buffer.duplicate().position(0).limit(length());
+  }
+
+  public void setVersion(final ProtocolVersion version)
+  {
+    ensureCapacity(2);
+    buffer.putShort(0, (short) version.rawValue ());
+  }
+
+  public void setSessionId (final byte[] buffer)
+  {
+    setSessionId(buffer, 0, buffer.length);
+  }
+
+  public void setSessionId (final byte[] buffer, final int offset, final int length)
+  {
+    ensureCapacity(SESSID_OFFSET2 + length);
+    int len = Math.min (32, length);
+    this.buffer.put (SESSID_OFFSET, (byte) len);
+    this.buffer.position (SESSID_OFFSET2);
+    this.buffer.put (buffer, offset, len);
   }
   
-  // We don't reallocate the buffer in any of the following methods,
-  // because we always allocate a large enough buffer for the base
-  // object in the constructor.
-  
-  public void setVersion (final ProtocolVersion version)
+  public void setCipherSuites(List<CipherSuite> suites)
   {
-    buffer.putShort (0, (short) version.rawValue ());
-  }
-
-  public void setSessionId (final byte[] sessionId)
-  {
-    setSessionId (sessionId, 0, sessionId.length);
-  }
-
-  public void setSessionId (final byte[] sessionId, final int offset,
-                            final int length)
-  {
-    if (length < 0 || length > 32)
-      throw new IllegalArgumentException("length must be between 0 and 32");
-    buffer.put(SESSID_OFFSET, (byte) length);
-    ((ByteBuffer) buffer.duplicate().position(SESSID_OFFSET2))
-      .put(sessionId, offset, length);
-  }
-
-  public void setCipherSuite (final CipherSuite suite)
-  {
-    int offset = SESSID_OFFSET + (buffer.get(SESSID_OFFSET) & 0xFF) + 1;
-    ((ByteBuffer) buffer.duplicate().position(offset)).put(suite.id());
-  }
-
-  public void setCompressionMethod (final CompressionMethod comp)
-  {
-    int offset = SESSID_OFFSET + (buffer.get(SESSID_OFFSET) & 0xFF) + 3;
-    buffer.put (offset, (byte) comp.getValue ());
-  }
-
-  // For extensions, we do reallocate the buffer.
-  
-  public void setDisableExtensions(boolean disable)
-  {
-    disableExtensions = disable;
+    int off = getCipherSuitesOffset();
+    ensureCapacity(off + (2 * suites.size()) + 2);
+    buffer.putShort(off, (short) (suites.size() * 2));
+    int i = 2;
+    for (CipherSuite suite : suites)
+      {
+        ((ByteBuffer) buffer.duplicate().position(off+i)).put(suite.id());
+        i += 2;
+      }
   }
   
+  public void setCompressionMethods(List<CompressionMethod> methods)
+  {
+    int off = getCompressionMethodsOffset();
+    ensureCapacity(off + methods.size() + 1);
+    buffer.put(off, (byte) methods.size());
+    for (CompressionMethod method : methods)
+      buffer.put(++off, (byte) method.getValue());
+  }
+
   public void setExtensionsLength (final int length)
   {
     if (length < 0 || length > 16384)
       throw new IllegalArgumentException("length must be nonnegative and not exceed 16384");
-    int needed = SESSID_OFFSET2 + (buffer.get(SESSID_OFFSET) & 0xFF) + 5 + length;
+    int needed = getExtensionsOffset() + 2 + length;
     if (buffer.capacity() < needed)
       ensureCapacity(needed);
-    buffer.putShort (SESSID_OFFSET2 + (buffer.get (SESSID_OFFSET) & 0xFF) + 3,
-                     (short) length);
+    buffer.putShort(getExtensionsOffset(), (short) length);
   }
   
   public void setExtensions(ByteBuffer extensions)
   {
     extensions = (ByteBuffer)
       extensions.duplicate().limit(extensions.position() + extensionsLength());
-    ((ByteBuffer) buffer.duplicate().position(SESSID_OFFSET2
-                                              + (buffer.get(SESSID_OFFSET) & 0xFF)
-                                              )).put(extensions);
+    ((ByteBuffer) buffer.duplicate().position(getExtensionsOffset() + 2)).put(extensions);
   }
   
-  public void ensureCapacity(int newCapacity)
+  public void ensureCapacity(final int length)
   {
-    ByteBuffer newBuffer = ByteBuffer.allocate(newCapacity);
-    newBuffer.put(buffer);
-    newBuffer.position(0);
-    buffer = newBuffer;
+    if (buffer.capacity() >= length)
+      return;
+    ByteBuffer newBuf = ByteBuffer.allocate(length);
+    newBuf.put((ByteBuffer) buffer.position(0));
+    newBuf.position(0);
+    this.buffer = newBuf;
   }
 }

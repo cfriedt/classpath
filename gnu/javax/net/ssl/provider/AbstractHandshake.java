@@ -51,6 +51,7 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
@@ -104,16 +105,34 @@ public abstract class AbstractHandshake
     };
   
   /**
-   * SSL 3.0
+   * SSL 3.0; the string "CLNT"
    */
   private static final byte[] SENDER_CLIENT
     = new byte[] { 0x43, 0x4C, 0x4E, 0x54 };
   
   /**
-   * SSL 3.0
+   * SSL 3.0; the string "SRVR"
    */
   private static final byte[] SENDER_SERVER
     = new byte[] { 0x53, 0x52, 0x56, 0x52 };
+  
+  /**
+   * SSL 3.0; the value 0x36 40 (for SHA-1 hashes) or 48 (for MD5 hashes)
+   * times.
+   */
+  private static final byte[] PAD1 = new byte[48];
+  
+  /**
+   * SSL 3.0; the value 0x5c 40 (for SHA-1 hashes) or 48 (for MD5 hashes)
+   * times.
+   */
+  private static final byte[] PAD2 = new byte[48];
+
+  static
+  {
+    Arrays.fill(PAD1, SSLHMac.PAD1);
+    Arrays.fill(PAD2, SSLHMac.PAD2);
+  }
   
   /**
    * The currently-read handshake messages. There may be zero, or
@@ -149,9 +168,54 @@ public abstract class AbstractHandshake
    * output or temporary storage.
    * @return An {@link SSLEngineResult} describing the result.
    */
-  public abstract SSLEngineResult.HandshakeStatus handleInput (ByteBuffer fragment)
-    throws SSLException;
+  public final HandshakeStatus handleInput (ByteBuffer fragment)
+    throws SSLException
+  {
+    HandshakeStatus status = status();
+    if (status != HandshakeStatus.NEED_UNWRAP)
+      return status;
 
+    // Try to read another...
+    if (!pollHandshake(fragment))
+      return HandshakeStatus.NEED_UNWRAP;
+
+    while (hasMessage() && status == HandshakeStatus.NEED_UNWRAP)
+      {
+        int pos = handshakeOffset;
+        status = implHandleInput();
+        int len = handshakeOffset - pos;
+        if (len == 0)
+          {
+            // Don't bother; the impl is just telling us to go around
+            // again.
+            continue;
+          }
+        if (doHash())
+          {
+            if (Debug.DEBUG)
+              logger.logv(Component.SSL_HANDSHAKE, "hashing output\n{0}",
+                          Util.hexDump((ByteBuffer) handshakeBuffer
+                                       .duplicate().position(pos)
+                                       .limit(pos+len), " >> "));
+            sha.update((ByteBuffer) handshakeBuffer.duplicate()
+                       .position(pos).limit(pos+len));
+            md5.update((ByteBuffer) handshakeBuffer.duplicate()
+                       .position(pos).limit(pos+len));
+          }
+      }
+    return status;
+  }
+
+  /**
+   * Called to process more handshake data. This method will be called
+   * repeatedly while there is remaining handshake data, and while the
+   * status is 
+   * @return
+   * @throws SSLException
+   */
+  protected abstract HandshakeStatus implHandleInput()
+    throws SSLException;
+  
   /**
    * Produce more handshake output. This is called in response to a
    * call to {@link javax.net.ssl.SSLEngine#wrap}, when the handshake
@@ -166,20 +230,27 @@ public abstract class AbstractHandshake
   public final SSLEngineResult.HandshakeStatus handleOutput (ByteBuffer fragment)
     throws SSLException
   {
+    int orig = fragment.position();
     SSLEngineResult.HandshakeStatus status = implHandleOutput(fragment);
     if (doHash())
       {
-        sha.update((ByteBuffer) fragment.duplicate().flip());
-        md5.update((ByteBuffer) fragment.duplicate().flip());
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE, "hashing output:\n{0}",
+                      Util.hexDump((ByteBuffer) fragment.duplicate().flip().position(orig), " >> "));
+        sha.update((ByteBuffer) fragment.duplicate().flip().position(orig));
+        md5.update((ByteBuffer) fragment.duplicate().flip().position(orig));
       }
     return status;
   }
   
   /**
-   * Called to implement the underlying 
-   * @param record
-   * @return
-   * @throws SSLException
+   * Called to implement the underlying output handling. The callee should
+   * attempt to fill the given buffer as much as it can; this can include
+   * multiple, and even partial, handshake messages.
+   * 
+   * @param fragment The buffer the callee should write handshake messages to.
+   * @return The new status of the handshake.
+   * @throws SSLException If an error occurs processing the output message.
    */
   protected abstract SSLEngineResult.HandshakeStatus implHandleOutput (ByteBuffer fragment)
     throws SSLException;
@@ -208,6 +279,23 @@ public abstract class AbstractHandshake
   abstract OutputSecurityParameters getOutputParams() throws SSLException;
   
   /**
+   * Used by the skeletal code to query the current status of the handshake.
+   * This <em>should</em> be the same value as returned by the previous call
+   * to {@link #implHandleOutput(ByteBuffer)} or {@link
+   *  #implHandleInput(ByteBuffer)}.
+   * 
+   * @return The current handshake status.
+   */
+  abstract SSLEngineResult.HandshakeStatus status();
+  
+  /**
+   * Handle an SSLv2 client hello. This is only used by SSL servers.
+   * 
+   * @param hello The hello message.
+   */
+  abstract void handleV2Hello(ByteBuffer hello) throws SSLException;
+  
+  /**
    * Attempt to read the next handshake message from the given
    * record. If only a partial handshake message is available, then
    * this method saves the incoming bytes and returns false. If a
@@ -221,29 +309,28 @@ public abstract class AbstractHandshake
    */
   protected boolean pollHandshake (final ByteBuffer fragment)
   {
-    Record record = new Record(fragment);
     // Allocate space for the new fragment.
-    if (handshakeBuffer == null || handshakeBuffer.remaining () < record.length ())
+    if (handshakeBuffer == null
+        || handshakeBuffer.remaining() < fragment.remaining())
       {
         // We need space for anything still unread in the handshake
         // buffer...
         int len = ((handshakeBuffer == null) ? 0
-                   : handshakeBuffer.position () - handshakeOffset);
+                   : handshakeBuffer.position() - handshakeOffset);
 
         // Plus room for the incoming record.
         len += fragment.remaining();
-        reallocateBuffer (len);
+        reallocateBuffer(len);
       }
 
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE, "inserting {0} into {1}",
+                  fragment, handshakeBuffer);
+    
     // Put the fragment into the buffer.
-    if (doHash())
-      {
-        sha.update(fragment);
-        md5.update(fragment);
-      }
-    handshakeBuffer.put (fragment);
+    handshakeBuffer.put(fragment);
 
-    return hasMessage ();
+    return hasMessage();
   }
   
   protected boolean doHash()
@@ -255,15 +342,23 @@ public abstract class AbstractHandshake
    * Tell if the handshake buffer currently has a full handshake
    * message.
    */
-  protected boolean hasMessage ()
+  protected boolean hasMessage()
   {
     if (handshakeBuffer == null)
       return false;
-    ByteBuffer tmp = handshakeBuffer.duplicate ();
-    tmp.flip ();
-    tmp.position (handshakeOffset);
-    Handshake handshake = new Handshake (tmp);
-    return (handshake.length () >= tmp.remaining ());
+    ByteBuffer tmp = handshakeBuffer.duplicate();
+    tmp.flip();
+    tmp.position(handshakeOffset);
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE, "current buffer: {0}; test buffer {1}",
+                  handshakeBuffer, tmp);
+    if (tmp.remaining() < 4)
+      return false;
+    Handshake handshake = new Handshake(tmp.slice());
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_HANDSHAKE, "handshake len:{0} remaining:{1}",
+                  handshake.length(), tmp.remaining());
+    return (handshake.length() <= tmp.remaining() - 4);
   }
 
   /**
@@ -273,9 +368,23 @@ public abstract class AbstractHandshake
    */
   private void reallocateBuffer (final int totalLen)
   {
-    int len = handshakeBuffer == null ? 0 : handshakeBuffer.capacity ();
+    int len = handshakeBuffer == null ? -1
+                                      : handshakeBuffer.capacity() - (handshakeBuffer.limit() - handshakeOffset);
     if (len >= totalLen)
-      return; // Big enough; no need to reallocate.
+      {
+        // Big enough; no need to reallocate; but maybe shift the contents
+        // down.
+        if (handshakeOffset > 0)
+          {
+            ByteBuffer tmp = handshakeBuffer.duplicate();
+            tmp.flip();
+            tmp.position(handshakeOffset);
+            handshakeBuffer.position(0);
+            handshakeBuffer.put(tmp);
+            handshakeOffset = 0;
+          }
+        return;
+      }
 
     // Start at 1K (probably the system's page size). Double the size
     // from there.
@@ -288,8 +397,8 @@ public abstract class AbstractHandshake
     if (handshakeBuffer != null)
       {
         handshakeBuffer.flip ();
-        handshakeBuffer.position (handshakeOffset);
-        newBuf.put (handshakeBuffer);
+        handshakeBuffer.position(handshakeOffset);
+        newBuf.put(handshakeBuffer);
       }
     handshakeBuffer = newBuf;
 
@@ -319,7 +428,7 @@ Certificate.signature.sha_hash
    * @param session The current session being negotiated.
    * @return The computed to-be-signed value.
    */
-  protected byte[] genV2CertificateVerify(MessageDigest md5,
+  protected byte[] genV3CertificateVerify(MessageDigest md5,
                                           MessageDigest sha,
                                           SessionImpl session)
   {
@@ -386,9 +495,9 @@ Certificate.signature.sha_hash
       {
         byte[] seed = new byte[clientRandom.length()
                                + serverRandom.length()];
-        clientRandom.buffer().get(seed, 0, clientRandom.length());
-        serverRandom.buffer().get(seed, clientRandom.length(),
-                                  serverRandom.length());
+        serverRandom.buffer().get(seed, 0, serverRandom.length());
+        clientRandom.buffer().get(seed, serverRandom.length(),
+                                  clientRandom.length());
         prf = new SSLRandom();
         HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
         attr.put(SSLRandom.SECRET, session.privateData.masterSecret);
@@ -401,11 +510,11 @@ Certificate.signature.sha_hash
                                + clientRandom.length()
                                + serverRandom.length()];
         System.arraycopy(KEY_EXPANSION, 0, seed, 0, KEY_EXPANSION.length);
-        clientRandom.buffer().get(seed, KEY_EXPANSION.length,
-                                  clientRandom.length());
-        serverRandom.buffer().get(seed, (KEY_EXPANSION.length
-                                         + clientRandom.length()),
+        serverRandom.buffer().get(seed, KEY_EXPANSION.length,
                                   serverRandom.length());
+        clientRandom.buffer().get(seed, (KEY_EXPANSION.length
+                                         + serverRandom.length()),
+                                  clientRandom.length());
         
         prf = new TLSRandom();
         HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
@@ -420,11 +529,8 @@ Certificate.signature.sha_hash
         prf.nextBytes(keys[1], 0, keys[1].length);
         prf.nextBytes(keys[2], 0, keys[2].length);
         prf.nextBytes(keys[3], 0, keys[3].length);
-        if (session.version.compareTo(ProtocolVersion.TLS_1_1) < 0)
-          {
-            prf.nextBytes(keys[4], 0, keys[4].length);
-            prf.nextBytes(keys[5], 0, keys[5].length);
-          }
+        prf.nextBytes(keys[4], 0, keys[4].length);
+        prf.nextBytes(keys[5], 0, keys[5].length);
       }
     catch (LimitReachedException lre)
       {
@@ -432,6 +538,16 @@ Certificate.signature.sha_hash
         throw new Error(lre);
       }
     
+    if (Debug.DEBUG_KEY_EXCHANGE)
+      logger.logv(Component.SSL_KEY_EXCHANGE,
+                  "keys generated;\n  [0]: {0}\n  [1]: {1}\n  [2]: {2}\n" +
+                  "  [3]: {3}\n  [4]: {4}\n  [5]: {5}",
+                  Util.toHexString(keys[0], ':'),
+                  Util.toHexString(keys[1], ':'),
+                  Util.toHexString(keys[2], ':'),
+                  Util.toHexString(keys[3], ':'),
+                  Util.toHexString(keys[4], ':'),
+                  Util.toHexString(keys[5], ':'));
     return keys;
   }
   
@@ -459,6 +575,10 @@ Certificate.signature.sha_hash
         TLSRandom prf = new TLSRandom();
         byte[] md5val = md5.digest();
         byte[] shaval = sha.digest();
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE, "finished md5:{0} sha:{1}",
+                      Util.toHexString(md5val, ':'),
+                      Util.toHexString(shaval, ':'));
         byte[] seed = new byte[CLIENT_FINISHED.length
                                + md5val.length
                                + shaval.length];
@@ -503,23 +623,23 @@ Certificate.signature.sha_hash
         
         md5.update(isClient ? SENDER_CLIENT : SENDER_SERVER);
         md5.update(session.privateData.masterSecret);
-        md5.update(SSLHMac.PAD1);
+        md5.update(PAD1);
         
         byte[] tmp = md5.digest();
         md5.reset();
         md5.update(session.privateData.masterSecret);
-        md5.update(SSLHMac.PAD2);
+        md5.update(PAD2);
         md5.update(tmp);
         finishedBuffer.put(md5.digest());
         
         sha.update(isClient ? SENDER_CLIENT : SENDER_SERVER);
         sha.update(session.privateData.masterSecret);
-        sha.update(SSLHMac.PAD1);
+        sha.update(PAD1, 0, 40);
         
         tmp = sha.digest();
         sha.reset();
         sha.update(session.privateData.masterSecret);
-        sha.update(SSLHMac.PAD2);
+        sha.update(PAD2, 0, 40);
         sha.update(tmp);
         finishedBuffer.put(sha.digest()).position(0);
       }
@@ -574,6 +694,10 @@ Certificate.signature.sha_hash
                                       SessionImpl session)
     throws SSLException
   {
+    if (Debug.DEBUG_KEY_EXCHANGE)
+      logger.logv(Component.SSL_KEY_EXCHANGE, "preMasterSecret:\n{0}",
+                  new ByteArray(preMasterSecret));
+    
     if (session.version == ProtocolVersion.SSL_3)
       {
         try
@@ -623,12 +747,12 @@ Certificate.signature.sha_hash
         byte[] seed = new byte[clientRandom.length()
                                + serverRandom.length()
                                + MASTER_SECRET.length];
-        clientRandom.buffer().get(seed, 0, clientRandom.length());
-        serverRandom.buffer().get(seed, clientRandom.length(),
+        System.arraycopy(MASTER_SECRET, 0, seed, 0, MASTER_SECRET.length);
+        clientRandom.buffer().get(seed, MASTER_SECRET.length,
+                                  clientRandom.length());
+        serverRandom.buffer().get(seed,
+                                  MASTER_SECRET.length + clientRandom.length(),
                                   serverRandom.length());
-        System.arraycopy(MASTER_SECRET, 0, seed,
-                         clientRandom.length() + serverRandom.length(),
-                         MASTER_SECRET.length);
         TLSRandom prf = new TLSRandom();
         HashMap<String,byte[]> attr = new HashMap<String,byte[]>(2);
         attr.put(TLSRandom.SECRET, preMasterSecret);
@@ -639,7 +763,7 @@ Certificate.signature.sha_hash
         prf.nextBytes(session.privateData.masterSecret, 0, 48);
       }
     
-    if (Configuration.DEBUG)
+    if (Debug.DEBUG_KEY_EXCHANGE)
       logger.log(Component.SSL_KEY_EXCHANGE, "master_secret: {0}",
                  new ByteArray(session.privateData.masterSecret));
     

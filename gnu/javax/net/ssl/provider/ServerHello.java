@@ -73,16 +73,15 @@ public class ServerHello implements Handshake.Body
   protected static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
 
   protected ByteBuffer buffer;
-
-  /** The total length of the message, including the extensions. */
-  private int totalLength;
-
+  protected boolean disableExtensions;
+  
   // Constructor.
   // -------------------------------------------------------------------------
 
   public ServerHello (final ByteBuffer buffer)
   {
     this.buffer = buffer;
+    disableExtensions = false;
   }
 
   public int length ()
@@ -90,7 +89,7 @@ public class ServerHello implements Handshake.Body
     int sessionLen = buffer.get(SESSID_OFFSET) & 0xFF;
     int len = SESSID_OFFSET2 + sessionLen + 3;
     int elen = 0;
-    if (len + 1 < buffer.limit()
+    if (!disableExtensions && len + 1 < buffer.limit()
         && (elen = buffer.getShort(len)) != 0)
       len += 2 + elen;
     return len;

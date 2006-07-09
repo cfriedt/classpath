@@ -41,6 +41,7 @@ package gnu.javax.net.ssl.provider;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * A SSL/TLS record structure. An SSL record is defined to be:
@@ -61,7 +62,7 @@ public class Record
 
   public Record (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 
   // XXX remove
@@ -114,6 +115,8 @@ public class Record
    */
   public int length ()
   {
+    // XXX this is different behavior than we usually want: we return the
+    // length field, not the total length. We should consider changing this.
     return buffer.getShort (3) & 0xFFFF;
   }
 
@@ -183,6 +186,9 @@ public class Record
     out.print ("  version: ");
     out.print (version ());
     out.println (";");
+    out.print("  length: ");
+    out.print(length());
+    out.println(";");
     out.println ("  fragment {");
     out.print (Util.hexDump (fragment (), "    "));
     out.println ("  };");

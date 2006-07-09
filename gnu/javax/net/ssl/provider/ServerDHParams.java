@@ -118,7 +118,7 @@ public class ServerDHParams implements Builder, ServerKeyExchangeParams
 
   public ByteBuffer buffer()
   {
-    return (ByteBuffer) buffer.duplicate().limit(length());
+    return (ByteBuffer) buffer.duplicate().position(0).limit(length());
   }
   
   /**

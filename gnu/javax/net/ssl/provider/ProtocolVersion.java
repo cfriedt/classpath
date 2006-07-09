@@ -81,7 +81,8 @@ public final class ProtocolVersion
       return SSL_3;
     if (name.equalsIgnoreCase ("TLSv1"))
       return TLS_1;
-    // TLSv1.1 not really supported yet.
+    if (name.equalsIgnoreCase("TLSv1.1"))
+      return TLS_1_1;
     throw new IllegalArgumentException ("unknown protocol name: " + name);
   }
 

@@ -74,8 +74,8 @@ import javax.net.ssl.X509TrustManager;
 public final class SSLContextImpl
   extends SSLContextSpi
 {
-  private SSLSessionContext serverContext;
-  private SSLSessionContext clientContext;
+  AbstractSessionContext serverContext;
+  AbstractSessionContext clientContext;
   
   X509ExtendedKeyManager keyManager;
   X509TrustManager trustManager;

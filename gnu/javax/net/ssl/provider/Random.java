@@ -79,7 +79,7 @@ public class Random implements Builder, Constructed
   public Random copy()
   {
     ByteBuffer buffer = ByteBuffer.allocate(32);
-    buffer.put(this.buffer);
+    buffer.put((ByteBuffer) this.buffer.duplicate().position(0));
     return new Random(buffer);
   }
 
