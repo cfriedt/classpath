@@ -68,7 +68,7 @@ public final class Security
 {
   private static final String ALG_ALIAS = "Alg.Alias.";
 
-  private static Vector providers = new Vector();
+  private static Vector<Provider> providers = new Vector<Provider>();
   private static Properties secprops = new Properties();
   
   static
@@ -139,7 +139,7 @@ public final class Security
 	    try
 	      {
 		ClassLoader sys = ClassLoader.getSystemClassLoader();
-		providers.addElement(Class.forName(name, true, sys).newInstance());
+		providers.addElement((Provider) Class.forName(name, true, sys).newInstance());
 	      }
 	    catch (ClassNotFoundException x)
 	      {
@@ -153,6 +153,10 @@ public final class Security
 	      {
 	        exception = x;
 	      }
+        catch (ClassCastException cce)
+          {
+            exception = cce;
+          }
 
 	    if (exception != null)
 	      {
@@ -490,7 +494,7 @@ public final class Security
     if (filter == null || filter.length() == 0)
       return getProviders();
 
-    HashMap map = new HashMap(1);
+    HashMap<String,String> map = new HashMap<String,String>(1);
     int i = filter.indexOf(':');
     if (i == -1) // <service>.<algorithm>
       map.put(filter, "");
@@ -553,10 +557,10 @@ public final class Security
     if (querries == null || querries.isEmpty())
       return getProviders();
 
-    LinkedHashSet result = new LinkedHashSet(providers); // assume all
+    LinkedHashSet<Provider> result = new LinkedHashSet<Provider>(providers); // assume all
     int dot, ws;
     String querry, service, algorithm, attribute, value;
-    LinkedHashSet serviceProviders = new LinkedHashSet(); // preserve insertion order
+    LinkedHashSet<Provider> serviceProviders = new LinkedHashSet<Provider>(); // preserve insertion order
     for (Iterator i = querries.iterator(); i.hasNext(); )
       {
         querry = (String) i.next();
@@ -622,12 +626,12 @@ public final class Security
     if (result.isEmpty())
       return null;
 
-    return (Provider[]) result.toArray(new Provider[result.size()]);
+    return result.toArray(new Provider[result.size()]);
   }
 
   private static void selectProviders(String svc, String algo, String attr,
                                       String val, LinkedHashSet providerSet,
-                                      LinkedHashSet result)
+                                      LinkedHashSet<Provider> result)
   {
     result.clear(); // ensure we start with an empty result set
     for (Iterator i = providerSet.iterator(); i.hasNext(); )

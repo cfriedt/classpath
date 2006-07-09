@@ -80,6 +80,11 @@ public class ByteBufferOutputStream extends OutputStream
       growBuffer();
     buffer.put(b, offset, length);
   }
+  
+  public @Override void write(byte[] b)
+  {
+    write(b, 0, b.length);
+  }
 
   /**
    * Get the current state of the buffer. The returned buffer will have
@@ -90,9 +95,12 @@ public class ByteBufferOutputStream extends OutputStream
    */
   public ByteBuffer buffer()
   {
-    ByteBuffer buf = buffer.slice();
-    buf.position(0).limit(buf.capacity());
-    return buf;
+    return ((ByteBuffer) buffer.duplicate().flip()).slice();
+  }
+  
+  public String toString()
+  {
+    return super.toString() + " [ buffer: " + buffer + " ]";
   }
   
   private void growBuffer()

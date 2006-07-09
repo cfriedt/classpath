@@ -1,5 +1,20 @@
 2006-07-09  Casey Marshall  <csm@gnu.org>
 
+	* gnu/java/io/ByteBufferOutputStream.java (write): new method.
+	(buffer): use flip() and slice() to get the buffer.
+	(toString): new method.
+	* gnu/java/security/Engine.java: merge mwringe's case-insensitive
+	algorithm name patch.
+	* gnu/javax/crypto/jce/GnuCrypto.java (<init>): qualify
+	PrivilegedAction.
+	* gnu/javax/crypto/key/dh/GnuDHPrivateKey.java (toString): new
+	method.
+	* gnu/javax/crypto/key/dh/GnuDHPublicKey.java (toString): new
+	method.
+	* java/security/Security.java: qualify generic types.
+
+2006-07-09  Casey Marshall  <csm@gnu.org>
+
 	* gnu/javax/net/ssl/AbstractSessionContext.java (newInstance):
 	return `AbstractSessionContext.'
 	(getSession): check if the session is null.

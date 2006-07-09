@@ -191,4 +191,11 @@ public class GnuDHPublicKey extends GnuDHKey implements DHPublicKey
     DHPublicKey that = (DHPublicKey) obj;
     return super.equals(that) && y.equals(that.getY());
   }
+
+  public String toString()
+  {
+    return (super.toString() + " [ y: "
+            + (y == null ? "(nil)" : y.toString(16))
+            + "; params: " + getParams() + " ]");
+  }
 }

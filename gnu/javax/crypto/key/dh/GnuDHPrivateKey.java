@@ -193,4 +193,11 @@ public class GnuDHPrivateKey extends GnuDHKey implements DHPrivateKey
     DHPrivateKey that = (DHPrivateKey) obj;
     return super.equals(that) && x.equals(that.getX());
   }
+  
+  public String toString()
+  {
+    return (super.toString() + " [ x: "
+            + (x == null ? "(nil)" : x.toString(16))
+            + "; params: " + getParams() + " ]");
+  }
 }

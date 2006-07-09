@@ -71,7 +71,7 @@ public final class GnuCrypto extends Provider
   {
     super(Registry.GNU_CRYPTO, 2.1, "GNU Crypto JCE Provider");
 
-    AccessController.doPrivileged(new PrivilegedAction()
+    AccessController.doPrivileged(new PrivilegedAction<Object>()
     {
       public Object run()
       {
