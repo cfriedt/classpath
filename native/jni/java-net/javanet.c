@@ -800,9 +800,9 @@ _javanet_accept (JNIEnv * env, jobject this, jobject impl)
       result = cpnet_accept (env, fd, &newfd);
       if (result != CPNATIVE_OK && result != CPNATIVE_EINTR)
 	{
-	  if (result == ETIMEDOUT)
+	  if (result == ETIMEDOUT || result == EAGAIN)
 	    JCL_ThrowException (env, "java/net/SocketTimeoutException",
-				"Timeout");
+				"Accept operation timed out");
 	  else
 	    JCL_ThrowException (env, IO_EXCEPTION,
 				cpnative_getErrorString (result));
@@ -951,13 +951,11 @@ _javanet_recvfrom (JNIEnv * env, jobject this, jarray buf, int offset,
 	  result = cpnet_recv (env, fd, p + offset, len, &received_bytes);
 	}
     }
-  while ((received_bytes == -1) &&
-	 (result == CPNATIVE_EINTR));
-
-  if (received_bytes == -1)
+  while (result == CPNATIVE_EINTR);
+  if (result != 0)
     {
-      if (result == EAGAIN)
-	JCL_ThrowException (env, "java/net/SocketTimeoutException", "Timeout");
+      if (result == EAGAIN || result == ETIMEDOUT)
+	JCL_ThrowException (env, "java/net/SocketTimeoutException", "Receive operation timed out");
       else
 	JCL_ThrowException (env, IO_EXCEPTION,
 			    cpnative_getErrorString (result));
@@ -980,7 +978,7 @@ _javanet_recvfrom (JNIEnv * env, jobject this, jarray buf, int offset,
   if (received_bytes == 0)
     received_bytes = -1;
 
-  return (received_bytes);
+  return received_bytes;
 #else /* not WITHOUT_NETWORK */
 #endif /* not WITHOUT_NETWORK */
 }
@@ -1024,7 +1022,7 @@ _javanet_sendto (JNIEnv * env, jobject this, jarray buf, int offset, int len,
   while (len > 0)
     {
       /* Send the data */
-      if (addr == 0)
+      if (addr == NULL)
 	{
 	  DBG ("_javanet_sendto(): Sending....\n");
 	  result = cpnet_send (env, fd, p + offset, len, &bytes_sent);
@@ -1035,6 +1033,13 @@ _javanet_sendto (JNIEnv * env, jobject this, jarray buf, int offset, int len,
 	  result = cpnet_sendTo (env, fd, p + offset, len, addr, &bytes_sent);
 	}
 
+      if (result == EDESTADDRREQ)
+	{
+	  JCL_ThrowException (env, NULL_EXCEPTION,
+			      "Socket is not connected and no address is given");
+	  break;
+	}
+	
       if (bytes_sent < 0)
 	{
 	  if (result != CPNATIVE_EINTR)

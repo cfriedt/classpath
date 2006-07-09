@@ -1,3 +1,19 @@
+2006-07-09  Guilhem Lavaux  <guilhem@kaffe.org>
+
+	* native/jni/java-net/gnu_java_net_VMPlainDatagramSocketImpl.c
+	(nativeReceive): Fixed the type of the arrays (use java types).
+	(nativeSendTo): Force throwing an exception if port is 0.
+
+	* native/jni/java-net/javanet.c:
+	(_javanet_accept): Throw SocketTimeoutException if ETIMEDOUT is
+	returned.
+	(_javanet_recvfrom): Likewise.
+	(_javanet_sendto): Throw a NullPointerException if the socket is
+	not connected and no address is given.
+	
+	* native/jni/java-net/javanet.h
+	(NULL_EXCEPTION): Defined.
+
 2006-06-16  Guilhem Lavaux  <guilhem@kaffe.org>
 
 	* native/jni/java-net/java_net_VMInetAddress.c

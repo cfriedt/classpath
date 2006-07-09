@@ -55,6 +55,7 @@ exception statement from your version. */
 #define CONNECT_EXCEPTION "java/net/ConnectException"
 #define SOCKET_EXCEPTION "java/net/SocketException"
 #define UNKNOWN_HOST_EXCEPTION "java/net/UnknownHostException"
+#define NULL_EXCEPTION "java/lang/NullPointerException"
 
 /* Socket Option Identifiers - Don't change or binary compatibility with 
                                the JDK will be broken! These also need to

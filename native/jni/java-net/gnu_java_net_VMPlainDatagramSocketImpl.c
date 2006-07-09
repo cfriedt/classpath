@@ -185,20 +185,20 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeReceive(JNIEnv     *env,
                                                           jintArray  receivedLength)
 {
 #ifndef WITHOUT_NETWORK
-  int           *port, *bytes_read;
+  jint          *port, *bytes_read;
   cpnet_address *addr;
   jbyte          *addressBytes;
 
   addr = 0;
     
-  port = (int*)(*env)->GetIntArrayElements(env, receivedFromPort, NULL);
+  port = (jint*)(*env)->GetIntArrayElements(env, receivedFromPort, NULL);
   if (port == NULL)
     {
       JCL_ThrowException(env, IO_EXCEPTION, "Internal error: could not access receivedFromPort array");
       return;
     }
   
-  bytes_read = (int*)(*env)->GetIntArrayElements(env, receivedLength, NULL);
+  bytes_read = (jint*)(*env)->GetIntArrayElements(env, receivedLength, NULL);
   if (bytes_read == NULL)
     {
       (*env)->ReleaseIntArrayElements(env, receivedFromPort, (jint*)port, 0);
@@ -215,7 +215,6 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeReceive(JNIEnv     *env,
   if (length == 0 && (*bytes_read) == -1)
     *bytes_read = 0;
 
-
   if ((*bytes_read) == -1)
     {
       (*env)->ReleaseIntArrayElements(env, receivedFromPort, (jint*)port, 0);
@@ -223,6 +222,9 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeReceive(JNIEnv     *env,
       JCL_ThrowException(env, IO_EXCEPTION, "Internal error: receive");
       return;
     }
+
+  if ((*env)->ExceptionOccurred(env))
+    return;
 
   *port = cpnet_addressGetPort (addr);
   
@@ -235,11 +237,6 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeReceive(JNIEnv     *env,
   
   (*env)->ReleaseIntArrayElements(env, receivedFromPort, (jint*)port, 0);
   (*env)->ReleaseIntArrayElements(env, receivedLength, (jint*)bytes_read, 0);
-
-  if ((*env)->ExceptionOccurred(env))
-    {
-      return;
-    }
 
   DBG("PlainDatagramSocketImpl.receive(): Received packet\n");
   
@@ -266,13 +263,20 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeSendTo(JNIEnv  *env,
   cpnet_address *netAddress;
 
   /* check if address given, tr 7.3.2005 */
-  if (addr != NULL)
+  if (addr != NULL )
     {
       netAddress = _javanet_get_ip_netaddr(env, addr);
       if ((*env)->ExceptionOccurred(env))
-        {
+        {	  
           return;
         }
+      if (port == 0)
+	{
+	  JCL_ThrowException(env, IO_EXCEPTION,
+			     "Invalid port number");
+	  cpnet_freeAddress(env, netAddress);
+	  return;
+	}
       cpnet_addressSetPort (netAddress, port);
     }
   else
@@ -283,6 +287,8 @@ Java_gnu_java_net_VMPlainDatagramSocketImpl_nativeSendTo(JNIEnv  *env,
   DBG("PlainDatagramSocketImpl.sendto(): have addr\n");
 
   _javanet_sendto(env, obj, buf, offset, len, netAddress);
+  if (netAddress != NULL)
+    cpnet_freeAddress(env, netAddress);
   if ((*env)->ExceptionOccurred(env))
     {
       return;
