@@ -38,8 +38,6 @@ exception statement from your version. */
 
 package javax.swing.plaf.basic;
 
-import gnu.classpath.NotImplementedException;
-
 import java.awt.AWTEvent;
 import java.awt.Color;
 import java.awt.Component;
@@ -52,6 +50,7 @@ import java.awt.LayoutManager;
 import java.awt.LayoutManager2;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.MouseEvent;
@@ -59,6 +58,8 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
 
+import javax.swing.AbstractAction;
+import javax.swing.ActionMap;
 import javax.swing.DefaultDesktopManager;
 import javax.swing.DesktopManager;
 import javax.swing.JComponent;
@@ -74,6 +75,7 @@ import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 import javax.swing.event.MouseInputAdapter;
 import javax.swing.event.MouseInputListener;
+import javax.swing.plaf.ActionMapUIResource;
 import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.InternalFrameUI;
 import javax.swing.plaf.UIResource;
@@ -177,10 +179,10 @@ public class BasicInternalFrameUI extends InternalFrameUI
     protected final int RESIZE_NONE = 0;
 
     /** The x offset from the top left corner of the JInternalFrame. */
-    private transient int xOffset = 0;
+    private transient int xOffset;
 
     /** The y offset from the top left corner of the JInternalFrame. */
-    private transient int yOffset = 0;
+    private transient int yOffset;
 
     /** The direction that the resize is occuring in. */
     private transient int direction = -1;
@@ -312,7 +314,7 @@ public class BasicInternalFrameUI extends InternalFrameUI
           frame.setCursor(Cursor.getDefaultCursor());
           showingCursor = Cursor.DEFAULT_CURSOR;
         }
-      else if (e.getSource()==frame && frame.isResizable())
+      else if (e.getSource() == frame && frame.isResizable())
         {
           setCursor(e);
         }
@@ -943,40 +945,53 @@ public class BasicInternalFrameUI extends InternalFrameUI
      */
     public void propertyChange(PropertyChangeEvent evt)
     {
-      if (evt.getPropertyName().equals(JInternalFrame.IS_MAXIMUM_PROPERTY))
+      String property = evt.getPropertyName();
+      if (property.equals(JInternalFrame.IS_MAXIMUM_PROPERTY))
         {
           if (frame.isMaximum())
             maximizeFrame(frame);
           else
             minimizeFrame(frame);
         }
-      else if (evt.getPropertyName().equals(JInternalFrame.IS_ICON_PROPERTY))
+      else if (property.equals(JInternalFrame.IS_ICON_PROPERTY))
         {
           if (frame.isIcon())
             iconifyFrame(frame);
           else
             deiconifyFrame(frame);
         }
-      else if (evt.getPropertyName().equals(JInternalFrame.IS_SELECTED_PROPERTY))
+      else if (property.equals(JInternalFrame.IS_SELECTED_PROPERTY))
         {
           if (frame.isSelected())
             activateFrame(frame);
           else
             deactivateFrame(frame);
         }
-      else if (evt.getPropertyName().equals(JInternalFrame.ROOT_PANE_PROPERTY)
-               || evt.getPropertyName().equals(
-                                               JInternalFrame.GLASS_PANE_PROPERTY))
+      else if (property.equals(JInternalFrame.ROOT_PANE_PROPERTY)
+               || property.equals(JInternalFrame.GLASS_PANE_PROPERTY))
         {
           Component old = (Component) evt.getOldValue();
-          old.removeMouseListener(glassPaneDispatcher);
-          old.removeMouseMotionListener(glassPaneDispatcher);
+          if (old != null)
+            {
+              old.removeMouseListener(glassPaneDispatcher);
+              old.removeMouseMotionListener(glassPaneDispatcher);
+            }
 
           Component newPane = (Component) evt.getNewValue();
-          newPane.addMouseListener(glassPaneDispatcher);
-          newPane.addMouseMotionListener(glassPaneDispatcher);
+          if (newPane != null)
+            {
+              newPane.addMouseListener(glassPaneDispatcher);
+              newPane.addMouseMotionListener(glassPaneDispatcher);
+            }
 
           frame.revalidate();
+        }
+      else if (property.equals(JInternalFrame.IS_CLOSED_PROPERTY))
+        {
+          if (evt.getNewValue() == Boolean.TRUE)
+            {
+              closeFrame(frame);
+            }
         }
       /*
        * FIXME: need to add ancestor properties to JComponents. else if
@@ -1082,6 +1097,23 @@ public class BasicInternalFrameUI extends InternalFrameUI
 
       g.translate(-x, -y);
       g.setColor(saved);
+    }
+  }
+
+  /**
+   * This action triggers the system menu.
+   *
+   * @author Roman Kennke (kennke@aicas.com)
+   */
+  private class ShowSystemMenuAction
+    extends AbstractAction
+  {
+    public void actionPerformed(ActionEvent e)
+    {
+      if (titlePane != null)
+        {
+          titlePane.showSystemMenu();
+        }
     }
   }
 
@@ -1226,9 +1258,17 @@ public class BasicInternalFrameUI extends InternalFrameUI
    * This method installs the keyboard actions for the JInternalFrame.
    */
   protected void installKeyboardActions()
-    throws NotImplementedException
   {
-    // FIXME: Implement.
+    ActionMapUIResource am = new ActionMapUIResource();
+    am.put("showSystemMenu", new ShowSystemMenuAction());
+
+    // The RI impl installs the audio actions as parent of the UI action map,
+    // so do we.
+    BasicLookAndFeel blaf = (BasicLookAndFeel) UIManager.getLookAndFeel();
+    ActionMap audioActionMap = blaf.getAudioActionMap();
+    am.setParent(audioActionMap);
+
+    SwingUtilities.replaceUIActionMap(frame, am);
   }
 
   /**
@@ -1309,9 +1349,10 @@ public class BasicInternalFrameUI extends InternalFrameUI
    * This method uninstalls the keyboard actions for the JInternalFrame.
    */
   protected void uninstallKeyboardActions()
-    throws NotImplementedException
   {
-    // FIXME: Implement.
+    SwingUtilities.replaceUIActionMap(frame, null);
+    SwingUtilities.replaceUIInputMap(frame, JComponent.WHEN_IN_FOCUSED_WINDOW,
+                                     null);
   }
 
   /**

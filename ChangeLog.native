@@ -1,4 +1,8 @@
 2006-07-09  Guilhem Lavaux  <guilhem@kaffe.org>
+	
+	* Merged HEAD as of 2006-06-09 0:00.
+
+2006-07-09  Guilhem Lavaux  <guilhem@kaffe.org>
 
 	* native/jni/java-net/gnu_java_net_VMPlainDatagramSocketImpl.c
 	(nativeReceive): Fixed the type of the arrays (use java types).

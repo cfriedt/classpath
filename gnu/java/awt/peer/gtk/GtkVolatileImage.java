@@ -50,25 +50,36 @@ public class GtkVolatileImage extends VolatileImage
   int width, height;
   private ImageCapabilities caps;
 
+  final GtkComponentPeer component;
+
   /**
    * Don't touch, accessed from native code.
    */
-  private long nativePointer;
-
-  /**
-   * Offscreen image we draw to.
-   */
-  CairoSurface offScreen;
-
-  private boolean needsUpdate = false;
+  long nativePointer;
 
   native long init(GtkComponentPeer component, int width, int height);
 
-  native void destroy();
+  native void destroy(long pointer);
 
-  native int[] getPixels();
-  
-  native void update(GtkImage image);
+  native int[] nativeGetPixels(long pointer);
+  public int[] getPixels()
+  {
+    return nativeGetPixels(nativePointer);
+  }
+
+  native void nativeCopyArea(long pointer, int x, int y, int w, int h, int dx,
+                             int dy );
+  public void copyArea(int x, int y, int w, int h, int dx, int dy)
+  {
+    nativeCopyArea(nativePointer, x, y, w, h, dx, dy);
+  }
+
+  native void nativeDrawVolatile(long pointer, long srcPtr, int x, int y,
+                                 int w, int h );
+  public void drawVolatile(long srcPtr, int x, int y, int w, int h )
+  {
+    nativeDrawVolatile(nativePointer, srcPtr, x, y, w, h);
+  }
 
   public GtkVolatileImage(GtkComponentPeer component, 
 			  int width, int height, ImageCapabilities caps)
@@ -76,8 +87,8 @@ public class GtkVolatileImage extends VolatileImage
     this.width = width;
     this.height = height;
     this.caps = caps;
+    this.component = component;
     nativePointer = init( component, width, height );
-    offScreen = new CairoSurface( width, height );
   }
 
   public GtkVolatileImage(int width, int height, ImageCapabilities caps)
@@ -97,12 +108,7 @@ public class GtkVolatileImage extends VolatileImage
 
   public void dispose()
   {
-    destroy();
-  }
-
-  void invalidate()
-  {
-    needsUpdate = true;
+    destroy(nativePointer);
   }
 
   public BufferedImage getSnapshot()
@@ -119,24 +125,17 @@ public class GtkVolatileImage extends VolatileImage
 
   public Graphics2D createGraphics()
   {
-    invalidate();
-    return offScreen.getGraphics();
+    return new VolatileImageGraphics( this );
   }
 
   public int validate(GraphicsConfiguration gc)
   {
-    if( needsUpdate )
-      {
-	update( offScreen.getGtkImage() );
-	needsUpdate = false;
-	return VolatileImage.IMAGE_RESTORED;
-      }
     return VolatileImage.IMAGE_OK;
   }
 
   public boolean contentsLost()
   {
-    return needsUpdate;
+    return false;
   }
 
   public ImageCapabilities getCapabilities()

@@ -47,11 +47,6 @@ exception statement from your version. */
 #include "gnu_java_awt_peer_gtk_GtkVolatileImage.h"
 #include "cairographics2d.h"
 
-/* prototypes */
-static void *getNativeObject( JNIEnv *env, jobject obj );
-/* static void setNativeObject( JNIEnv *env, jobject obj, void *ptr ); */
-
-GdkPixmap *cp_gtk_get_pixmap( JNIEnv *env, jobject obj);
 
 /**
  * Creates a cairo surface, ARGB32, native ordering, premultiplied alpha.
@@ -91,9 +86,11 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env,
  * Destroy the surface
  */
 JNIEXPORT void JNICALL 
-Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy (JNIEnv *env, jobject obj)
+Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy
+(JNIEnv *env __attribute__((unused)), jobject obj __attribute((unused)),
+ jlong pointer)
 {
-  GdkPixmap* pixmap = getNativeObject(env, obj);
+  GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
   if( pixmap != NULL )
     {
       gdk_threads_enter();
@@ -106,8 +103,8 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy (JNIEnv *env, jobject obj)
  * Gets all pixels in an array
  */
 JNIEXPORT jintArray JNICALL 
-Java_gnu_java_awt_peer_gtk_GtkVolatileImage_getPixels
-(JNIEnv *env, jobject obj)
+Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeGetPixels
+(JNIEnv *env, jobject obj, jlong pointer)
 {
   /* jint *pixeldata, *jpixdata; */
   jint *jpixdata;
@@ -126,7 +123,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_getPixels
   g_assert (field != 0);
   height = (*env)->GetIntField (env, obj, field);
 
-  pixmap = GDK_PIXMAP(getNativeObject(env, obj));
+  pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
   g_assert(pixmap != NULL);
 
   gdk_threads_enter();
@@ -146,45 +143,53 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_getPixels
 }
 
 /**
- * Update the pixels.
+ * Copy area
  */
 JNIEXPORT void JNICALL 
-Java_gnu_java_awt_peer_gtk_GtkVolatileImage_update
-(JNIEnv *env, jobject obj, jobject gtkimage)
+Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeCopyArea
+(JNIEnv *env __attribute__((unused)), jobject obj __attribute((unused)),
+ jlong pointer, jint x, jint y, jint w, jint h, jint dx, jint dy)
 {
-  GdkPixmap *pixmap = getNativeObject(env, obj);
   GdkPixbuf *pixbuf;
+  GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
+
+  g_assert (pixmap != NULL);
 
   gdk_threads_enter();
-  g_assert( pixmap != NULL );
-
-  pixbuf = cp_gtk_image_get_pixbuf (env, gtkimage);
-  g_assert( pixbuf != NULL );
-
+  
+  pixbuf = gdk_pixbuf_new( GDK_COLORSPACE_RGB, TRUE, 8, w, h );
+  gdk_pixbuf_get_from_drawable( pixbuf, pixmap, NULL, x, y, 0, 0, w, h );
   gdk_draw_pixbuf (pixmap, NULL, pixbuf,
-		   0, 0, 0, 0,  /* src and dest x, y */
-		   -1, -1, /* full width, height */
+		   0, 0, x + dx, y + dy, 
+		   w, h, 
 		   GDK_RGB_DITHER_NORMAL, 0, 0);
   gdk_threads_leave();
 }
 
-GdkPixmap *cp_gtk_get_pixmap( JNIEnv *env, jobject obj)
+JNIEXPORT void JNICALL 
+Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile
+(JNIEnv *env __attribute__((unused)), jobject obj __attribute((unused)),
+ jlong pointer, jlong srcptr, jint x, jint y, jint w, jint h)
 {
-  return (GdkPixmap *)getNativeObject(env, obj);
+  GdkPixmap *dst, *src;
+  GdkGC *gc;
+
+  src = JLONG_TO_PTR(GdkPixmap, srcptr);
+  dst = JLONG_TO_PTR(GdkPixmap, pointer);
+  g_assert (src != NULL);
+  g_assert (dst != NULL);
+
+  gdk_threads_enter();
+ 
+  gc = gdk_gc_new( dst );
+  gdk_draw_drawable(dst,
+		    gc,
+		    src,
+		    0, 0,
+		    x, y,
+		    w, h);
+  g_object_unref( gc );
+
+  gdk_threads_leave();
 }
 
-/**
- * Gets the native object field.
- */
-static void *
-getNativeObject( JNIEnv *env, jobject obj )
-{
-  jclass cls;
-  jlong value;
-  jfieldID nofid;
-  cls = (*env)->GetObjectClass( env, obj );
-  nofid = (*env)->GetFieldID( env, cls, "nativePointer", "J" );
-  value = (*env)->GetLongField( env, obj, nofid );
-  (*env)->DeleteLocalRef( env, cls );
-  return JLONG_TO_PTR(void, value);
-}

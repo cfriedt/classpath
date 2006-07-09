@@ -11,9 +11,10 @@ extern "C"
 #endif
 
 JNIEXPORT jlong JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env, jobject, jobject, jint, jint);
-JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy (JNIEnv *env, jobject);
-JNIEXPORT jintArray JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_getPixels (JNIEnv *env, jobject);
-JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_update (JNIEnv *env, jobject, jobject);
+JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy (JNIEnv *env, jobject, jlong);
+JNIEXPORT jintArray JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeGetPixels (JNIEnv *env, jobject, jlong);
+JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeCopyArea (JNIEnv *env, jobject, jlong, jint, jint, jint, jint, jint, jint);
+JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile (JNIEnv *env, jobject, jlong, jlong, jint, jint, jint, jint);
 
 #ifdef __cplusplus
 }
