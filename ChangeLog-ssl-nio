@@ -1,5 +1,10 @@
 2006-07-12  Casey Marshall  <csm@gnu.org>
 
+	* gnu/javax/security/auth/callback/CertificateCallback.java: new
+	file.
+
+2006-07-12  Casey Marshall  <csm@gnu.org>
+
 	* gnu/javax/net/ssl/provider/AbstractHandshake.java
 	(engine, inParams, outParams, tasks, serverRandom, clientRandom,
 	compression): new fields.
