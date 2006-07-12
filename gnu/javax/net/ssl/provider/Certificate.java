@@ -109,11 +109,11 @@ public class Certificate implements Handshake.Body
         int length2 = (((b.get () & 0xFF) << 16)
                        | (b.getShort () & 0xFFFF));
         byte[] buf = new byte[length2];
-        buffer.position(i+3);
-        buffer.get (buf);
+        b.position(i+3);
+        b.get (buf);
         list.add(factory.generateCertificate (new ByteArrayInputStream (buf)));
         i += length2 + 3;
-        buffer.position(i);
+        b.position(i);
       }
     return list;
   }

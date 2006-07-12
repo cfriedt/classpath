@@ -44,8 +44,6 @@ import gnu.classpath.debug.SystemLogger;
 import gnu.java.io.ByteBufferOutputStream;
 import gnu.javax.net.ssl.Session;
 import gnu.javax.net.ssl.SSLRecordHandler;
-import gnu.javax.net.ssl.provider.Alert.Description;
-import gnu.javax.net.ssl.provider.Alert.Level;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -54,18 +52,14 @@ import java.nio.ByteOrder;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.zip.DataFormatException;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.ShortBufferException;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSessionContext;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 
@@ -149,7 +143,12 @@ public final class SSLEngineImpl extends SSLEngine
       ProtocolVersion.TLS_1.toString(),
       ProtocolVersion.SSL_3.toString()
     };
-    enabledSuites = new String[] {
+    enabledSuites = defaultSuites();
+  }
+  
+  static String[] defaultSuites()
+  {
+    return new String[] {
       CipherSuite.TLS_DHE_DSS_WITH_AES_256_CBC_SHA.toString(),
       CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA.toString(),
       CipherSuite.TLS_DH_DSS_WITH_AES_256_CBC_SHA.toString(),
@@ -224,8 +223,15 @@ public final class SSLEngineImpl extends SSLEngine
         break;
         
       case CLIENT:
-        throw new UnsupportedOperationException("client handshake not yet implemented");
-        //break;
+        try
+          {
+            handshake = new ClientHandshake(this);
+          }
+        catch (NoSuchAlgorithmException nsae)
+          {
+            throw new SSLException(nsae);
+          }
+        break;
       }
   }
 
@@ -244,7 +250,9 @@ public final class SSLEngineImpl extends SSLEngine
   @Override
   public Runnable getDelegatedTask()
   {
-    return null;
+    if (handshake == null)
+      return null;
+    return handshake.getTask();
   }
   
   @Override
@@ -266,9 +274,11 @@ public final class SSLEngineImpl extends SSLEngine
   }
   
   @Override
-  public SSLEngineResult.HandshakeStatus getHandshakeStatus()
+  public HandshakeStatus getHandshakeStatus()
   {
-    return handshakeStatus;
+    if (handshake == null)
+      return HandshakeStatus.NOT_HANDSHAKING;
+    return handshake.status();
   }
   
   @Override
@@ -603,7 +613,17 @@ public final class SSLEngineImpl extends SSLEngine
       {
         if (handshake == null)
           beginHandshake();
-        handshakeStatus = handshake.handleInput(msg);
+        try
+          {
+            handshakeStatus = handshake.handleInput(msg);
+          }
+        catch (AlertException ae)
+          {
+            lastAlert = ae.alert();
+            return new SSLEngineResult(SSLEngineResult.Status.OK,
+                                       SSLEngineResult.HandshakeStatus.NEED_WRAP,
+                                       0, 0);
+          }
         if (Debug.DEBUG)
           logger.logv(Component.SSL_HANDSHAKE, "handshake status {0}", handshakeStatus);
         result = new SSLEngineResult(SSLEngineResult.Status.OK,
@@ -658,7 +678,9 @@ public final class SSLEngineImpl extends SSLEngine
     
     ContentType type = null;
     ByteBuffer sysMessage = null;
-    
+    if (Debug.DEBUG)
+      logger.logv(Component.SSL_RECORD_LAYER, "wrap {0} {1} {2} {3} / {4}",
+                  sources, offset, length, sink, getHandshakeStatus());
     if (lastAlert != null)
       {
         type = ContentType.ALERT;
@@ -675,7 +697,7 @@ public final class SSLEngineImpl extends SSLEngine
         sysMessage = ByteBuffer.allocate(1);
         sysMessage.put(0, (byte) 1);
       }
-    else if (handshakeStatus == SSLEngineResult.HandshakeStatus.NEED_WRAP)
+    else if (getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NEED_WRAP)
       {
         // If we are not encrypting, optimize the handshake to fill
         // the buffer directly.
@@ -692,8 +714,8 @@ public final class SSLEngineImpl extends SSLEngine
             if (Debug.DEBUG)
               logger.logv(Component.SSL_RECORD_LAYER, "emitting record:\n{0}",
                           new Record((ByteBuffer) sink.duplicate().position(orig)));
-            SSLEngineResult result =  new SSLEngineResult(SSLEngineResult.Status.OK,
-                                                          handshakeStatus, 0, produced);
+            SSLEngineResult result = new SSLEngineResult(SSLEngineResult.Status.OK,
+                                                         handshakeStatus, 0, produced);
             
             // Note, this will only happen if we transition from
             // TLS_NULL_WITH_NULL_NULL *to* TLS_NULL_WITH_NULL_NULL, which
@@ -709,7 +731,16 @@ public final class SSLEngineImpl extends SSLEngine
         // Rough guideline; XXX.
         sysMessage = ByteBuffer.allocate(sink.remaining() - 2048);
         type = ContentType.HANDSHAKE;
-        handshakeStatus = handshake.handleOutput(sysMessage);
+        try
+          {
+            handshakeStatus = handshake.handleOutput(sysMessage);
+          }
+        catch (AlertException ae)
+          {
+            lastAlert = ae.alert();
+            return new SSLEngineResult(Status.OK,
+                                       HandshakeStatus.NEED_WRAP, 0, 0);
+          }
         sysMessage.flip();
         if (Debug.DEBUG)
           logger.logv(Component.SSL_HANDSHAKE, "handshake status {0}",

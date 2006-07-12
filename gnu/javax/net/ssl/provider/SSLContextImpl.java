@@ -38,12 +38,12 @@ exception statement from your version. */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.java.security.action.GetSecurityPropertyAction;
 import gnu.javax.net.ssl.AbstractSessionContext;
 import gnu.javax.net.ssl.NullManagerParameters;
 import gnu.javax.net.ssl.SRPTrustManager;
-import gnu.javax.net.ssl.StaticTrustAnchors;
 
-import java.security.InvalidAlgorithmParameterException;
+import java.security.AccessController;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -63,7 +63,6 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedKeyManager;
-import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 
 /**
@@ -71,8 +70,7 @@ import javax.net.ssl.X509TrustManager;
  * 
  * @author Casey Marshall (csm@gnu.org)
  */
-public final class SSLContextImpl
-  extends SSLContextSpi
+public final class SSLContextImpl extends SSLContextSpi
 {
   AbstractSessionContext serverContext;
   AbstractSessionContext clientContext;
@@ -145,8 +143,7 @@ public final class SSLContextImpl
    */
   protected @Override SSLServerSocketFactory engineGetServerSocketFactory()
   {
-    // TODO Auto-generated method stub
-    return null;
+    return new SSLServerSocketFactoryImpl(this);
   }
 
   /* (non-Javadoc)
@@ -154,8 +151,7 @@ public final class SSLContextImpl
    */
   protected @Override SSLSocketFactory engineGetSocketFactory()
   {
-    // TODO Auto-generated method stub
-    return null;
+    return new SSLSocketFactoryImpl(this);
   }
 
   /* (non-Javadoc)
@@ -302,11 +298,11 @@ public final class SSLContextImpl
    */
   private SecureRandom defaultRandom()
   {
-    String alg = Util.getSecurityProperty("gnu.javax.net.ssl.secureRandom");
+    GetSecurityPropertyAction gspa
+      = new GetSecurityPropertyAction("gnu.javax.net.ssl.secureRandom");
+    String alg = AccessController.doPrivileged(gspa);
     if (alg == null)
-      {
-        alg = "Fortuna";
-      }
+      alg = "Fortuna";
     SecureRandom rand = null;
     try
       {

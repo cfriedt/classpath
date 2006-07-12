@@ -38,23 +38,11 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
-
-import java.math.BigInteger;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-
-import java.security.PublicKey;
-import java.security.interfaces.RSAKey;
-import javax.crypto.interfaces.DHPublicKey;
 
 /**
  * The client key exchange message.
@@ -67,21 +55,21 @@ struct {
   } exchange_keys;
 } ClientKeyExchange;</pre>
  */
-final class ClientKeyExchange implements Handshake.Body
+public class ClientKeyExchange implements Handshake.Body
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final ByteBuffer buffer;
-  private final CipherSuite suite;
-  private final ProtocolVersion version;
+  protected ByteBuffer buffer;
+  protected final CipherSuite suite;
+  protected final ProtocolVersion version;
 
   // Constructors.
   // -------------------------------------------------------------------------
 
-  ClientKeyExchange (final ByteBuffer buffer, final CipherSuite suite,
-                     final ProtocolVersion version)
+  public ClientKeyExchange (final ByteBuffer buffer, final CipherSuite suite,
+                            final ProtocolVersion version)
   {
     suite.getClass();
     version.getClass ();
@@ -93,7 +81,7 @@ final class ClientKeyExchange implements Handshake.Body
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  ExchangeKeys exchangeKeys ()
+  public ExchangeKeys exchangeKeys ()
   {
     KeyExchangeAlgorithm alg = suite.keyExchangeAlgorithm();
     if (alg == KeyExchangeAlgorithm.RSA)
@@ -103,9 +91,11 @@ final class ClientKeyExchange implements Handshake.Body
     throw new IllegalArgumentException("unsupported key exchange");
   }
 
-  public int length ()
+  public int length()
   {
-    return exchangeKeys ().length ();
+    if (suite.keyExchangeAlgorithm() == KeyExchangeAlgorithm.NONE)
+      return 0;
+    return exchangeKeys().length();
   }
 
   public String toString ()

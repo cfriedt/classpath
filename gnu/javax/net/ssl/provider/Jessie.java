@@ -59,6 +59,7 @@ import java.security.Provider;
  */
 public class Jessie extends Provider
 {
+  private static final long serialVersionUID = -1;
 
   public static final String VERSION = "2.0.0";
   public static final double VERSION_DOUBLE = 2.0;
@@ -80,6 +81,7 @@ public class Jessie extends Provider
           put("Alg.Alias.SSLContext.TLSv1",   "TLSv1.1");
           put("Alg.Alias.SSLContext.TLSv1.0", "TLSv1.1");
           put("Alg.Alias.SSLContext.TLS",     "TLSv1.1");
+          put("Alg.Alias.SSLContext.SSL",     "TLSv1.1");
 
           put("KeyManagerFactory.JessieX509",   X509KeyManagerFactory.class.getName());
           put("TrustManagerFactory.JessieX509", X509TrustManagerFactory.class.getName());

@@ -51,47 +51,66 @@ struct {
   public-key-encrypted PreMasterSecret pre_master_secret;
 } EncryptedPreMasterSecret;</pre>
  */
-final class EncryptedPreMasterSecret extends ExchangeKeys
+public final class EncryptedPreMasterSecret extends ExchangeKeys implements Builder
 {
   private final ProtocolVersion version;
 
-  EncryptedPreMasterSecret (final ByteBuffer buffer, final ProtocolVersion version)
+  public EncryptedPreMasterSecret(ByteBuffer buffer, ProtocolVersion version)
   {
-    super (buffer);
-    version.getClass ();
+    super(buffer);
+    version.getClass();
     this.version = version;
   }
+  
+  public EncryptedPreMasterSecret(byte[] encryptedSecret, ProtocolVersion version)
+  {
+    this(ByteBuffer.allocate(version == ProtocolVersion.SSL_3
+                             ? encryptedSecret.length
+                             : encryptedSecret.length + 2), version);
+    ByteBuffer b = buffer.duplicate();
+    if (version != ProtocolVersion.SSL_3)
+      b.putShort((short) encryptedSecret.length);
+    b.put(encryptedSecret);
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().rewind();
+  }
 
-  byte[] encryptedSecret ()
+  public byte[] encryptedSecret()
   {
     byte[] secret;
     if (version == ProtocolVersion.SSL_3)
       {
         buffer.position (0);
         secret = new byte[buffer.limit ()];
+        buffer.get(secret);
       }
     else
       {
-        int len = buffer.getShort (0) & 0xFFFF;
+        int len = buffer.getShort(0) & 0xFFFF;
         secret = new byte[len];
-        buffer.position (2);
-        buffer.get (secret);
+        buffer.position(2);
+        buffer.get(secret);
       }
     return secret;
   }
 
-  void setEncryptedSecret (final byte[] secret, final int offset, final int length)
+  public void setEncryptedSecret(final byte[] secret, final int offset, final int length)
   {
     if (version == ProtocolVersion.SSL_3)
       {
-        buffer.position (0);
-        buffer.put (secret, offset, length);
+        buffer.position(0);
+        buffer.put(secret, offset, length);
+        buffer.rewind();
       }
     else
       {
-        buffer.putShort (0, (short) length);
-        buffer.position (2);
-        buffer.put (secret, offset, length);
+        buffer.putShort(0, (short) length);
+        buffer.position(2);
+        buffer.put(secret, offset, length);
+        buffer.rewind();
       }
   }
 
@@ -99,11 +118,11 @@ final class EncryptedPreMasterSecret extends ExchangeKeys
   {
     if (version == ProtocolVersion.SSL_3)
       {
-        return buffer.position (0).limit ();
+        return buffer.capacity();
       }
     else
       {
-        return buffer.getShort (0) & 0xFFFF;
+        return (buffer.getShort(0) & 0xFFFF) + 2;
       }
   }
 

@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
 
+import java.security.AccessController;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -65,6 +66,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactorySpi;
 import javax.net.ssl.X509TrustManager;
 
+import gnu.java.security.action.GetPropertyAction;
 import gnu.java.security.x509.X509CertPath;
 import gnu.javax.net.ssl.NullManagerParameters;
 import gnu.javax.net.ssl.StaticTrustAnchors;
@@ -79,19 +81,22 @@ public class X509TrustManagerFactory extends TrustManagerFactorySpi
   // Constants and fields.
   // -------------------------------------------------------------------------
 
-  private static final String sep = Util.getProperty("file.separator");
+  private static final String sep
+    = AccessController.doPrivileged(new GetPropertyAction("file.separator"));
   
   /**
    * The location of the JSSE key store.
    */
-  private static final String JSSE_CERTS = Util.getProperty("java.home")
-    + sep + "lib" + sep + "security" + sep + "jssecerts";
+  private static final String JSSE_CERTS
+    = AccessController.doPrivileged(new GetPropertyAction("java.home"))
+      + sep + "lib" + sep + "security" + sep + "jssecerts";
 
   /**
    * The location of the system key store, containing the CA certs.
    */
-  private static final String CA_CERTS = Util.getProperty("java.home")
-    + sep + "lib" + sep + "security" + sep + "cacerts";
+  private static final String CA_CERTS
+    = AccessController.doPrivileged(new GetPropertyAction("java.home"))
+      + sep + "lib" + sep + "security" + sep + "cacerts";
 
   private Manager current;
 
@@ -136,13 +141,14 @@ public class X509TrustManagerFactory extends TrustManagerFactorySpi
   {
     if (store == null)
       {
-        String s = Util.getProperty("javax.net.ssl.trustStoreType");
+        GetPropertyAction gpa = new GetPropertyAction("javax.net.ssl.trustStoreType");
+        String s = AccessController.doPrivileged(gpa);
         if (s == null)
           s = KeyStore.getDefaultType();
         store = KeyStore.getInstance(s);
         try
           {
-            s = Util.getProperty("javax.net.ssl.trustStore");
+            s = AccessController.doPrivileged(gpa.setParameters("javax.net.ssl.trustStore"));
             FileInputStream in = null;
             if (s == null)
               {
@@ -159,20 +165,20 @@ public class X509TrustManagerFactory extends TrustManagerFactorySpi
               {
                 in = new FileInputStream(s);
               }
-            String p = Util.getProperty("javax.net.ssl.trustStorePassword");
+            String p = AccessController.doPrivileged(gpa.setParameters("javax.net.ssl.trustStorePassword"));
             store.load(in, p != null ? p.toCharArray() : null);
           }
         catch (IOException ioe)
           {
-            throw new KeyStoreException(ioe.toString());
+            throw new KeyStoreException(ioe);
           }
         catch (CertificateException ce)
           {
-            throw new KeyStoreException(ce.toString());
+            throw new KeyStoreException(ce);
           }
         catch (NoSuchAlgorithmException nsae)
           {
-            throw new KeyStoreException(nsae.toString());
+            throw new KeyStoreException(nsae);
           }
       }
 
@@ -263,6 +269,9 @@ public class X509TrustManagerFactory extends TrustManagerFactorySpi
       try
         {
           params = new PKIXParameters(anchors);
+          // XXX we probably do want to enable revocation, but it's a pain
+          // in the ass.
+          params.setRevocationEnabled(false);
         }
       catch (InvalidAlgorithmParameterException iape)
         {

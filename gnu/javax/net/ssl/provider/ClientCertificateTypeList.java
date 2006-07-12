@@ -49,7 +49,7 @@ import java.util.ConcurrentModificationException;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
-public class ClientCertificateTypeList
+public class ClientCertificateTypeList implements Iterable<ClientCertificateType>
 {
   private final ByteBuffer buffer;
   private int modCount;
@@ -73,6 +73,11 @@ public class ClientCertificateTypeList
                                            + "; requested: " + index);
     return CertificateRequest.ClientCertificateType.forValue
       (buffer.get (index + 1) & 0xFF);
+  }
+  
+  public java.util.Iterator<ClientCertificateType> iterator()
+  {
+    return new Iterator();
   }
 
   public void put (final int index, final CertificateRequest.ClientCertificateType type)

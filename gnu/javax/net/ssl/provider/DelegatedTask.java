@@ -1,4 +1,4 @@
-/* ExchangeKeys.java -- key exchange values.
+/* DelegatedTask.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -33,20 +33,61 @@ module.  An independent module is a module which is not derived from
 or based on this library.  If you modify this library, you may extend
 this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.  */
+exception statement from your version. */
 
 
 package gnu.javax.net.ssl.provider;
 
-import java.nio.ByteBuffer;
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
 
-public abstract class ExchangeKeys implements Constructed
+/**
+ * @author Casey Marshall (csm@gnu.org)
+ */
+public abstract class DelegatedTask implements Runnable
 {
-
-  protected ByteBuffer buffer;
-
-  public ExchangeKeys (final ByteBuffer buffer)
+  private static final SystemLogger logger = SystemLogger.SYSTEM;
+  private boolean hasRun;
+  protected Throwable thrown;
+  
+  protected DelegatedTask()
   {
-    this.buffer = buffer;
+    hasRun = false;
   }
+  
+  public final void run()
+  {
+    if (hasRun)
+      throw new IllegalStateException("task already ran");
+    try
+      {
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_DELEGATED_TASK,
+                      "running delegated task {0} in {1}", this,
+                      Thread.currentThread());
+        implRun();
+      }
+    catch (Throwable t)
+      {
+        if (Debug.DEBUG)
+          logger.log(Component.SSL_DELEGATED_TASK, "task threw exception", t);
+        thrown = t;
+      }
+    finally
+      {
+        hasRun = true;
+      }
+  }
+
+  public final boolean hasRun() 
+  {
+    return hasRun;
+  }
+  
+  public final Throwable thrown()
+  {
+    return thrown;
+  }
+  
+  protected abstract void implRun() throws Throwable;
 }

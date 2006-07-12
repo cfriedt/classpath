@@ -39,28 +39,46 @@ exception statement from your version.  */
 package gnu.javax.net.ssl.provider;
 
 import gnu.classpath.ByteArray;
-import gnu.classpath.Configuration;
 import gnu.classpath.debug.Component;
 import gnu.classpath.debug.SystemLogger;
+import gnu.java.security.action.GetSecurityPropertyAction;
 import gnu.java.security.prng.IRandom;
 import gnu.java.security.prng.LimitReachedException;
+import gnu.javax.security.auth.callback.CertificateCallback;
+import gnu.javax.security.auth.callback.DefaultCallbackHandler;
 
 import java.nio.ByteBuffer;
+import java.security.AccessController;
 import java.security.DigestException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.logging.Logger;
+import java.util.LinkedList;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
+import javax.crypto.Cipher;
 import javax.crypto.KeyAgreement;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.X509TrustManager;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.ConfirmationCallback;
 
 /**
  * The base interface for handshake implementations. Concrete
@@ -149,13 +167,23 @@ public abstract class AbstractHandshake
   protected MessageDigest sha;
   protected MessageDigest md5;
   
+  protected final SSLEngineImpl engine;
   protected KeyAgreement keyAgreement;
   protected byte[] preMasterSecret;
-  
-  protected AbstractHandshake() throws NoSuchAlgorithmException
+  protected InputSecurityParameters inParams;
+  protected OutputSecurityParameters outParams;
+  protected LinkedList<DelegatedTask> tasks;
+  protected Random serverRandom;
+  protected Random clientRandom;
+  protected CompressionMethod compression;
+
+  protected AbstractHandshake(SSLEngineImpl engine)
+    throws NoSuchAlgorithmException
   {
+    this.engine = engine;
     sha = MessageDigest.getInstance("SHA-1");
     md5 = MessageDigest.getInstance("MD5");
+    tasks = new LinkedList<DelegatedTask>();
   }
   
   /**
@@ -171,6 +199,9 @@ public abstract class AbstractHandshake
   public final HandshakeStatus handleInput (ByteBuffer fragment)
     throws SSLException
   {
+    if (!tasks.isEmpty())
+      return HandshakeStatus.NEED_TASK;
+
     HandshakeStatus status = status();
     if (status != HandshakeStatus.NEED_UNWRAP)
       return status;
@@ -227,9 +258,12 @@ public abstract class AbstractHandshake
    * appropriately.
    * @return An {@link SSLEngineResult} describing the result.
    */
-  public final SSLEngineResult.HandshakeStatus handleOutput (ByteBuffer fragment)
+  public final HandshakeStatus handleOutput (ByteBuffer fragment)
     throws SSLException
   {
+    if (!tasks.isEmpty())
+      return HandshakeStatus.NEED_TASK;
+
     int orig = fragment.position();
     SSLEngineResult.HandshakeStatus status = implHandleOutput(fragment);
     if (doHash())
@@ -266,7 +300,11 @@ public abstract class AbstractHandshake
    * @return The input parameters for the newly established session.
    * @throws SSLException If the handshake is not complete.
    */
-  abstract InputSecurityParameters getInputParams() throws SSLException;
+  final InputSecurityParameters getInputParams() throws SSLException
+  {
+    checkKeyExchange();
+    return inParams;
+  }
 
   /**
    * Return a new instance of output security parameters, initialized with
@@ -276,7 +314,23 @@ public abstract class AbstractHandshake
    * @return The output parameters for the newly established session.
    * @throws SSLException If the handshake is not complete.
    */
-  abstract OutputSecurityParameters getOutputParams() throws SSLException;
+  final OutputSecurityParameters getOutputParams() throws SSLException
+  {
+    checkKeyExchange();
+    return outParams;
+  }
+  
+  /**
+   * Fetch a delegated task waiting to run, if any.
+   *
+   * @return The task.
+   */
+  final Runnable getTask()
+  {
+    if (tasks.isEmpty())
+      return null;
+    return tasks.removeFirst();
+  }
   
   /**
    * Used by the skeletal code to query the current status of the handshake.
@@ -286,7 +340,20 @@ public abstract class AbstractHandshake
    * 
    * @return The current handshake status.
    */
-  abstract SSLEngineResult.HandshakeStatus status();
+  abstract HandshakeStatus status();
+  
+  /**
+   * Check if the key exchange completed successfully, throwing an exception
+   * if not.
+   * 
+   * <p>Note that we assume that the caller of our SSLEngine is correct, and
+   * that they did run the delegated tasks that encapsulate the key exchange.
+   * What we are primarily checking, therefore, is that no error occurred in the
+   * key exchange operation itself.
+   *
+   * @throws SSLException If the key exchange did not complete successfully.
+   */
+  abstract void checkKeyExchange() throws SSLException;
   
   /**
    * Handle an SSLv2 client hello. This is only used by SSL servers.
@@ -376,11 +443,8 @@ public abstract class AbstractHandshake
         // down.
         if (handshakeOffset > 0)
           {
-            ByteBuffer tmp = handshakeBuffer.duplicate();
-            tmp.flip();
-            tmp.position(handshakeOffset);
-            handshakeBuffer.position(0);
-            handshakeBuffer.put(tmp);
+            handshakeBuffer.flip().position(handshakeOffset);
+            handshakeBuffer.compact();
             handshakeOffset = 0;
           }
         return;
@@ -664,29 +728,116 @@ Certificate.signature.sha_hash
       }
   }
   
-  protected void diffieHellmanPhase1(DHPublicKey dhKey) throws SSLException
+  protected class DHPhase extends DelegatedTask
   {
-    try
-      {
-        keyAgreement.doPhase(dhKey, false);
-      }
-    catch (InvalidKeyException ike)
-      {
-        throw new SSLException(ike);
-      }
+    private final DHPublicKey key;
+    
+    protected DHPhase(DHPublicKey key)
+    {
+      this.key = key;
+    }
+
+    protected void implRun() throws InvalidKeyException, SSLException
+    {
+      keyAgreement.doPhase(key, true);
+      preMasterSecret = keyAgreement.generateSecret();
+      generateMasterSecret(clientRandom, serverRandom, engine.session());
+      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+      setupSecurityParameters(keys, engine.getUseClientMode(), engine, compression);
+    }
   }
   
-  protected void diffieHellmanPhase2(DHPublicKey dhKey) throws SSLException
+  protected class CertVerifier extends DelegatedTask
   {
-    try
-      {
-        keyAgreement.doPhase(dhKey, true);
-        preMasterSecret = keyAgreement.generateSecret();
-      }
-    catch (InvalidKeyException ike)
-      {
-        throw new SSLException(ike);
-      }
+    private final boolean clientSide;
+    private final X509Certificate[] chain;
+    private boolean verified;
+
+    protected CertVerifier(boolean clientSide, X509Certificate[] chain)
+    {
+      this.clientSide = clientSide;
+      this.chain = chain;
+    }
+    
+    boolean verified()
+    {
+      return verified;
+    }
+    
+    protected void implRun()
+    {
+      X509TrustManager tm = engine.contextImpl.trustManager;
+      if (clientSide)
+        {
+          try
+            {
+              tm.checkServerTrusted(chain, null);
+              verified = true;
+            }
+          catch (CertificateException ce)
+            {
+              if (Debug.DEBUG)
+                logger.log(Component.SSL_DELEGATED_TASK, "cert verify", ce);
+              // For client connections, ask the user if the certificate is OK.
+              CallbackHandler verify = new DefaultCallbackHandler();
+              GetSecurityPropertyAction gspa
+                = new GetSecurityPropertyAction("jessie.certificate.handler");
+              String clazz = AccessController.doPrivileged(gspa);
+              try
+                {
+                  ClassLoader cl =
+                    AccessController.doPrivileged(new PrivilegedExceptionAction<ClassLoader>()
+                      {
+                        public ClassLoader run() throws Exception
+                        {
+                          return ClassLoader.getSystemClassLoader();
+                        }
+                      });
+                  verify = (CallbackHandler) cl.loadClass(clazz).newInstance();
+                }
+              catch (Exception x)
+                {
+                  // Ignore.
+                  if (Debug.DEBUG)
+                    logger.log(Component.SSL_DELEGATED_TASK,
+                               "callback handler loading", x);
+                }
+              // XXX Internationalize
+              CertificateCallback confirm =
+                new CertificateCallback(chain[0],
+                "The server's certificate could not be verified. There is no proof " +
+                "that this server is who it claims to be, or that their certificate " +
+                "is valid. Do you wish to continue connecting? ");
+
+              try
+                {
+                  verify.handle(new Callback[] { confirm });
+                  verified = confirm.getSelectedIndex() == ConfirmationCallback.YES;
+                }
+              catch (Exception x)
+                {
+                  if (Debug.DEBUG)
+                    logger.log(Component.SSL_DELEGATED_TASK,
+                               "callback handler exception", x);
+                  verified = false;
+                }
+            }
+        }
+      else
+        {
+          try
+            {
+              tm.checkClientTrusted(chain, null);
+            }
+          catch (CertificateException ce)
+            {
+              verified = false;
+            }
+        }
+      
+      if (verified)
+        engine.session().setPeerVerified(true);
+    }
   }
   
   protected void generateMasterSecret(Random clientRandom,
@@ -694,6 +845,10 @@ Certificate.signature.sha_hash
                                       SessionImpl session)
     throws SSLException
   {
+    assert(clientRandom != null);
+    assert(serverRandom != null);
+    assert(session != null);
+    
     if (Debug.DEBUG_KEY_EXCHANGE)
       logger.logv(Component.SSL_KEY_EXCHANGE, "preMasterSecret:\n{0}",
                   new ByteArray(preMasterSecret));
@@ -770,5 +925,63 @@ Certificate.signature.sha_hash
     // Wipe out the preMasterSecret.
     for (int i = 0; i < preMasterSecret.length; i++)
       preMasterSecret[i] = 0;
+  }
+  
+  protected void setupSecurityParameters(byte[][] keys, boolean isClient,
+                                         SSLEngineImpl engine,
+                                         CompressionMethod compression)
+    throws SSLException
+  {
+    assert(keys.length == 6);
+    assert(engine != null);
+    assert(compression != null);
+
+    try
+      {
+        CipherSuite s = engine.session().suite;
+        Cipher inCipher = s.cipher();
+        Mac inMac = s.mac(engine.session().version);
+        Inflater inflater = (compression == CompressionMethod.ZLIB
+                             ? new Inflater() : null); 
+        inCipher.init(Cipher.DECRYPT_MODE,
+                      new SecretKeySpec(keys[isClient ? 3 : 2],
+                                        s.cipherAlgorithm().toString()),
+                      new IvParameterSpec(keys[isClient ? 5 : 4]));
+        inMac.init(new SecretKeySpec(keys[isClient ? 1 : 0],
+                                     inMac.getAlgorithm()));
+        inParams = new InputSecurityParameters(inCipher, inMac,
+                                               inflater,
+                                               engine.session(), s);
+                
+        Cipher outCipher = s.cipher();
+        Mac outMac = s.mac(engine.session().version);
+        Deflater deflater = (compression == CompressionMethod.ZLIB
+                             ? new Deflater() : null);
+        outCipher.init(Cipher.ENCRYPT_MODE,
+                       new SecretKeySpec(keys[isClient ? 2 : 3],
+                                         s.cipherAlgorithm().toString()),
+                       new IvParameterSpec(keys[isClient ? 4 : 5]));
+        outMac.init(new SecretKeySpec(keys[isClient ? 0 : 1],
+                                      outMac.getAlgorithm()));
+        outParams = new OutputSecurityParameters(outCipher, outMac,
+                                                 deflater,
+                                                 engine.session(), s);
+      }
+    catch (InvalidAlgorithmParameterException iape)
+      {
+        throw new SSLException(iape);
+      }
+    catch (InvalidKeyException ike)
+      {
+        throw new SSLException(ike);
+      }
+    catch (NoSuchAlgorithmException nsae)
+      {
+        throw new SSLException(nsae);
+      }
+    catch (NoSuchPaddingException nspe)
+      {
+        throw new SSLException(nspe);
+      }
   }
 }

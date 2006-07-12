@@ -38,23 +38,17 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import static gnu.javax.net.ssl.provider.Extension.Type.*;
-import static gnu.javax.net.ssl.provider.KeyExchangeAlgorithm.*;
 import static gnu.javax.net.ssl.provider.ServerHandshake.State.*;
-import static gnu.javax.net.ssl.provider.SignatureAlgorithm.*;
 import static gnu.javax.net.ssl.provider.Handshake.Type.*;
 
-import gnu.classpath.Configuration;
 import gnu.classpath.debug.Component;
 import gnu.java.security.action.GetSecurityPropertyAction;
 import gnu.javax.crypto.key.dh.GnuDHPublicKey;
 import gnu.javax.net.ssl.AbstractSessionContext;
 import gnu.javax.net.ssl.Session;
-import gnu.javax.net.ssl.Session.ID;
+import gnu.javax.net.ssl.provider.Alert.Description;
 import gnu.javax.net.ssl.provider.CertificateRequest.ClientCertificateType;
-import gnu.javax.net.ssl.provider.ServerNameList.ServerName;
 
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
 import java.security.AccessController;
@@ -74,26 +68,18 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Level;
-import java.util.zip.Deflater;
-import java.util.zip.Inflater;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyAgreement;
-import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSessionContext;
 import javax.net.ssl.X509ExtendedKeyManager;
-import javax.net.ssl.X509TrustManager;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.security.auth.x500.X500Principal;
 
@@ -140,12 +126,7 @@ class ServerHandshake extends AbstractHandshake
 
   private State state;
 
-  private final SSLEngineImpl engine;
-
   /* Handshake result fields. */
-  private CompressionMethod compression;
-  private Random clientRandom;
-  private Random serverRandom;
   private ByteBuffer outBuffer;
   private boolean clientHadExtensions = false;
   private boolean continuedSession = false;
@@ -154,28 +135,22 @@ class ServerHandshake extends AbstractHandshake
   private X509Certificate clientCert = null;
   private X509Certificate localCert = null;
   private boolean helloV2 = false;
-  
-  /**
-   * We remember this to ensure that we use a different one if the client's
-   * session ID happens to be the same as our random one (this is possible,
-   * if the random we're initialized with is predictable).
-   */
-  private Session.ID clientSessionID;
-
-  private InputSecurityParameters inParams;
-  private OutputSecurityParameters outParams;
-  
-  private KeyAgreement keyAgreement;
   private KeyPair dhPair;
+  
+  // Delegated tasks we use.
+  private GenDH genDH;
+  private CertVerifier certVerifier;
+  private CertLoader certLoader;
+  private DelegatedTask keyExchangeTask;
 
   ServerHandshake (boolean writeHelloRequest, final SSLEngineImpl engine)
     throws NoSuchAlgorithmException
   {
+    super(engine);
     if (writeHelloRequest)
       state = WRITE_HELLO_REQUEST;
     else
       state = READ_CLIENT_HELLO;
-    this.engine = engine;
     handshakeOffset = 0;
   }
 
@@ -249,7 +224,6 @@ class ServerHandshake extends AbstractHandshake
    * implementation.
    *
    * XXX Maybe consider implementing lzo (GNUTLS supports that).
-   * XXX Maybe add way to disable zlib support, through properties.
    */
   private static CompressionMethod chooseCompression (final CompressionMethodList comps)
     throws SSLException
@@ -284,7 +258,7 @@ class ServerHandshake extends AbstractHandshake
 
   public @Override HandshakeStatus implHandleInput()
     throws SSLException
-  {    
+  {
     if (state == DONE)
       return HandshakeStatus.FINISHED;
 
@@ -317,9 +291,9 @@ class ServerHandshake extends AbstractHandshake
         // supports).
         case READ_CLIENT_HELLO:
           if (handshake.type () != CLIENT_HELLO)
-            throw new SSLException ("expecting client hello");
-          // XXX throw better exception.
-
+            throw new AlertException(new Alert(Alert.Level.FATAL,
+                                               Alert.Description.UNEXPECTED_MESSAGE));
+            
           {
             ClientHello hello = (ClientHello) handshake.body ();
             engine.session().version
@@ -426,8 +400,8 @@ class ServerHandshake extends AbstractHandshake
                   = cert.certificates().toArray(new X509Certificate[0]);
                 if (chain.length == 0)
                   throw new CertificateException("no certificates in chain");
-                X509TrustManager tm = engine.contextImpl.trustManager;
-                tm.checkClientTrusted(chain, null);
+                certVerifier = new CertVerifier(false, chain);
+                tasks.add(certVerifier);
                 engine.session().setPeerCertificates(chain);
                 clientCert = chain[0];
                 // Delay setting 'peerVerified' until CertificateVerify.
@@ -474,114 +448,24 @@ class ServerHandshake extends AbstractHandshake
                   new GnuDHPublicKey(null, myKey.getParams().getP(),
                                      myKey.getParams().getG(),
                                      pub.publicValue());
-                diffieHellmanPhase2(clientKey);
+                keyExchangeTask = new DHPhase(clientKey);
+                tasks.add(keyExchangeTask);
               }
+
             if (engine.session().suite.keyExchangeAlgorithm() ==
                 KeyExchangeAlgorithm.RSA)
               {
                 EncryptedPreMasterSecret secret = (EncryptedPreMasterSecret)
                   kex.exchangeKeys();
-                Cipher rsa = null;
-                try
-                  {
-                    rsa = Cipher.getInstance("RSA");
-                    rsa.init(Cipher.DECRYPT_MODE, localCert);
-                  }
-                catch (InvalidKeyException ike)
-                  {
-                    throw new SSLException(ike);
-                  }
-                catch (NoSuchAlgorithmException nsae)
-                  {
-                    throw new SSLException(nsae);
-                  }
-                catch (NoSuchPaddingException nspe)
-                  {
-                    // Shouldn't happen; RSA only has one padding here.
-                    throw new SSLException(nspe);
-                  }
-                
-                try
-                  {
-                    preMasterSecret = rsa.doFinal(secret.encryptedSecret());
-                  }
-                catch (BadPaddingException bpe)
-                  {
-                    throw new SSLException(bpe);
-                  }
-                catch (IllegalBlockSizeException ibse)
-                  {
-                    throw new SSLException(ibse);
-                  }
+                keyExchangeTask = new RSAKeyExchange(secret.encryptedSecret());
+                tasks.add(keyExchangeTask);
               }
             // XXX SRP
-            
-            // Generate the master keys.
-            generateMasterSecret(clientRandom, serverRandom, engine.session());
-            
-            // Initialize our security parameters.
-            byte[][] keys = generateKeys(clientRandom, serverRandom,
-                                         engine.session());
-            try
-              {
-                CipherSuite s = engine.session().suite;
-                Cipher inCipher = s.cipher();
-                Mac inMac = s.mac(engine.session().version);
-                Inflater inflater = (compression == CompressionMethod.ZLIB
-                                     ? new Inflater() : null); 
-                inCipher.init(Cipher.DECRYPT_MODE,
-                              new SecretKeySpec(keys[2],
-                                                s.cipherAlgorithm().toString()),
-                              new IvParameterSpec(keys[4]));
-                inMac.init(new SecretKeySpec(keys[0],
-                                             inMac.getAlgorithm()));
-                inParams = new InputSecurityParameters(inCipher, inMac,
-                                                       inflater,
-                                                       engine.session(), s);
-                
-                Cipher outCipher = s.cipher();
-                Mac outMac = s.mac(engine.session().version);
-                Deflater deflater = (compression == CompressionMethod.ZLIB
-                                     ? new Deflater() : null);
-                outCipher.init(Cipher.ENCRYPT_MODE,
-                               new SecretKeySpec(keys[3],
-                                                 s.cipherAlgorithm().toString()),
-                               new IvParameterSpec(keys[5]));
-                outMac.init(new SecretKeySpec(keys[1],
-                                              outMac.getAlgorithm()));
-                outParams = new OutputSecurityParameters(outCipher, outMac,
-                                                         deflater,
-                                                         engine.session(), s);
-              }
-            catch (InvalidAlgorithmParameterException iape)
-              {
-                throw new SSLException(iape);
-              }
-            catch (InvalidKeyException ike)
-              {
-                throw new SSLException(ike);
-              }
-            catch (NoSuchAlgorithmException nsae)
-              {
-                throw new SSLException(nsae);
-              }
-            catch (NoSuchPaddingException nspe)
-              {
-                throw new SSLException(nspe);
-              }
             
             if (clientCert != null)
               state = READ_CERTIFICATE_VERIFY;
             else
-              {
-                if (continuedSession)
-                  {
-                    engine.changeCipherSpec();
-                    state = WRITE_FINISHED;
-                  }
-                else
-                  state = READ_FINISHED;
-              }
+              state = READ_FINISHED;
           }
           break;
 
@@ -602,7 +486,8 @@ class ServerHandshake extends AbstractHandshake
             try
               {
                 verifyClient(verify.signature());
-                engine.session().setPeerVerified(true);
+                if (certVerifier != null && certVerifier.verified())
+                  engine.session().setPeerVerified(true);
               }
             catch (SignatureException se)
               {
@@ -634,10 +519,9 @@ class ServerHandshake extends AbstractHandshake
         case READ_FINISHED:
           {
             if (handshake.type() != FINISHED)
-              {
-                throw new SSLException("expecting FINISHED message");
-              }
-            
+              throw new AlertException(new Alert(Alert.Level.FATAL,
+                                                 Description.UNEXPECTED_MESSAGE));
+
             Finished clientFinished = (Finished) handshake.body();
             
             MessageDigest md5copy = null;
@@ -696,12 +580,14 @@ class ServerHandshake extends AbstractHandshake
 
     handshakeOffset += handshake.length() + 4;
 
+    if (!tasks.isEmpty())
+      return HandshakeStatus.NEED_TASK;
     if (state.isReadState())
       return HandshakeStatus.NEED_UNWRAP;
     if (state.isWriteState())
       return HandshakeStatus.NEED_WRAP;
 
-    return HandshakeStatus.FINISHED; // XXX ???
+    return HandshakeStatus.FINISHED;
   }
 
   public @Override HandshakeStatus implHandleOutput (ByteBuffer fragment)
@@ -818,15 +704,15 @@ output_loop:
             case WRITE_SERVER_HELLO:
             {
               ServerHelloBuilder hello = new ServerHelloBuilder();
-              hello.setVersion (engine.session().version);
+              hello.setVersion(engine.session().version);
               Random r = hello.random();
-              r.setGmtUnixTime ((int) (System.currentTimeMillis() / 1000));
+              r.setGmtUnixTime(Util.unixTime());
               byte[] nonce = new byte[28];
               engine.session().random().nextBytes(nonce);
               r.setRandomBytes(nonce);
-              serverRandom = r.copy ();
+              serverRandom = r.copy();
               hello.setSessionId(engine.session().getId());
-              hello.setCipherSuite (engine.session().suite);
+              hello.setCipherSuite(engine.session().suite);
               hello.setCompressionMethod(compression);
               if (clientHadExtensions)
                 {
@@ -847,15 +733,38 @@ output_loop:
               fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
               outBuffer.position(outBuffer.position() + l);
 
+
               if (continuedSession)
                 {
+                  byte[][] keys = generateKeys(clientRandom, serverRandom,
+                                               engine.session());
+                  setupSecurityParameters(keys, false, engine, compression);
                   engine.changeCipherSpec();
                   state = WRITE_FINISHED;
                 }
+              else if (engine.session().suite.signatureAlgorithm()
+                       != SignatureAlgorithm.ANONYMOUS)
+                {
+                  certLoader = new CertLoader();
+                  tasks.add(certLoader);
+                  state = WRITE_CERTIFICATE;
+                  break output_loop;
+                }
+              else if (engine.session().suite.isEphemeralDH())
+                {
+                  genDH = new GenDH();
+                  tasks.add(genDH);
+                  state = WRITE_SERVER_KEY_EXCHANGE;
+                  break output_loop;
+                }
+              else if (engine.getWantClientAuth() || engine.getNeedClientAuth())
+                {
+                  state = WRITE_CERTIFICATE_REQUEST;
+                }
               else
-                state = WRITE_CERTIFICATE;
+                state = WRITE_SERVER_HELLO_DONE;
             }
-            break output_loop; // XXX temporary
+            break;
 
             // Certificate.
             //
@@ -864,54 +773,15 @@ output_loop:
             // itself (usually, servers must authenticate).
             case WRITE_CERTIFICATE:
             {
-              if (engine.session().suite.keyExchangeAlgorithm() == null)
-                {
-                  state = WRITE_SERVER_KEY_EXCHANGE;
-                  break;
-                }
-              String sigAlg = null;
-              switch (engine.session().suite.keyExchangeAlgorithm())
-                {
-                  case NONE:
-                    break;
-
-                  case RSA:
-                    sigAlg = "RSA";
-                    break;
-
-                  case DIFFIE_HELLMAN:
-                    if (engine.session().suite.isEphemeralDH())
-                      sigAlg = "DHE_";
-                    else
-                      sigAlg = "DH_";
-                    switch (engine.session().suite.signatureAlgorithm())
-                      {
-                        case RSA:
-                          sigAlg += "RSA";
-                          break;
-
-                        case DSA:
-                          sigAlg += "DSS";
-                          break;
-                      }
-
-                  case SRP:
-                    switch (engine.session().suite.signatureAlgorithm())
-                      {
-                        case RSA:
-                          sigAlg = "SRP_RSA";
-                          break;
-
-                        case DSA:
-                          sigAlg = "SRP_DSS";
-                          break;
-                      }
-                }
-              X509ExtendedKeyManager km = engine.contextImpl.keyManager;
-              Principal[] issuers = null; // XXX use TrustedAuthorities extension.
-              keyAlias = km.chooseEngineServerAlias(sigAlg, issuers, engine);
-              X509Certificate[] chain = km.getCertificateChain(keyAlias);
-
+              // We must have scheduled a certificate loader to run.
+              assert(certLoader != null);
+              assert(certLoader.hasRun());
+              if (certLoader.thrown() != null)
+                throw new AlertException(new Alert(Alert.Level.FATAL,
+                                                   Alert.Description.HANDSHAKE_FAILURE),
+                                         certLoader.thrown());
+              java.security.cert.Certificate[] chain
+                = engine.session().getLocalCertificates();
               CertificateBuilder cert = new CertificateBuilder(CertificateType.X509);
               try
                 {
@@ -921,8 +791,6 @@ output_loop:
                 {
                   throw new SSLException(ce);
                 }
-              engine.session().setLocalCertificates(chain);
-              localCert = chain[0];
 
               if (Debug.DEBUG)
                 {
@@ -939,7 +807,22 @@ output_loop:
               fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
               outBuffer.position(outBuffer.position() + l);
 
-              state = WRITE_SERVER_KEY_EXCHANGE;
+              CipherSuite s = engine.session().suite;
+              if (s.isEphemeralDH()
+                  || (s.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN
+                      && s.signatureAlgorithm() == SignatureAlgorithm.ANONYMOUS))
+                {
+                  genDH = new GenDH();
+                  tasks.add(genDH);
+                  state = WRITE_SERVER_KEY_EXCHANGE;
+                  break output_loop;
+                }
+              else if (engine.getWantClientAuth() || engine.getNeedClientAuth())
+                {
+                  state = WRITE_CERTIFICATE_REQUEST;
+                }
+              else
+                state = WRITE_SERVER_HELLO_DONE;
             }
             break output_loop; // XXX temporary
 
@@ -954,58 +837,46 @@ output_loop:
             {
               KeyExchangeAlgorithm kex = engine.session().suite.keyExchangeAlgorithm();
               
+              ByteBuffer paramBuffer = null;
+              ByteBuffer sigBuffer = null;
               if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
                 {
-                  genDiffieHellman();
+                  assert(genDH != null);
+                  assert(genDH.hasRun());
+                  if (genDH.thrown() != null)
+                    throw new AlertException(new Alert(Alert.Level.FATAL,
+                                                       Alert.Description.HANDSHAKE_FAILURE),
+                                             genDH.thrown());
+                  assert(dhPair != null);
                   initDiffieHellman((DHPrivateKey) dhPair.getPrivate(),
                                     engine.session().random());
+                  paramBuffer = genDH.paramsBuffer;
+                  sigBuffer = genDH.sigBuffer;
                 }
               // XXX handle SRP
               
-              if (kex != KeyExchangeAlgorithm.NONE
-                  && kex != KeyExchangeAlgorithm.RSA
-                  && engine.session().suite.isEphemeralDH())
-                {
-                  // This key exchange requires server params; construct them.
-                  ByteBuffer paramBuffer = null;
+              ServerKeyExchangeBuilder ske
+                = new ServerKeyExchangeBuilder(engine.session().suite);
+              ske.setParams(paramBuffer);
+              if (sigBuffer != null)
+                ske.setSignature(sigBuffer);
                   
-                  if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
-                    {
-                      DHPublicKey pubKey = (DHPublicKey) dhPair.getPublic();
-                      ServerDHParams params =
-                        new ServerDHParams(pubKey.getParams().getP(),
-                                           pubKey.getParams().getG(),
-                                           pubKey.getY());
-                      paramBuffer = params.buffer();
-                      if (Debug.DEBUG)
-                        logger.logv(Component.SSL_HANDSHAKE, "server DH params:\n{0}",
-                                    Util.hexDump(paramBuffer));
-                    }
-                  // XXX handle SRP
+              if (Debug.DEBUG)
+                logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
                   
-                  ByteBuffer sigBuffer = signParams(paramBuffer.duplicate());
-                  ServerKeyExchangeBuilder ske
-                    = new ServerKeyExchangeBuilder(engine.session().suite);
-                  ske.setParams(paramBuffer);
-                  ske.setSignature(sigBuffer);
-                  
-                  if (Debug.DEBUG)
-                    logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
-                  
-                  outBuffer = ske.buffer();
-                  int l = Math.min(fragment.remaining(), outBuffer.remaining());
-                  fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
-                                  | (ske.length() & 0xFFFFFF));
-                  fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
-                  outBuffer.position(outBuffer.position() + l);
-                }
+              outBuffer = ske.buffer();
+              int l = Math.min(fragment.remaining(), outBuffer.remaining());
+              fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
+                              | (ske.length() & 0xFFFFFF));
+              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
+              outBuffer.position(outBuffer.position() + l);
               
               if (engine.getWantClientAuth() || engine.getNeedClientAuth())
                 state = WRITE_CERTIFICATE_REQUEST;
               else
                 state = WRITE_SERVER_HELLO_DONE;
             }
-            break output_loop; // XXX temporary
+            break;
 
             // Certificate Request.
             //
@@ -1048,7 +919,7 @@ output_loop:
               
               state = WRITE_SERVER_HELLO_DONE;
             }
-            break output_loop; // XXX temporary
+            break;
 
             // Server Hello Done.
             //
@@ -1115,6 +986,8 @@ output_loop:
             break;
           }
       }
+    if (!tasks.isEmpty())
+      return HandshakeStatus.NEED_TASK;
     if (state.isWriteState() || outBuffer.hasRemaining())
       return HandshakeStatus.NEED_WRAP;
     if (state.isReadState())
@@ -1125,6 +998,8 @@ output_loop:
   
   @Override HandshakeStatus status()
   {
+    if (!tasks.isEmpty())
+      return HandshakeStatus.NEED_TASK;
     if (state.isReadState())
       return HandshakeStatus.NEED_UNWRAP;
     if (state.isWriteState())
@@ -1132,19 +1007,21 @@ output_loop:
     
     return HandshakeStatus.FINISHED;
   }
-  
-  @Override InputSecurityParameters getInputParams() throws SSLException
+
+  @Override void checkKeyExchange() throws SSLException
   {
-    if (inParams == null)
-      throw new SSLException("premature usage of input security parameters");
-    return inParams;
-  }
-  
-  @Override OutputSecurityParameters getOutputParams() throws SSLException
-  {
-    if (outParams == null)
-      throw new SSLException("premature usage of output security parameters");
-    return outParams;
+    if (continuedSession) // No key exchange needed.
+      return;
+    if (keyExchangeTask == null) // An error if we never created one.
+      throw new AlertException(new Alert(Alert.Level.FATAL,
+                                         Alert.Description.INTERNAL_ERROR));
+    if (!keyExchangeTask.hasRun()) // An error if the caller never ran it.
+      throw new AlertException(new Alert(Alert.Level.FATAL,
+                                         Alert.Description.INTERNAL_ERROR));
+    if (keyExchangeTask.thrown() != null) // An error was thrown.
+      throw new AlertException(new Alert(Alert.Level.FATAL,
+                                         Alert.Description.HANDSHAKE_FAILURE),
+                               keyExchangeTask.thrown());
   }
   
   @Override void handleV2Hello(ByteBuffer hello)
@@ -1154,84 +1031,23 @@ output_loop:
     sha.update((ByteBuffer) hello.duplicate().position(2).limit(len+2));
     helloV2 = true;
   }
-  
-  /**
-   * Generate, or fetch from our certificate, the Diffie-Hellman exchange
-   * parameters.
-   * 
-   * @throws SSLException
-   */
-  private void genDiffieHellman() throws SSLException
-  {
-    try
-      {
-        // XXX generating a DH key, especially given a large prime, can
-        // take a while. We should perhaps look into making this a delegated
-        // task, so we don't block other connections when generating keys.
-        //
-        // Also, I should investigate whether or not these DH parameters are
-        // "secure" or not; I mean, I'm not really worried, because SSH uses
-        // similar static parameters, but this *could* be a potential hole.
-        if (engine.session().suite.isEphemeralDH())
-          {
-            KeyPairGenerator dhGen = KeyPairGenerator.getInstance("DH");
-            DHParameterSpec dhparams = DiffieHellman.getParams().getParams();
-            dhGen.initialize(dhparams, engine.session().random());
-            dhPair = dhGen.generateKeyPair();
-          }
-        else
-          {
-            X509Certificate cert = (X509Certificate)
-              engine.session().getLocalCertificates()[0];
-            PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
-            dhPair = new KeyPair(cert.getPublicKey(), key);
-          }
 
-        if (Debug.DEBUG_KEY_EXCHANGE)
-          logger.logv(Component.SSL_KEY_EXCHANGE,
-                      "Diffie-Hellman public:{0} private:{1}",
-                      dhPair.getPublic(), dhPair.getPrivate());
-      }
-    catch (InvalidAlgorithmParameterException iape)
-      {
-        throw new SSLException(iape);
-      }
-    catch (NoSuchAlgorithmException nsae)
-      {
-        throw new SSLException(nsae);
-      }
-  }
-  
-  private ByteBuffer signParams(ByteBuffer serverParams) throws SSLException
+  private ByteBuffer signParams(ByteBuffer serverParams)
+    throws NoSuchAlgorithmException, InvalidKeyException, SignatureException
   {
-    try
-      {
-        SignatureAlgorithm alg = engine.session().suite.signatureAlgorithm();
-        java.security.Signature sig
-          = java.security.Signature.getInstance(alg.algorithm());
-        PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
-        if (Debug.DEBUG_KEY_EXCHANGE)
-          logger.logv(Component.SSL_HANDSHAKE, "server key: {0}", key);
-        sig.initSign(key);
-        sig.update(clientRandom.buffer());
-        sig.update(serverRandom.buffer());
-        sig.update(serverParams);
-        byte[] sigVal = sig.sign();
-        Signature signature = new Signature(sigVal, engine.session().suite.signatureAlgorithm());
-        return signature.buffer();
-      }
-    catch (NoSuchAlgorithmException nsae)
-      {
-        throw new SSLException(nsae);
-      }
-    catch (InvalidKeyException ike)
-      {
-        throw new SSLException(ike);
-      }
-    catch (SignatureException se)
-      {
-        throw new SSLException(se);
-      }
+    SignatureAlgorithm alg = engine.session().suite.signatureAlgorithm();
+    java.security.Signature sig
+      = java.security.Signature.getInstance(alg.algorithm());
+    PrivateKey key = engine.contextImpl.keyManager.getPrivateKey(keyAlias);
+    if (Debug.DEBUG_KEY_EXCHANGE)
+      logger.logv(Component.SSL_HANDSHAKE, "server key: {0}", key);
+    sig.initSign(key);
+    sig.update(clientRandom.buffer());
+    sig.update(serverRandom.buffer());
+    sig.update(serverParams);
+    byte[] sigVal = sig.sign();
+    Signature signature = new Signature(sigVal, engine.session().suite.signatureAlgorithm());
+    return signature.buffer();
   }
   
   private void verifyClient(byte[] sigValue) throws SSLException, SignatureException
@@ -1274,5 +1090,127 @@ output_loop:
       {
         throw new SSLException(nsae);
       }
+  }
+  
+  // Delegated tasks.
+
+  class CertLoader extends DelegatedTask
+  {
+    CertLoader()
+    {
+    }
+    
+    public void implRun() throws SSLException
+    {
+      String sigAlg = null;
+      switch (engine.session().suite.keyExchangeAlgorithm())
+        {
+          case NONE:
+            break;
+
+          case RSA:
+            sigAlg = "RSA";
+            break;
+
+          case DIFFIE_HELLMAN:
+            if (engine.session().suite.isEphemeralDH())
+              sigAlg = "DHE_";
+            else
+              sigAlg = "DH_";
+            switch (engine.session().suite.signatureAlgorithm())
+              {
+                case RSA:
+                  sigAlg += "RSA";
+                  break;
+
+                case DSA:
+                  sigAlg += "DSS";
+                  break;
+              }
+
+          case SRP:
+            switch (engine.session().suite.signatureAlgorithm())
+              {
+                case RSA:
+                  sigAlg = "SRP_RSA";
+                  break;
+
+                case DSA:
+                  sigAlg = "SRP_DSS";
+                  break;
+              }
+        }
+      X509ExtendedKeyManager km = engine.contextImpl.keyManager;
+      Principal[] issuers = null; // XXX use TrustedAuthorities extension.
+      keyAlias = km.chooseEngineServerAlias(sigAlg, issuers, engine);
+      if (keyAlias == null)
+        throw new SSLException("no certificates available");
+      X509Certificate[] chain = km.getCertificateChain(keyAlias);
+      engine.session().setLocalCertificates(chain);
+      localCert = chain[0];
+      if (engine.session().suite.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN
+          && !engine.session().suite.isEphemeralDH())
+        dhPair = new KeyPair(localCert.getPublicKey(),
+                             km.getPrivateKey(keyAlias));
+    }
+  }
+  
+  /**
+   * Delegated task for generating Diffie-Hellman parameters.
+   */
+  private class GenDH extends DelegatedTask
+  {
+    ByteBuffer paramsBuffer;
+    ByteBuffer sigBuffer;
+
+    protected void implRun()
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException,
+             InvalidKeyException, SignatureException
+    {
+      KeyPairGenerator dhGen = KeyPairGenerator.getInstance("DH");
+      DHParameterSpec dhparams = DiffieHellman.getParams().getParams();
+      dhGen.initialize(dhparams, engine.session().random());
+      dhPair = dhGen.generateKeyPair();
+      DHPublicKey pub = (DHPublicKey) dhPair.getPublic();
+      
+      // Generate the parameters message.
+      ServerDHParams params = new ServerDHParams(pub.getParams().getP(),
+                                                 pub.getParams().getG(),
+                                                 pub.getY());
+      paramsBuffer = params.buffer();
+      
+      // Sign the parameters, if needed.
+      if (engine.session().suite.signatureAlgorithm() != SignatureAlgorithm.ANONYMOUS)
+        {
+          sigBuffer = signParams(paramsBuffer);
+          paramsBuffer.rewind();
+        }
+      if (Debug.DEBUG_KEY_EXCHANGE)
+        logger.logv(Component.SSL_KEY_EXCHANGE,
+                    "Diffie-Hellman public:{0} private:{1}",
+                    dhPair.getPublic(), dhPair.getPrivate());
+    }
+  }
+  
+  class RSAKeyExchange extends DelegatedTask
+  {
+    private final byte[] encryptedPreMasterSecret;
+
+    RSAKeyExchange(byte[] encryptedPreMasterSecret)
+    {
+      this.encryptedPreMasterSecret = encryptedPreMasterSecret;
+    }
+    
+    public void implRun()
+      throws BadPaddingException, IllegalBlockSizeException, InvalidKeyException,
+             NoSuchAlgorithmException, NoSuchPaddingException, SSLException
+    {
+      Cipher rsa = Cipher.getInstance("RSA");
+      rsa.init(Cipher.DECRYPT_MODE, localCert);
+      preMasterSecret = rsa.doFinal(encryptedPreMasterSecret);
+      generateMasterSecret(clientRandom, serverRandom, engine.session());
+      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+      setupSecurityParameters(keys, false, engine, compression);
+    }
   }
 }

@@ -1,3 +1,98 @@
+2006-07-12  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/AbstractHandshake.java
+	(engine, inParams, outParams, tasks, serverRandom, clientRandom,
+	compression): new fields.
+	(<init>): take an SSLEngineImpl parameter; init `tasks.'
+	(handleInput): return NEED_TASK if we have tasks.
+	(getInputParams, getOutputParams): implement here; mark final.
+	(getTask): new method.
+	(checkKeyExchange): new method.
+	(reallocateBuffer): use `compact.'
+	(diffieHellmanPhase1, diffieHellmanPhase2): removed.
+	(DHPhase, CertVerifier): new classes.
+	(generateMasterSecret): add asserts.
+	(setupSecurityParameters): new method.
+	* gnu/javax/net/ssl/provider/Certificate.java (certificates): fix
+	reading multiple certificates.
+	* gnu/javax/net/ssl/provider/ClientCertificateTypeList.java:
+	implement Iterable<ClientCertificateType>.
+	(iterator): new method.
+	* gnu/javax/net/ssl/provider/ClientDiffieHellmanPublic.java: make
+	public; implement Builder.
+	(<init>): make public.
+	(<init>): new constructor.
+	(wrap): new method.
+	(buffer): new method.
+	(publicValue): make public; use `rewind.'
+	(setPublicValue): use `Util.trim;' use `rewind.'
+	(length): return proper length.
+	* gnu/javax/net/ssl/provider/ClientHandshake.java: new file.
+	* gnu/javax/net/ssl/provider/ClientKeyExchange.java: remove unused
+	imports; make public, non-final.
+	(buffer): make protected, non-final.
+	(suite, version): make protected.
+	(<init>): make public.
+	(length): return 0 for NONE key exchange algorithm.
+	* gnu/javax/net/ssl/provider/ClientKeyExchangeBuilder.java: new
+	file.
+	* gnu/javax/net/ssl/provider/DelegatedTask.java: new file.
+	* gnu/javax/net/ssl/provider/DiffieHellman.java (getParams): use
+	AccessController instead of Util.
+	* gnu/javax/net/ssl/provider/EncryptedPreMasterSecret.java: make
+	public; implement Builder.
+	(<init>): make public.
+	(<init>): new constructor.
+	(buffer): new method.
+	(encryptedSecret): make public; fix SSLv3 handling.
+	(setEncryptedSecret): make public; rewind the buffer after putting
+	the value.
+	(length): fix length computation.
+	* gnu/javax/net/ssl/provider/ExchangeKeys.java: make public.
+	(buffer): make protected, non-final.
+	(<init>): made public; don't check null.
+	* gnu/javax/net/ssl/provider/Jessie.java (<init>): add "SSL" alias.
+	* gnu/javax/net/ssl/provider/ServerHandshake.java: clean up unused
+	imports.
+	(engine, compression, clientRandom, serverRandom, clientSessionID,
+	inParams, outParams, keyAgreement): moved to superclass.
+	(genDH, certVerifier, certLoader, keyExchangeTask): new fields.
+	(<init>): pass engine to superclass constructor.
+	(implHandleInput): throw `AlertException' when it makes sense; run
+	long-running tasks as delegated tasks; return NEED_TASK if we
+	scheduled a delegated task.
+	(implHandleOutput): generate keys for continued sessions; run
+	long-running tasks as delegated tasks; return NEED_TASK if we
+	scheduled a delegated task.
+	(status): also return NEED_TASK as appropriate.
+	(getInputParams, getOutputParams): removed.
+	(checkKeyExchange): new method.
+	(genDiffieHellman): removed.
+	(signParams): throw exceptions.
+	(CertLoader, GenDH, RSAKeyExchange): new classes.
+	* gnu/javax/net/ssl/provider/SSLContextImpl.java
+	(engineGetServerSocketFactory): implement.
+	(engineGetSocketFactory): implement.
+	(defaultRandom): use AccessController instead of Util.
+	* gnu/javax/net/ssl/provider/SSLEngineImpl.java (<init>): use
+	`defaultSuites.'
+	(defaultSuites): new method.
+	(startHandshake): start client handshake in client mode.
+	(getDelegatedTask): implement.
+	(unwrap, wrap): send alert if we catch an AlertException during
+	handshaking.
+	* gnu/javax/net/ssl/provider/SSLServerSocketFactoryImpl.java: new
+	file.
+	* gnu/javax/net/ssl/provider/SSLServerSocketImpl.java: new file.
+	* gnu/javax/net/ssl/provider/SSLSocketFactoryImpl.java: new file.
+	* gnu/javax/net/ssl/provider/SSLSocketImpl.java: new file.
+	* gnu/javax/net/ssl/provider/X509TrustManagerFactory.java
+	(sep, JSSE_CERTS, CA_CERTS, engineInit): use AccessController, not
+	Util.
+	(checkTrusted): don't require revocation checking.
+	* java/util/Collections.java (CheckedMap.entrySet): casting hack.
+	* java/util/concurrent/CopyOnWriteArrayList.java: new file.
+
 2006-07-09  Casey Marshall  <csm@gnu.org>
 
 	* gnu/java/io/ByteBufferOutputStream.java (write): new method.

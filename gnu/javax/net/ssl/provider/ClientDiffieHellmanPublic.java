@@ -56,40 +56,55 @@ struct {
   } dh_public;
 } ClientDiffieHellmanPublic;</pre> 
  */
-class ClientDiffieHellmanPublic extends ExchangeKeys
+public class ClientDiffieHellmanPublic extends ExchangeKeys implements Builder
 {
-  ClientDiffieHellmanPublic (final ByteBuffer buffer)
+  public ClientDiffieHellmanPublic(final ByteBuffer buffer)
   {
-    super (buffer);
+    super(buffer);
+  }
+  
+  public ClientDiffieHellmanPublic(final BigInteger Yc)
+  {
+    super(wrap(Yc));
+  }
+  
+  private static ByteBuffer wrap(BigInteger Yc)
+  {
+    byte[] b = Util.trim(Yc);
+    ByteBuffer ret = ByteBuffer.allocate(b.length + 2);
+    ret.putShort((short) b.length);
+    ret.put(b);
+    return (ByteBuffer) ret.rewind();
   }
 
-  BigInteger publicValue ()
+  public ByteBuffer buffer()
   {
-    int len = length ();
+    return (ByteBuffer) buffer.duplicate().rewind().limit(length());
+  }
+  
+  public BigInteger publicValue()
+  {
+    int len = length() - 2;
     byte[] b = new byte[len];
-    buffer.position (2);
-    buffer.get (b);
-    return new BigInteger (1, b);
+    buffer.position(2);
+    buffer.get(b);
+    buffer.rewind();
+    return new BigInteger(1, b);
   }
 
-  void setPublicValue (final BigInteger y)
+  public void setPublicValue(final BigInteger Yc)
   {
-    byte[] buf = y.toByteArray ();
-    int length = buf.length;
-    int offset = 0;
-    if (buf[0] == 0)
-      {
-        length--;
-        offset++;
-      }
-    buffer.putShort (0, (short) length);
-    buffer.position (2);
-    buffer.put (buf, offset, length);
+    byte[] buf = Util.trim(Yc);
+    if (buffer.capacity() < buf.length + 2)
+      buffer = ByteBuffer.allocate(buf.length + 2);
+    buffer.putShort((short) buf.length);
+    buffer.put(buf);
+    buffer.rewind();
   }
 
   public int length ()
   {
-    return buffer.getShort (0) & 0xFFFF;
+    return (buffer.getShort(0) & 0xFFFF) + 2;
   }
 
   public String toString ()
