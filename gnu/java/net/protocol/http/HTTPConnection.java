@@ -692,7 +692,7 @@ public class HTTPConnection
                 SSLSocket ss =
                   (SSLSocket) factory.createSocket(socket, connectHostname,
                                                    connectPort, true);
-                String[] protocols = { "TLSv1", "SSLv3" };
+                String[] protocols = { "TLSv1.1", "TLSv1", "SSLv3" };
                 ss.setEnabledProtocols(protocols);
                 ss.setUseClientMode(true);
                 synchronized (handshakeCompletedListeners)

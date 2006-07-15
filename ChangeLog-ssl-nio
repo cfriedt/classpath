@@ -1,5 +1,13 @@
 2006-07-14  Casey Marshall  <csm@gnu.org>
 
+	* gnu/java/net/protocol/http/HTTPConnection.java (getSocket):
+	enable TLSv1.1.
+	* gnu/java/security/action/GetPropertyAction.java: implement
+	PrivilegedAction<String>.
+	(run): return String.
+
+2006-07-14  Casey Marshall  <csm@gnu.org>
+
 	* gnu/classpath/debug/Component.java (SSL_DELEGATED_TASK): new
 	constant.
 	* gnu/classpath/debug/SystemLogger.java (getSystemLogger): new
