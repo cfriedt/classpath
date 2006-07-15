@@ -87,7 +87,11 @@ public class SSLSocketImpl extends SSLSocket
     {
       if (!initialHandshakeDone
           || engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING)
-        doHandshake();
+        {
+          doHandshake();
+          if (handshakeException != null)
+            throw handshakeException;
+        }
 
       int k = 0;
       while (k < len)
@@ -104,6 +108,7 @@ public class SSLSocketImpl extends SSLSocket
               buffer.flip();
               out.write(buffer.array(), 0, buffer.limit());
               k += result.bytesConsumed();
+              buffer.clear();
             }
         }
     }
@@ -141,7 +146,11 @@ public class SSLSocketImpl extends SSLSocket
     {
       if (!initialHandshakeDone ||
           engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING)
-        doHandshake();
+        {
+          doHandshake();
+          if (handshakeException != null)
+            throw handshakeException;
+        }
 
       if (!appBuffer.hasRemaining())
         {
@@ -415,115 +424,125 @@ public class SSLSocketImpl extends SSLSocket
     else
       sockOut = super.getOutputStream();
     
-    while (status != HandshakeStatus.NOT_HANDSHAKING
-           && status != HandshakeStatus.FINISHED)
+    try
       {
-        logger.logv(Component.SSL_HANDSHAKE, "socket processing state {0}",
-                    status);
-
-        if (inBuffer.capacity() != getSession().getPacketBufferSize())
+        while (status != HandshakeStatus.NOT_HANDSHAKING
+               && status != HandshakeStatus.FINISHED)
           {
-            ByteBuffer b
+            logger.logv(Component.SSL_HANDSHAKE, "socket processing state {0}",
+                        status);
+
+            if (inBuffer.capacity() != getSession().getPacketBufferSize())
+              {
+                ByteBuffer b
+                  = ByteBuffer.wrap(new byte[getSession().getPacketBufferSize()]);
+                if (inBuffer.hasRemaining())
+                  b.put(inBuffer).flip();
+                inBuffer = b;
+              }
+            if (outBuffer.capacity() != getSession().getPacketBufferSize())
+              outBuffer
               = ByteBuffer.wrap(new byte[getSession().getPacketBufferSize()]);
-            if (inBuffer.hasRemaining())
-              b.put(inBuffer).flip();
-            inBuffer = b;
-          }
-        if (outBuffer.capacity() != getSession().getPacketBufferSize())
-          outBuffer
-            = ByteBuffer.wrap(new byte[getSession().getPacketBufferSize()]);
 
-        switch (status)
-          {
-            case NEED_UNWRAP:
-              // Read in a single SSL record.
-              inBuffer.clear();
-              int i = sockIn.read();
-              if (i == -1)
-                throw new EOFException();
-              if ((i & 0x80) == 0x80) // SSLv2 client hello.
-                {
-                  inBuffer.put((byte) i);
-                  int v2len = (i & 0x7f) << 8;
-                  i = sockIn.read();
-                  v2len = v2len | (i & 0xff);
-                  inBuffer.put((byte) i);
-                  sockIn.readFully(inBuffer.array(), 2, v2len);
-                  inBuffer.position(0).limit(v2len + 2);
-                }
-              else
-                {
-                  inBuffer.put((byte) i);
-                  inBuffer.putInt(sockIn.readInt());
-                  int reclen = inBuffer.getShort(3) & 0xFFFF;
-                  sockIn.readFully(inBuffer.array(), 5, reclen);
-                  inBuffer.position(0).limit(reclen + 5);
-                }
-              result = engine.unwrap(inBuffer, emptyBuffer);
-              status = result.getHandshakeStatus();
-              if (result.getStatus() != Status.OK)
-                throw new SSLException("unexpected SSL status "
-                                       + result.getStatus());
-              break;
-              
-            case NEED_WRAP:
+            switch (status)
               {
-                outBuffer.clear();
-                result = engine.wrap(emptyBuffer, outBuffer);
-                status = result.getHandshakeStatus();
-                if (result.getStatus() != Status.OK)
-                  throw new SSLException("unexpected SSL status "
-                                         + result.getStatus());
-                outBuffer.flip();
-                sockOut.write(outBuffer.array(), outBuffer.position(), 
-                              outBuffer.limit());
-              }
-              break;
-              
-            case NEED_TASK:
-              {
-                Runnable task;
-                while ((task = engine.getDelegatedTask()) != null)
-                  task.run();
-                status = engine.getHandshakeStatus();
-              }
-              break;
-              
-            case FINISHED:
-              break;
-          }
-      }
-    
-    initialHandshakeDone = true;
+                case NEED_UNWRAP:
+                  // Read in a single SSL record.
+                  inBuffer.clear();
+                  int i = sockIn.read();
+                  if (i == -1)
+                    throw new EOFException();
+                  if ((i & 0x80) == 0x80) // SSLv2 client hello.
+                    {
+                      inBuffer.put((byte) i);
+                      int v2len = (i & 0x7f) << 8;
+                      i = sockIn.read();
+                      v2len = v2len | (i & 0xff);
+                      inBuffer.put((byte) i);
+                      sockIn.readFully(inBuffer.array(), 2, v2len);
+                      inBuffer.position(0).limit(v2len + 2);
+                    }
+                  else
+                    {
+                      inBuffer.put((byte) i);
+                      inBuffer.putInt(sockIn.readInt());
+                      int reclen = inBuffer.getShort(3) & 0xFFFF;
+                      sockIn.readFully(inBuffer.array(), 5, reclen);
+                      inBuffer.position(0).limit(reclen + 5);
+                    }
+                  result = engine.unwrap(inBuffer, emptyBuffer);
+                  status = result.getHandshakeStatus();
+                  if (result.getStatus() != Status.OK)
+                    throw new SSLException("unexpected SSL status "
+                                           + result.getStatus());
+                  break;
 
-    HandshakeCompletedEvent hce = new HandshakeCompletedEvent(this, getSession());
-    for (HandshakeCompletedListener l : listeners)
-      {
-        try
-          {
-            l.handshakeCompleted(hce);
+                case NEED_WRAP:
+                {
+                  outBuffer.clear();
+                  result = engine.wrap(emptyBuffer, outBuffer);
+                  status = result.getHandshakeStatus();
+                  if (result.getStatus() != Status.OK)
+                    throw new SSLException("unexpected SSL status "
+                                           + result.getStatus());
+                  outBuffer.flip();
+                  sockOut.write(outBuffer.array(), outBuffer.position(), 
+                                outBuffer.limit());
+                }
+                break;
+
+                case NEED_TASK:
+                {
+                  Runnable task;
+                  while ((task = engine.getDelegatedTask()) != null)
+                    task.run();
+                  status = engine.getHandshakeStatus();
+                }
+                break;
+
+                case FINISHED:
+                  break;
+              }
           }
-        catch (ThreadDeath td)
+
+        initialHandshakeDone = true;
+
+        HandshakeCompletedEvent hce = new HandshakeCompletedEvent(this, getSession());
+        for (HandshakeCompletedListener l : listeners)
           {
-            throw td;
+            try
+              {
+                l.handshakeCompleted(hce);
+              }
+            catch (ThreadDeath td)
+              {
+                throw td;
+              }
+            catch (Throwable x)
+              {
+                logger.log(Component.WARNING,
+                           "HandshakeCompletedListener threw exception", x);
+              }
           }
-        catch (Throwable x)
-          {
-            logger.log(Component.WARNING,
-                       "HandshakeCompletedListener threw exception", x);
-          }
+
+        now += System.currentTimeMillis();
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_HANDSHAKE,
+                      "handshake completed in {0}ms in thread {1}", now,
+                      Thread.currentThread().getName());
       }
-    
-    now += System.currentTimeMillis();
-    if (Debug.DEBUG)
-      logger.logv(Component.SSL_HANDSHAKE,
-                  "handshake completed in {0}ms in thread {1}", now,
-                  Thread.currentThread().getName());
-    
-    synchronized (engine)
+    catch (SSLException ssle)
       {
-        isHandshaking = false;
-        engine.notifyAll();
+        handshakeException = ssle;
+        throw ssle;
+      }
+    finally
+      {
+        synchronized (engine)
+          {
+            isHandshaking = false;
+            engine.notifyAll();
+          }
       }
   }
   

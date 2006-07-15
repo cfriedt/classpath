@@ -152,9 +152,11 @@ public class InputSecurityParameters
     fragmentLength -= maclen;
 
     int padlen = 0;
+    int padRemoveLen = 0;
     if (!suite.isStreamCipher ())
       {
         padlen = fragment.get(record.length() - 1) & 0xFF;
+        padRemoveLen = padlen + 1;
         if (Debug.DEBUG)
           logger.logv(Component.SSL_RECORD_LAYER, "padlen:{0}", padlen);
 
@@ -183,7 +185,7 @@ public class InputSecurityParameters
           logger.logv(Component.SSL_RECORD_LAYER, "padding bad? {0}",
                       badPadding);
         if (!badPadding)
-          fragmentLength = fragmentLength - padlen - 1;
+          fragmentLength = fragmentLength - padRemoveLen;
       }
     
     int ivlen = 0;
@@ -234,7 +236,7 @@ public class InputSecurityParameters
     int produced = 0;
     if (inflater != null)
       {
-        ByteBufferOutputStream out = new ByteBufferOutputStream(record.length());
+        ByteBufferOutputStream out = new ByteBufferOutputStream(fragmentLength);
         byte[] inbuffer = new byte[1024];
         byte[] outbuffer = new byte[1024];
         boolean done = false;
@@ -243,6 +245,7 @@ public class InputSecurityParameters
           fragment.position (cipher.getBlockSize());
         else
           fragment.position(0);
+        fragment.limit(fragmentLength);
         
         while (!done)
           {
@@ -290,7 +293,7 @@ public class InputSecurityParameters
     else
       {
         ByteBuffer outbuf = (ByteBuffer)
-          fragment.duplicate().position(0).limit(record.length() - maclen - padlen - 1);
+          fragment.duplicate().position(0).limit(record.length() - maclen - padRemoveLen);
         if (record.version().compareTo(ProtocolVersion.TLS_1_1) >= 0
             && !suite.isStreamCipher())
           outbuf.position(cipher.getBlockSize());

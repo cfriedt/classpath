@@ -103,9 +103,9 @@ public class ServerDHParams implements Builder, ServerKeyExchangeParams
     buffer.put(y_bytes, y_off, y_len);
   }
 
-  public KeyExchangeAlgorithm algorithm ()
+  @Deprecated public KeyExchangeAlgorithm algorithm ()
   {
-    return KeyExchangeAlgorithm.DIFFIE_HELLMAN;
+    return null; // XXX can't support this.
   }
 
   public int length ()

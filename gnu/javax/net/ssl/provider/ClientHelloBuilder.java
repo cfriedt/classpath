@@ -115,9 +115,14 @@ public class ClientHelloBuilder extends ClientHello implements Builder
   
   public void setExtensions(ByteBuffer extensions)
   {
-    extensions = (ByteBuffer)
-      extensions.duplicate().limit(extensions.position() + extensionsLength());
-    ((ByteBuffer) buffer.duplicate().position(getExtensionsOffset() + 2)).put(extensions);
+    int elen = extensions.getShort(0) & 0xFFFF;
+    setExtensionsLength(elen);
+    ((ByteBuffer) buffer.duplicate().position(getExtensionsOffset())).put(extensions);
+  }
+  
+  public void setDisableExtensions(boolean disableExtensions)
+  {
+    this.disableExtensions = disableExtensions;
   }
   
   public void ensureCapacity(final int length)

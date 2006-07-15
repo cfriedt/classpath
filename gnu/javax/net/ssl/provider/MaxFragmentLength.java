@@ -2,6 +2,8 @@ package gnu.javax.net.ssl.provider;
 
 import gnu.javax.net.ssl.provider.Extension.Value;
 
+import java.nio.ByteBuffer;
+
 /**
  * Extension value 
  * @author csm
@@ -22,12 +24,17 @@ public class MaxFragmentLength extends Value
     this.length = length;
   }
   
+  public ByteBuffer buffer()
+  {
+    return ByteBuffer.allocate(1).put(0, (byte) value);
+  }
+  
   public int length()
   {
     return 1;
   }
 
-  public int getValue ()
+  public int getValue()
   {
     return value;
   }

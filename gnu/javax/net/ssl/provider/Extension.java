@@ -55,20 +55,31 @@ import java.nio.ByteOrder;
  * 
  * @author csm@gnu.org
  */
-public final class Extension implements Constructed
+public final class Extension implements Builder, Constructed
 {
 
   // Fields.
   // -------------------------------------------------------------------------
 
-  private final ByteBuffer buffer;
+  private ByteBuffer buffer;
 
   // Constructor.
   // -------------------------------------------------------------------------
 
-  Extension(final ByteBuffer buffer)
+  public Extension(final ByteBuffer buffer)
   {
     this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
+  }
+  
+  public Extension(final Type type, final Value value)
+  {
+    ByteBuffer valueBuffer = value.buffer();
+    int length = 2 + 2 + valueBuffer.remaining();
+    buffer = ByteBuffer.allocate(length);
+    buffer.putShort((short) type.getValue());
+    buffer.putShort((short) valueBuffer.remaining());
+    buffer.put(valueBuffer);
+    buffer.rewind();
   }
 
   // Instance methods.
@@ -76,7 +87,12 @@ public final class Extension implements Constructed
 
   public int length ()
   {
-    return (buffer.getShort (2) & 0xFFFF) + 2;
+    return (buffer.getShort (2) & 0xFFFF) + 4;
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
   }
 
   public Type type()
@@ -224,7 +240,7 @@ public final class Extension implements Constructed
     }
   }
   
-  public static abstract class Value implements Constructed
+  public static abstract class Value implements Builder, Constructed
   {
   }
 }

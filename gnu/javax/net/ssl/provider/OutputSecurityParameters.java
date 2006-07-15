@@ -266,15 +266,6 @@ public class OutputSecurityParameters
           cipher.update(ByteBuffer.wrap(macValue), outfragment);
         if (pad != null)
           cipher.update(ByteBuffer.wrap(pad), outfragment);
-        try
-          {
-            cipher.doFinal(ByteBuffer.wrap(new byte[0]), outfragment);
-          }
-        catch (BadPaddingException bpe)
-          {
-            // Should never happen; we are encrypting.
-            throw new Error("bad padding while encrypting", bpe);
-          }
       }
     else
       {
@@ -291,7 +282,7 @@ public class OutputSecurityParameters
         if (macValue != null)
           outfragment.put(macValue);
       }
-    
+      
     // Advance the output buffer's position.
     output.position(output.position() + outrecord.length() + 5);
     sequence++;

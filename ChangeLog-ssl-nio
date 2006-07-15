@@ -1,3 +1,148 @@
+2006-07-14  Casey Marshall  <csm@gnu.org>
+
+	* gnu/classpath/debug/Component.java (SSL_DELEGATED_TASK): new
+	constant.
+	* gnu/classpath/debug/SystemLogger.java (getSystemLogger): new
+	class method.
+	* gnu/javax/crypto/RSACipherImpl.java (logger): make instance of
+	SystemLogger.
+	(doFinal): use `EME_PKCS1_V1_5' to pad/unpad.
+	* gnu/javax/net/ssl/AbstractSessionContext.java (getSession): new
+	method.
+	* gnu/javax/net/ssl/PreSharedKeyManager.java: new file.
+	* gnu/javax/net/ssl/PreSharedKeyManagerParameters.java: new file.
+	* gnu/javax/net/ssl/provider/AbstractHandshake.java: move
+	delegated task classes to the end.
+	(handleInput): don't stop processing current input if tasks are
+	scheduled.
+	(DHE_PSKGen): new class.
+	* gnu/javax/net/ssl/provider/CertificateStatusRequest.java
+	(buffer): make non-final.
+	(<init>): new "builder" constructor.
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/CertificateURL.java (buffer): make
+	non-final.
+	(<init>): new "builder" constructor.
+	(buffer): new method.
+	(URLAndOptionalHash): implement Builder.
+	(URLAndOptionalHash.<init>): set buffer order to BIG_ENDIAN.
+	(URLAndOptionalHash.<init>, URLAndOptionalHash.<init>): new
+	"builder" constructors.
+	(URLAndOptionalHash.buffer): new method.
+	* gnu/javax/net/ssl/provider/CipherSuite.java: replace
+	DIFFIE_HELLMAN with qualified algorithm.
+	(TLS_PSK_WITH_RC4_128_SHA, TLS_PSK_WITH_3DES_EDE_CBC_SHA,
+	TLS_PSK_WITH_AES_128_CBC_SHA, TLS_PSK_WITH_AES_256_CBC_SHA,
+	TLS_DHE_PSK_WITH_RC4_128_SHA, TLS_DHE_PSK_WITH_3DES_EDE_CBC_SHA,
+	TLS_DHE_PSK_WITH_AES_128_CBC_SHA,
+	TLS_DHE_PSK_WITH_AES_256_CBC_SHA,
+	TLS_RSA_PSK_WITH_RC4_128_SHA, TLS_RSA_PSK_WITH_3DES_EDE_CBC_SHA,
+	TLS_RSA_PSK_WITH_AES_128_CBC_SHA,
+	TLS_RSA_PSK_WITH_AES_256_CBC_SHA): new constants.
+	* gnu/javax/net/ssl/provider/ClientDHE_PSKParameters.java: new
+	file.
+	* gnu/javax/net/ssl/provider/ClientHandshake.java
+	(maxFragmentLengthSent, truncatedHMacSent, sentVersion): new
+	fields.
+	(implHandleInput): handle hello extensions; handle PSK key
+	exchange.
+	(implHandleOutput): send extensions if configured; handle PSK key
+	exchange.
+	(enableExtensions, maxFragmentLength, truncatedHMac,
+	getPSKIdentity): new methods.
+	(RSAGen.implRun): use the protocol version we sent in the
+	generated secret, not the agreed version.
+	* gnu/javax/net/ssl/provider/ClientHello.java: remove unused
+	imports.
+	(disableExtensions): new field.
+	(length): use `disableExtensions' field.
+	(extensions): fix telling if there are extensions.
+	* gnu/javax/net/ssl/provider/ClientHelloBuilder.java
+	(setExtensions): fix.
+	(setDisableExtensions): new method.
+	* gnu/javax/net/ssl/provider/ClientKeyExchange.java
+	(exchangeKeys): handle PSK exchange.
+	* gnu/javax/net/ssl/provider/ClientPSKParameters.java: new file.
+	* gnu/javax/net/ssl/provider/ClientRSA_PSKParameters.java: new
+	file.
+	* gnu/javax/net/ssl/provider/EncryptedPreMasterSecret.java
+	(toString): include hexdump output.
+	* gnu/javax/net/ssl/provider/Extension.java: implement Builder.
+	(buffer): mark non-final.
+	(<init>): make public.
+	(<init>): new "builder" constructor.
+	(length): include length of the extension type.
+	(buffer): new method.
+	(Value): implement Builder.
+	* gnu/javax/net/ssl/provider/ExtensionList.java: implement
+	Builder.
+	(<init>): new "builder" constructor.
+	(get): fix.
+	(length): return total length, including length field.
+	* gnu/javax/net/ssl/provider/InputSecurityParameters.java
+	(decrypt): handle stream ciphers (with no padding) properly.
+	* gnu/javax/net/ssl/provider/Jessie.java (<init>): add JessiePSK
+	key manager factory.
+	* gnu/javax/net/ssl/provider/KeyExchangeAlgorithm.java
+	(DIFFIE_HELLMAN): removed.
+	(DH_DSS, DH_RSA, DH_anon, DHE_DSS, DHE_RSA, PSK, DHE_PSK,
+	RSA_PSK): new enum constants.
+	* gnu/javax/net/ssl/provider/MaxFragmentLength.java (buffer): new
+	method.
+	* gnu/javax/net/ssl/provider/OutputSecurityParameters.java
+	(encrypt): don't use `doFinal.'
+	* gnu/javax/net/ssl/provider/PreSharedKeyManagerFactoryImpl.java:
+	new file.
+	* gnu/javax/net/ssl/provider/SSLContextImpl.java (pskManager): new
+	field.
+	(engineInit): initialize PSK manager, if specified.
+	* gnu/javax/net/ssl/provider/SSLEngineImpl.java (unwrap): debug
+	logging; don't log warnings on closure alerts.
+	* gnu/javax/net/ssl/provider/SSLSocketImpl.java
+	(SocketOutputStream.write): throw an exception if the handshake
+	threw one in another thread; clear the output buffer after writing
+	the record.
+	(doHandshake): fix this; capture exceptions thrown here, for other
+	threads.
+	* gnu/javax/net/ssl/provider/ServerDHE_PSKParameters.java: new
+	file.
+	* gnu/javax/net/ssl/provider/ServerDHParams.java (algorithm): mark
+	deprecated (it's difficult to support this properly).
+	* gnu/javax/net/ssl/provider/ServerHandshake.java
+	(chooseSuites): select suites based on key exchange algorithm.
+	(implHandleInput): handle key exchange better; handle PSK
+	exchange.
+	(implHandleOutput): likewise.
+	(CertLoader.implRun): just use key exchange name directly.
+	(RSA_PSKExchange): new class.
+	* gnu/javax/net/ssl/provider/ServerKeyExchange.java (params):
+	handle PSK exchange algorithms.
+	(signature): likewise.
+	* gnu/javax/net/ssl/provider/ServerNameList.java
+	(buffer): make non-final.
+	(<init>): new "builder" constructor.
+	(buffer): new method.
+	(ServerName.buffer): make non-final.
+	(ServerName.<init>): new "builder" constructor.
+	(ServerName.length): return total length, including type and
+	length fields.
+	(ServerName.buffer): new method.
+	* gnu/javax/net/ssl/provider/ServerPSKParameters.java: new file.
+	* gnu/javax/net/ssl/provider/ServerRSA_PSKParameters.java: new
+	file.
+	* gnu/javax/net/ssl/provider/TruncatedHMAC.java (buffer): new
+	method.
+	* gnu/javax/net/ssl/provider/TrustedAuthorities.java (<init>): set
+	buffer order to BIG_ENDIAN.
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/UnresolvedExtensionValue.java
+	(buffer): new method.
+	* gnu/javax/net/ssl/provider/Util.java (wrapBuffer, wrapBuffer):
+	new methods.
+	(WrappedBuffer): new class.
+	* gnu/javax/net/ssl/provider/X509KeyManagerFactory.java
+	(getAliases): add RSA_PSK.
+
 2006-07-12  Casey Marshall  <csm@gnu.org>
 
 	* gnu/javax/security/auth/callback/CertificateCallback.java: new

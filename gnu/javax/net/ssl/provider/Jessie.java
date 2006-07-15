@@ -85,6 +85,7 @@ public class Jessie extends Provider
 
           put("KeyManagerFactory.JessieX509",   X509KeyManagerFactory.class.getName());
           put("TrustManagerFactory.JessieX509", X509TrustManagerFactory.class.getName());
+          put("KeyManagerFactory.JessiePSK",    PreSharedKeyManagerFactoryImpl.class.getName());
           //put("TrustManagerFactory.SRP",        SRPTrustManagerFactory.class.getName());
 
           put("Mac.SSLv3HMac-MD5", SSLv3HMacMD5Impl.class.getName());

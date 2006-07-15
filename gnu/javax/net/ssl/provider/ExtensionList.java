@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
@@ -17,7 +18,7 @@ import java.util.NoSuchElementException;
  * 
  * @author csm
  */
-public class ExtensionList implements Iterable<Extension>
+public class ExtensionList implements Builder, Iterable<Extension>
 {
   private final ByteBuffer buffer;
   private int modCount;
@@ -26,6 +27,23 @@ public class ExtensionList implements Iterable<Extension>
   {
     this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     modCount = 0;
+  }
+  
+  public ExtensionList(List<Extension> extensions)
+  {
+    int length = 2;
+    for (Extension extension : extensions)
+      length += extension.length();
+    buffer = ByteBuffer.allocate(length);
+    buffer.putShort((short) (length - 2));
+    for (Extension extension : extensions)
+      buffer.put(extension.buffer());
+    buffer.rewind();
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
   }
 
   public Extension get (final int index)
@@ -42,7 +60,8 @@ public class ExtensionList implements Iterable<Extension>
     if (n < index)
       throw new IndexOutOfBoundsException ("no elemenet at " + index);
     int el = buffer.getShort (i+2) & 0xFFFF;
-    return new Extension (((ByteBuffer) buffer.duplicate().position(i).limit(i+el+4)).slice());
+    ByteBuffer b = (ByteBuffer) buffer.duplicate().position(i).limit(i+el+4);
+    return new Extension(b.slice());
   }
   
   /**
@@ -72,7 +91,7 @@ public class ExtensionList implements Iterable<Extension>
    */
   public int length ()
   {
-    return buffer.getShort (0) & 0xFFFF;
+    return (buffer.getShort (0) & 0xFFFF) + 2;
   }
   
   /**
@@ -165,31 +184,31 @@ public class ExtensionList implements Iterable<Extension>
   
   public Iterator<Extension> iterator()
   {
-    return new ExtensionsIterator ();
+    return new ExtensionsIterator();
   }
 
-  public String toString ()
+  public String toString()
   {
     return toString (null);
   }
   
-  public String toString (final String prefix)
+  public String toString(final String prefix)
   {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    if (prefix != null) out.print (prefix);
-    out.println ("ExtensionList {");
-    if (prefix != null) out.print (prefix);
-    out.print ("  length = ");
-    out.print (length ());
-    out.println (";");
+    StringWriter str = new StringWriter();
+    PrintWriter out = new PrintWriter(str);
+    if (prefix != null) out.print(prefix);
+    out.println("ExtensionList {");
+    if (prefix != null) out.print(prefix);
+    out.print("  length = ");
+    out.print(length());
+    out.println(";");
     String subprefix = "  ";
     if (prefix != null)
       subprefix = prefix + subprefix;
     for (Extension e : this)
-      out.println (e.toString(subprefix));
-    if (prefix != null) out.print (prefix);
-    out.println ("};");
+      out.println(e.toString(subprefix));
+    if (prefix != null) out.print(prefix);
+    out.print("};");
     return str.toString();
   }
 

@@ -333,7 +333,8 @@ public class X509KeyManagerFactory extends KeyManagerFactorySpi
           if (keyType.equalsIgnoreCase("RSA")
               || keyType.equalsIgnoreCase("DHE_RSA")
               || keyType.equalsIgnoreCase("SRP_RSA")
-              || keyType.equalsIgnoreCase("rsa_sign"))
+              || keyType.equalsIgnoreCase("rsa_sign")
+              || keyType.equalsIgnoreCase("RSA_PSK"))
             {
               if (!(privKey instanceof RSAPrivateKey) ||
                   !(pubKey instanceof RSAPublicKey))

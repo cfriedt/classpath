@@ -1,4 +1,4 @@
-/* TruncatedHMAC.java --
+/* PreSharedKeyManagerParameters.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -33,44 +33,51 @@ module.  An independent module is a module which is not derived from
 or based on this library.  If you modify this library, you may extend
 this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.  */
+exception statement from your version. */
 
 
-package gnu.javax.net.ssl.provider;
+package gnu.javax.net.ssl;
 
-import gnu.javax.net.ssl.provider.Extension.Value;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 
-import java.nio.ByteBuffer;
+import javax.crypto.SecretKey;
+import javax.net.ssl.ManagerFactoryParameters;
 
 /**
- * The value type for the {@link Extension.Type#TRUNCATED_HMAC} extension.
- * This extension has an empty value; this class is thusly empty.
- * 
- * @author csm
+ * @author Casey Marshall (csm@gnu.org)
  */
-public class TruncatedHMAC extends Value
+public class PreSharedKeyManagerParameters
+  implements ManagerFactoryParameters
 {
-
-  public int length()
-  {
-    return 0;
-  }
+  private final LinkedHashMap<String, SecretKey> keys;
   
-  public ByteBuffer buffer()
+  public PreSharedKeyManagerParameters()
   {
-    return ByteBuffer.wrap(new byte[0]);
-  }
-  
-  public String toString()
-  {
-    return toString(null);
+    keys = new LinkedHashMap<String, SecretKey>();
   }
 
-  public String toString(String prefix)
+  public SecretKey getKey(String name)
   {
-    String s = "TruncatedHMAC;";
-    if (prefix != null)
-      s = prefix + s;
-    return s;
+    name.getClass();
+    return keys.get(name);
+  }
+  
+  public void putKey(String name, SecretKey key)
+  {
+    name.getClass();
+    key.getClass();
+    keys.put(name, key);
+  }
+  
+  public boolean removeKey(String name)
+  {
+    name.getClass();
+    return keys.remove(name) != null;
+  }
+  
+  public Iterator<String> identities()
+  {
+    return keys.keySet().iterator();
   }
 }

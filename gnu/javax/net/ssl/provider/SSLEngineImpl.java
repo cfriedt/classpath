@@ -566,38 +566,44 @@ public final class SSLEngineImpl extends SSLEngine
             insec = params;
             result = new SSLEngineResult (SSLEngineResult.Status.OK,
                                           handshakeStatus,
-                                          record.length() + 5, 0); // XXXX
+                                          record.length() + 5, 0);
           }
       }
     else if (type == ContentType.ALERT)
       {
         int len = 0;
-        if (alertBuffer.position () > 0)
+        if (alertBuffer.position() > 0)
           {
-            alertBuffer.put (msg.get ());
+            alertBuffer.put(msg.get());
             len = 1;
           }
-        len += msg.remaining () / 2;
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "processing alerts {0}",
+                      Util.wrapBuffer(msg));
+        len += msg.remaining() / 2;
         Alert[] alerts = new Alert[len];
         int i = 0;
-        if (alertBuffer.position () > 0)
+        if (alertBuffer.position() > 0)
           {
-            alertBuffer.flip ();
-            alerts[0] = new Alert (alertBuffer);
+            alertBuffer.flip();
+            alerts[0] = new Alert(alertBuffer);
             i++;
           }
         while (i < alerts.length)
           {
-            alerts[i++] = new Alert (msg.duplicate ());
-            msg.position (msg.position () + 2);
+            alerts[i++] = new Alert(msg.duplicate());
+            msg.position(msg.position() + 2);
           }
+        if (Debug.DEBUG)
+          logger.logv(Component.SSL_RECORD_LAYER, "alerts: {0}", alerts.length);
 
         for (i = 0; i < alerts.length; i++)
           {
-            if (alerts[i].level () == Alert.Level.FATAL)
-              throw new AlertException (alerts[i]);
-            logger.log (java.util.logging.Level.WARNING,
-                        "received alert: {0}", alerts[i]);
+            if (alerts[i].level() == Alert.Level.FATAL)
+              throw new AlertException(alerts[i], false);
+            if (alerts[i].description() != Alert.Description.CLOSE_NOTIFY)
+              logger.log(java.util.logging.Level.WARNING,
+                         "received alert: {0}", alerts[i]);
             if (alerts[i].description() == Alert.Description.CLOSE_NOTIFY)
               inClosed = true;
           }

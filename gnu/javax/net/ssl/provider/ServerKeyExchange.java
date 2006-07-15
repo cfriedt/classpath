@@ -94,14 +94,22 @@ public class ServerKeyExchange implements Handshake.Body
   public ServerKeyExchangeParams params ()
   {
     KeyExchangeAlgorithm kex = suite.keyExchangeAlgorithm ();
-    if (kex.equals (KeyExchangeAlgorithm.RSA))
-      return new ServerRSAParams (buffer.duplicate ());
-    else if (kex.equals (KeyExchangeAlgorithm.DIFFIE_HELLMAN))
-      return new ServerDHParams (buffer.duplicate ());
+    if (kex == KeyExchangeAlgorithm.RSA)
+      return new ServerRSAParams(buffer.duplicate ());
+    else if (kex == KeyExchangeAlgorithm.DHE_DSS
+             || kex == KeyExchangeAlgorithm.DHE_RSA
+             || kex == KeyExchangeAlgorithm.DH_anon)
+      return new ServerDHParams(buffer.duplicate());
 //     else if (kex.equals (KeyExchangeAlgorithm.SRP))
 //       return new ServerSRPParams (buffer.duplicate ());
-    else if (kex.equals (KeyExchangeAlgorithm.NONE))
+    else if (kex == KeyExchangeAlgorithm.NONE)
       return null;
+    else if (kex == KeyExchangeAlgorithm.DHE_PSK)
+      return new ServerDHE_PSKParameters(buffer.duplicate());
+    else if (kex == KeyExchangeAlgorithm.PSK)
+      return new ServerPSKParameters(buffer.duplicate());
+    else if (kex == KeyExchangeAlgorithm.RSA_PSK)
+      return new ServerPSKParameters(buffer.duplicate());
     throw new IllegalArgumentException ("unsupported key exchange: " + kex);
   }
 
@@ -112,10 +120,15 @@ public class ServerKeyExchange implements Handshake.Body
    */
   public Signature signature ()
   {
-    if (suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
+    KeyExchangeAlgorithm kex = suite.keyExchangeAlgorithm();
+    if (kex == KeyExchangeAlgorithm.NONE
+        || kex == KeyExchangeAlgorithm.DH_anon
+        || kex == KeyExchangeAlgorithm.DHE_PSK
+        || kex == KeyExchangeAlgorithm.PSK
+        || kex == KeyExchangeAlgorithm.RSA_PSK)
       return null;
-    ServerKeyExchangeParams params = params ();
-    ByteBuffer sigbuf = ((ByteBuffer) buffer.position (params.length ())).slice ();
+    ServerKeyExchangeParams params = params();
+    ByteBuffer sigbuf = ((ByteBuffer) buffer.position(params.length ())).slice ();
     return new Signature (sigbuf, suite.signatureAlgorithm ());
   }
 

@@ -38,8 +38,9 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import static gnu.javax.net.ssl.provider.ServerHandshake.State.*;
 import static gnu.javax.net.ssl.provider.Handshake.Type.*;
+import static gnu.javax.net.ssl.provider.KeyExchangeAlgorithm.*;
+import static gnu.javax.net.ssl.provider.ServerHandshake.State.*;
 
 import gnu.classpath.debug.Component;
 import gnu.java.security.action.GetSecurityPropertyAction;
@@ -54,6 +55,7 @@ import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.KeyManagementException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
@@ -73,9 +75,11 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -192,22 +196,44 @@ class ServerHandshake extends AbstractHandshake
     throws SSLException
   {
     // Figure out which SignatureAlgorithms we can support.
-    HashSet<SignatureAlgorithm> sigs = new HashSet<SignatureAlgorithm>(2);
+    HashSet<KeyExchangeAlgorithm> kexes = new HashSet<KeyExchangeAlgorithm>(8);
+
     X509ExtendedKeyManager km = engine.contextImpl.keyManager;
-    if (km.getServerAliases(SignatureAlgorithm.DSA.name(), null).length != 0)
-      sigs.add(SignatureAlgorithm.DSA);
-    if (km.getServerAliases(SignatureAlgorithm.RSA.name(), null).length != 0)
-      sigs.add(SignatureAlgorithm.RSA);
+    if (km != null)
+      {
+        if (km.getServerAliases(DH_DSS.name(), null).length > 0)
+          kexes.add(DH_DSS);
+        if (km.getServerAliases(DH_RSA.name(), null).length > 0)
+          kexes.add(DH_RSA);
+        if (km.getServerAliases(DHE_DSS.name(), null).length > 0)
+          kexes.add(DHE_DSS);
+        if (km.getServerAliases(DHE_RSA.name(), null).length > 0)
+          kexes.add(DHE_RSA);
+        if (km.getServerAliases(RSA.name(), null).length > 0)
+          kexes.add(RSA);
+        if (km.getServerAliases(RSA_PSK.name(), null).length > 0
+            && engine.contextImpl.pskManager != null)
+          kexes.add(RSA_PSK);
+      }
+    if (engine.contextImpl.pskManager != null)
+      {
+        kexes.add(DHE_PSK);
+        kexes.add(PSK);
+      }
     
     if (Debug.DEBUG)
-      logger.logv(Component.SSL_HANDSHAKE, "we have certs for signature algorithms {0}", sigs);
+      logger.logv(Component.SSL_HANDSHAKE,
+                  "we have certs for key exchange algorithms {0}", kexes);
     
-    HashSet<CipherSuite> suites = new HashSet<CipherSuite>(enabledSuites.length);
+    HashSet<CipherSuite> suites = new HashSet<CipherSuite>();
     for (String s : enabledSuites)
       {
         CipherSuite suite = CipherSuite.forName(s);
-        if (suite != null && sigs.contains(suite.signatureAlgorithm()))
-          suites.add (suite);
+        if (suite == null)
+          continue;
+        if (!kexes.contains(suite.keyExchangeAlgorithm()))
+          continue;
+        suites.add (suite);
       }
     for (CipherSuite suite : clientSuites)
       {
@@ -438,27 +464,130 @@ class ServerHandshake extends AbstractHandshake
               throw new SSLException("expecting client key exchange");
             ClientKeyExchange kex = (ClientKeyExchange) handshake.body();
             
-            if (engine.session().suite.keyExchangeAlgorithm() ==
-                KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+            KeyExchangeAlgorithm alg = engine.session().suite.keyExchangeAlgorithm();
+            switch (alg)
               {
-                ClientDiffieHellmanPublic pub = (ClientDiffieHellmanPublic)
-                  kex.exchangeKeys();
-                DHPublicKey myKey = (DHPublicKey) dhPair.getPublic();
-                DHPublicKey clientKey =
-                  new GnuDHPublicKey(null, myKey.getParams().getP(),
-                                     myKey.getParams().getG(),
-                                     pub.publicValue());
-                keyExchangeTask = new DHPhase(clientKey);
-                tasks.add(keyExchangeTask);
-              }
+                case DHE_DSS:
+                case DHE_RSA:
+                case DH_anon:
+                  {
+                    ClientDiffieHellmanPublic pub = (ClientDiffieHellmanPublic)
+                      kex.exchangeKeys();
+                    DHPublicKey myKey = (DHPublicKey) dhPair.getPublic();
+                    DHPublicKey clientKey =
+                      new GnuDHPublicKey(null, myKey.getParams().getP(),
+                                         myKey.getParams().getG(),
+                                         pub.publicValue());
+                    keyExchangeTask = new DHPhase(clientKey);
+                    tasks.add(keyExchangeTask);
+                  }
+                  break;
 
-            if (engine.session().suite.keyExchangeAlgorithm() ==
-                KeyExchangeAlgorithm.RSA)
-              {
-                EncryptedPreMasterSecret secret = (EncryptedPreMasterSecret)
-                  kex.exchangeKeys();
-                keyExchangeTask = new RSAKeyExchange(secret.encryptedSecret());
-                tasks.add(keyExchangeTask);
+                case RSA:
+                  {
+                    EncryptedPreMasterSecret secret = (EncryptedPreMasterSecret)
+                      kex.exchangeKeys();
+                    keyExchangeTask = new RSAKeyExchange(secret.encryptedSecret());
+                    tasks.add(keyExchangeTask);
+                  }
+                  break;
+            
+                case PSK:
+                  {
+                    ClientPSKParameters params = (ClientPSKParameters)
+                      kex.exchangeKeys();
+                    SecretKey key = null;
+                    try
+                      {
+                        key = engine.contextImpl.pskManager.getKey(params.identity());
+                      }
+                    catch (KeyManagementException kme)
+                      {
+                        // Ignore; we hide the fact that a PSK identity was
+                        // not found.
+                      }
+                    if (key != null)
+                      {
+                        byte[] keyb = key.getEncoded();
+                        preMasterSecret = new byte[(2 * keyb.length) + 4];
+                        preMasterSecret[0] = (byte) (keyb.length >>> 8);
+                        preMasterSecret[1] = (byte)  keyb.length;
+                        preMasterSecret[keyb.length + 2]
+                          = (byte) (keyb.length >>> 8);
+                        preMasterSecret[keyb.length + 3]
+                          = (byte)  keyb.length;
+                        System.arraycopy(keyb, 0, preMasterSecret,
+                                         keyb.length + 4, keyb.length);
+                      }
+                    else
+                      {
+                        // Generate a random, fake secret.
+                        preMasterSecret = new byte[8];
+                        preMasterSecret[1] = 2;
+                        preMasterSecret[5] = 2;
+                        preMasterSecret[6] = (byte) engine.session().random().nextInt();
+                        preMasterSecret[7] = (byte) engine.session().random().nextInt();
+                      }
+                    
+                    generateMasterSecret(clientRandom, serverRandom,
+                                         engine.session());
+                    byte[][] keys = generateKeys(clientRandom, serverRandom,
+                                                 engine.session());
+                    setupSecurityParameters(keys, false, engine, compression);
+                  }
+                  break;
+                  
+                case DHE_PSK:
+                  {
+                    ClientDHE_PSKParameters params = (ClientDHE_PSKParameters)
+                      kex.exchangeKeys();
+                    DHPublicKey serverKey = (DHPublicKey) dhPair.getPublic();
+                    DHPublicKey clientKey =
+                      new GnuDHPublicKey(null, serverKey.getParams().getP(),
+                                         serverKey.getParams().getG(),
+                                         params.params().publicValue());
+                    SecretKey psk = null;
+                    try
+                      {
+                        psk = engine.contextImpl.pskManager.getKey(params.identity());
+                      }
+                    catch (KeyManagementException kme)
+                      {
+                      }
+                    if (psk == null)
+                      {
+                        byte[] fakeKey = new byte[16];
+                        engine.session().random().nextBytes(fakeKey);
+                        psk = new SecretKeySpec(fakeKey, "DHE_PSK");
+                      }
+                    keyExchangeTask = new DHE_PSKGen(clientKey, psk, false);
+                    tasks.add(keyExchangeTask);
+                  }
+                  break;
+                  
+                case RSA_PSK:
+                  {
+                    ClientRSA_PSKParameters params = (ClientRSA_PSKParameters)
+                      kex.exchangeKeys();
+                    SecretKey psk = null;
+                    try
+                      {
+                        psk = engine.contextImpl.pskManager.getKey(params.identity());
+                      }
+                    catch (KeyManagementException kme)
+                      {
+                      }
+                    if (psk == null)
+                      {
+                        byte[] fakeKey = new byte[16];
+                        engine.session().random().nextBytes(fakeKey);
+                        psk = new SecretKeySpec(fakeKey, "DHE_PSK");
+                      }
+                    keyExchangeTask =
+                      new RSA_PSKExchange(params.secret().encryptedSecret(), psk);
+                    tasks.add(keyExchangeTask);
+                  }
+                  break;
               }
             // XXX SRP
             
@@ -733,7 +862,7 @@ output_loop:
               fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
               outBuffer.position(outBuffer.position() + l);
 
-
+              CipherSuite cs = engine.session().suite;
               if (continuedSession)
                 {
                   byte[][] keys = generateKeys(clientRandom, serverRandom,
@@ -742,15 +871,27 @@ output_loop:
                   engine.changeCipherSpec();
                   state = WRITE_FINISHED;
                 }
-              else if (engine.session().suite.signatureAlgorithm()
-                       != SignatureAlgorithm.ANONYMOUS)
+              else if (cs.signatureAlgorithm() != SignatureAlgorithm.ANONYMOUS
+                       || cs.keyExchangeAlgorithm() == RSA_PSK)
                 {
                   certLoader = new CertLoader();
                   tasks.add(certLoader);
                   state = WRITE_CERTIFICATE;
+                  if (cs.keyExchangeAlgorithm() == DHE_DSS
+                      || cs.keyExchangeAlgorithm() == DHE_RSA)
+                    {
+                      genDH = new GenDH();
+                      tasks.add(genDH);
+                      state = WRITE_SERVER_KEY_EXCHANGE;
+                    }
                   break output_loop;
                 }
-              else if (engine.session().suite.isEphemeralDH())
+              else if (engine.session().suite.keyExchangeAlgorithm() == PSK)
+                {
+                  state = WRITE_SERVER_KEY_EXCHANGE;
+                }
+              else if (cs.keyExchangeAlgorithm() == DHE_PSK
+                       || cs.keyExchangeAlgorithm() == DH_anon)
                 {
                   genDH = new GenDH();
                   tasks.add(genDH);
@@ -808,9 +949,8 @@ output_loop:
               outBuffer.position(outBuffer.position() + l);
 
               CipherSuite s = engine.session().suite;
-              if (s.isEphemeralDH()
-                  || (s.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN
-                      && s.signatureAlgorithm() == SignatureAlgorithm.ANONYMOUS))
+              KeyExchangeAlgorithm kexalg = s.keyExchangeAlgorithm();
+              if (kexalg == DHE_DSS || kexalg == DHE_RSA)
                 {
                   genDH = new GenDH();
                   tasks.add(genDH);
@@ -839,7 +979,8 @@ output_loop:
               
               ByteBuffer paramBuffer = null;
               ByteBuffer sigBuffer = null;
-              if (kex == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+              if (kex == DHE_DSS || kex == DHE_RSA || kex == DH_anon
+                  || kex == DHE_PSK)
                 {
                   assert(genDH != null);
                   assert(genDH.hasRun());
@@ -852,6 +993,15 @@ output_loop:
                                     engine.session().random());
                   paramBuffer = genDH.paramsBuffer;
                   sigBuffer = genDH.sigBuffer;
+                  
+                  if (kex == DHE_PSK)
+                    {
+                      String identityHint
+                        = engine.contextImpl.pskManager.chooseIdentityHint();
+                      ServerDHE_PSKParameters psk =
+                        new ServerDHE_PSKParameters(identityHint, paramBuffer);
+                      paramBuffer = psk.buffer();
+                    }
                 }
               // XXX handle SRP
               
@@ -1102,54 +1252,16 @@ output_loop:
     
     public void implRun() throws SSLException
     {
-      String sigAlg = null;
-      switch (engine.session().suite.keyExchangeAlgorithm())
-        {
-          case NONE:
-            break;
-
-          case RSA:
-            sigAlg = "RSA";
-            break;
-
-          case DIFFIE_HELLMAN:
-            if (engine.session().suite.isEphemeralDH())
-              sigAlg = "DHE_";
-            else
-              sigAlg = "DH_";
-            switch (engine.session().suite.signatureAlgorithm())
-              {
-                case RSA:
-                  sigAlg += "RSA";
-                  break;
-
-                case DSA:
-                  sigAlg += "DSS";
-                  break;
-              }
-
-          case SRP:
-            switch (engine.session().suite.signatureAlgorithm())
-              {
-                case RSA:
-                  sigAlg = "SRP_RSA";
-                  break;
-
-                case DSA:
-                  sigAlg = "SRP_DSS";
-                  break;
-              }
-        }
+      KeyExchangeAlgorithm kexalg = engine.session().suite.keyExchangeAlgorithm();
       X509ExtendedKeyManager km = engine.contextImpl.keyManager;
       Principal[] issuers = null; // XXX use TrustedAuthorities extension.
-      keyAlias = km.chooseEngineServerAlias(sigAlg, issuers, engine);
+      keyAlias = km.chooseEngineServerAlias(kexalg.name(), issuers, engine);
       if (keyAlias == null)
         throw new SSLException("no certificates available");
       X509Certificate[] chain = km.getCertificateChain(keyAlias);
       engine.session().setLocalCertificates(chain);
       localCert = chain[0];
-      if (engine.session().suite.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN
-          && !engine.session().suite.isEphemeralDH())
+      if (kexalg == DH_DSS || kexalg == DH_RSA)
         dhPair = new KeyPair(localCert.getPublicKey(),
                              km.getPrivateKey(keyAlias));
     }
@@ -1208,6 +1320,40 @@ output_loop:
       Cipher rsa = Cipher.getInstance("RSA");
       rsa.init(Cipher.DECRYPT_MODE, localCert);
       preMasterSecret = rsa.doFinal(encryptedPreMasterSecret);
+      generateMasterSecret(clientRandom, serverRandom, engine.session());
+      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+      setupSecurityParameters(keys, false, engine, compression);
+    }
+  }
+  
+  class RSA_PSKExchange extends DelegatedTask
+  {
+    private final byte[] encryptedPreMasterSecret;
+    private final SecretKey psKey;
+    
+    RSA_PSKExchange(byte[] encryptedPreMasterSecret, SecretKey psKey)
+    {
+      this.encryptedPreMasterSecret = encryptedPreMasterSecret;
+      this.psKey = psKey;
+    }
+    
+    public @Override void implRun()
+      throws BadPaddingException, IllegalBlockSizeException, InvalidKeyException,
+             NoSuchAlgorithmException, NoSuchPaddingException, SSLException
+    {
+      Cipher rsa = Cipher.getInstance("RSA");
+      rsa.init(Cipher.DECRYPT_MODE, localCert);
+      byte[] rsaSecret = rsa.doFinal(encryptedPreMasterSecret);
+      byte[] psSecret = psKey.getEncoded();
+      preMasterSecret = new byte[rsaSecret.length + psSecret.length + 4];
+      preMasterSecret[0] = (byte) (rsaSecret.length >>> 8);
+      preMasterSecret[1] = (byte)  rsaSecret.length;
+      System.arraycopy(rsaSecret, 0, preMasterSecret, 2, rsaSecret.length);
+      preMasterSecret[rsaSecret.length + 2] = (byte) (psSecret.length >>> 8);
+      preMasterSecret[rsaSecret.length + 3] = (byte)  psSecret.length;
+      System.arraycopy(psSecret, 0, preMasterSecret, rsaSecret.length+4,
+                       psSecret.length);
+      
       generateMasterSecret(clientRandom, serverRandom, engine.session());
       byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
       setupSecurityParameters(keys, false, engine, compression);

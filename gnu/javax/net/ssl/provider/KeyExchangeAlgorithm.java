@@ -45,6 +45,13 @@ public enum KeyExchangeAlgorithm
 {
   NONE,
   RSA,
-  DIFFIE_HELLMAN,
-  SRP;
+  DH_DSS,
+  DH_RSA,
+  DH_anon,
+  DHE_DSS,
+  DHE_RSA,
+  SRP,
+  PSK,
+  DHE_PSK,
+  RSA_PSK;
 }

@@ -68,6 +68,7 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.IvParameterSpec;
@@ -210,7 +211,7 @@ public abstract class AbstractHandshake
     if (!pollHandshake(fragment))
       return HandshakeStatus.NEED_UNWRAP;
 
-    while (hasMessage() && status == HandshakeStatus.NEED_UNWRAP)
+    while (hasMessage() && status != HandshakeStatus.NEED_WRAP)
       {
         int pos = handshakeOffset;
         status = implHandleInput();
@@ -728,118 +729,6 @@ Certificate.signature.sha_hash
       }
   }
   
-  protected class DHPhase extends DelegatedTask
-  {
-    private final DHPublicKey key;
-    
-    protected DHPhase(DHPublicKey key)
-    {
-      this.key = key;
-    }
-
-    protected void implRun() throws InvalidKeyException, SSLException
-    {
-      keyAgreement.doPhase(key, true);
-      preMasterSecret = keyAgreement.generateSecret();
-      generateMasterSecret(clientRandom, serverRandom, engine.session());
-      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
-      setupSecurityParameters(keys, engine.getUseClientMode(), engine, compression);
-    }
-  }
-  
-  protected class CertVerifier extends DelegatedTask
-  {
-    private final boolean clientSide;
-    private final X509Certificate[] chain;
-    private boolean verified;
-
-    protected CertVerifier(boolean clientSide, X509Certificate[] chain)
-    {
-      this.clientSide = clientSide;
-      this.chain = chain;
-    }
-    
-    boolean verified()
-    {
-      return verified;
-    }
-    
-    protected void implRun()
-    {
-      X509TrustManager tm = engine.contextImpl.trustManager;
-      if (clientSide)
-        {
-          try
-            {
-              tm.checkServerTrusted(chain, null);
-              verified = true;
-            }
-          catch (CertificateException ce)
-            {
-              if (Debug.DEBUG)
-                logger.log(Component.SSL_DELEGATED_TASK, "cert verify", ce);
-              // For client connections, ask the user if the certificate is OK.
-              CallbackHandler verify = new DefaultCallbackHandler();
-              GetSecurityPropertyAction gspa
-                = new GetSecurityPropertyAction("jessie.certificate.handler");
-              String clazz = AccessController.doPrivileged(gspa);
-              try
-                {
-                  ClassLoader cl =
-                    AccessController.doPrivileged(new PrivilegedExceptionAction<ClassLoader>()
-                      {
-                        public ClassLoader run() throws Exception
-                        {
-                          return ClassLoader.getSystemClassLoader();
-                        }
-                      });
-                  verify = (CallbackHandler) cl.loadClass(clazz).newInstance();
-                }
-              catch (Exception x)
-                {
-                  // Ignore.
-                  if (Debug.DEBUG)
-                    logger.log(Component.SSL_DELEGATED_TASK,
-                               "callback handler loading", x);
-                }
-              // XXX Internationalize
-              CertificateCallback confirm =
-                new CertificateCallback(chain[0],
-                "The server's certificate could not be verified. There is no proof " +
-                "that this server is who it claims to be, or that their certificate " +
-                "is valid. Do you wish to continue connecting? ");
-
-              try
-                {
-                  verify.handle(new Callback[] { confirm });
-                  verified = confirm.getSelectedIndex() == ConfirmationCallback.YES;
-                }
-              catch (Exception x)
-                {
-                  if (Debug.DEBUG)
-                    logger.log(Component.SSL_DELEGATED_TASK,
-                               "callback handler exception", x);
-                  verified = false;
-                }
-            }
-        }
-      else
-        {
-          try
-            {
-              tm.checkClientTrusted(chain, null);
-            }
-          catch (CertificateException ce)
-            {
-              verified = false;
-            }
-        }
-      
-      if (verified)
-        engine.session().setPeerVerified(true);
-    }
-  }
-  
   protected void generateMasterSecret(Random clientRandom,
                                       Random serverRandom,
                                       SessionImpl session)
@@ -983,5 +872,153 @@ Certificate.signature.sha_hash
       {
         throw new SSLException(nspe);
       }
+  }
+  
+  protected class DHPhase extends DelegatedTask
+  {
+    private final DHPublicKey key;
+    
+    protected DHPhase(DHPublicKey key)
+    {
+      this.key = key;
+    }
+
+    protected void implRun() throws InvalidKeyException, SSLException
+    {
+      keyAgreement.doPhase(key, true);
+      preMasterSecret = keyAgreement.generateSecret();
+      generateMasterSecret(clientRandom, serverRandom, engine.session());
+      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+      setupSecurityParameters(keys, engine.getUseClientMode(), engine, compression);
+    }
+  }
+  
+  protected class CertVerifier extends DelegatedTask
+  {
+    private final boolean clientSide;
+    private final X509Certificate[] chain;
+    private boolean verified;
+
+    protected CertVerifier(boolean clientSide, X509Certificate[] chain)
+    {
+      this.clientSide = clientSide;
+      this.chain = chain;
+    }
+    
+    boolean verified()
+    {
+      return verified;
+    }
+    
+    protected void implRun()
+    {
+      X509TrustManager tm = engine.contextImpl.trustManager;
+      if (clientSide)
+        {
+          try
+            {
+              tm.checkServerTrusted(chain, null);
+              verified = true;
+            }
+          catch (CertificateException ce)
+            {
+              if (Debug.DEBUG)
+                logger.log(Component.SSL_DELEGATED_TASK, "cert verify", ce);
+              // For client connections, ask the user if the certificate is OK.
+              CallbackHandler verify = new DefaultCallbackHandler();
+              GetSecurityPropertyAction gspa
+                = new GetSecurityPropertyAction("jessie.certificate.handler");
+              String clazz = AccessController.doPrivileged(gspa);
+              try
+                {
+                  ClassLoader cl =
+                    AccessController.doPrivileged(new PrivilegedExceptionAction<ClassLoader>()
+                      {
+                        public ClassLoader run() throws Exception
+                        {
+                          return ClassLoader.getSystemClassLoader();
+                        }
+                      });
+                  verify = (CallbackHandler) cl.loadClass(clazz).newInstance();
+                }
+              catch (Exception x)
+                {
+                  // Ignore.
+                  if (Debug.DEBUG)
+                    logger.log(Component.SSL_DELEGATED_TASK,
+                               "callback handler loading", x);
+                }
+              // XXX Internationalize
+              CertificateCallback confirm =
+                new CertificateCallback(chain[0],
+                "The server's certificate could not be verified. There is no proof " +
+                "that this server is who it claims to be, or that their certificate " +
+                "is valid. Do you wish to continue connecting? ");
+
+              try
+                {
+                  verify.handle(new Callback[] { confirm });
+                  verified = confirm.getSelectedIndex() == ConfirmationCallback.YES;
+                }
+              catch (Exception x)
+                {
+                  if (Debug.DEBUG)
+                    logger.log(Component.SSL_DELEGATED_TASK,
+                               "callback handler exception", x);
+                  verified = false;
+                }
+            }
+        }
+      else
+        {
+          try
+            {
+              tm.checkClientTrusted(chain, null);
+            }
+          catch (CertificateException ce)
+            {
+              verified = false;
+            }
+        }
+      
+      if (verified)
+        engine.session().setPeerVerified(true);
+    }
+  }
+  
+  protected class DHE_PSKGen extends DelegatedTask
+  {
+    private final DHPublicKey dhKey;
+    private final SecretKey psKey;
+    private final boolean isClient;
+    
+    protected DHE_PSKGen(DHPublicKey dhKey, SecretKey psKey, boolean isClient)
+    {
+      this.dhKey = dhKey;
+      this.psKey = psKey;
+      this.isClient = isClient;
+    }
+
+    /* (non-Javadoc)
+     * @see gnu.javax.net.ssl.provider.DelegatedTask#implRun()
+     */
+    @Override protected void implRun() throws Throwable
+    {
+      keyAgreement.doPhase(dhKey, true);
+      byte[] dhSecret = keyAgreement.generateSecret();
+      byte[] psSecret = psKey.getEncoded();
+      preMasterSecret = new byte[dhSecret.length + psSecret.length + 4];
+      preMasterSecret[0] = (byte) (dhSecret.length >>> 8);
+      preMasterSecret[1] = (byte)  dhSecret.length;
+      System.arraycopy(dhSecret, 0, preMasterSecret, 2, dhSecret.length);
+      preMasterSecret[dhSecret.length + 2] = (byte) (psSecret.length >>> 8);
+      preMasterSecret[dhSecret.length + 3] = (byte)  psSecret.length;
+      System.arraycopy(psSecret, 0, preMasterSecret, dhSecret.length + 4,
+                       psSecret.length);
+      
+      generateMasterSecret(clientRandom, serverRandom, engine.session());
+      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+      setupSecurityParameters(keys, isClient, engine, compression);
+    }
   }
 }

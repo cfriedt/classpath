@@ -133,16 +133,16 @@ public final class EncryptedPreMasterSecret extends ExchangeKeys implements Buil
 
   public String toString (final String prefix)
   {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    if (prefix != null) out.print (prefix);
-    out.println ("struct {");
-    if (prefix != null) out.print (prefix);
-    out.print ("  pre_master_secret = ");
-    out.print (Util.toHexString (encryptedSecret (), ':'));
-    out.println (';');
-    if (prefix != null) out.print (prefix);
-    out.print ("} EncryptedPreMasterSecret;");
-    return str.toString ();
+    StringWriter str = new StringWriter();
+    PrintWriter out = new PrintWriter(str);
+    if (prefix != null) out.print(prefix);
+    out.println("struct {");
+    if (prefix != null) out.print(prefix);
+    out.println("  pre_master_secret = ");
+    out.print(Util.hexDump(encryptedSecret(), prefix != null ? prefix + "    "
+                                                             : "    "));
+    if (prefix != null) out.print(prefix);
+    out.print("} EncryptedPreMasterSecret;");
+    return str.toString();
   }
 }

@@ -1,3 +1,41 @@
+/* ServerNameList.java --
+   Copyright (C) 2006  Free Software Foundation, Inc.
+
+This file is a part of GNU Classpath.
+
+GNU Classpath is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+GNU Classpath is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Classpath; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301
+USA
+
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version.  */
+
+
 package gnu.javax.net.ssl.provider;
 
 import gnu.javax.net.ssl.provider.Extension.Value;
@@ -7,7 +45,11 @@ import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
@@ -39,16 +81,33 @@ struct {
  */
 public class ServerNameList extends Value implements Iterable<ServerNameList.ServerName>
 {
-  private final ByteBuffer buffer;
+  private ByteBuffer buffer;
   
   public ServerNameList (final ByteBuffer buffer)
   {
     this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
+  
+  public ServerNameList(List<ServerName> names)
+  {
+    int length = 2;
+    for (ServerName name : names)
+      length += name.length();
+    buffer = ByteBuffer.allocate(length);
+    buffer.putShort((short) (length - 2));
+    for (ServerName name : names)
+      buffer.put(name.buffer());
+    buffer.rewind();
+  }
 
   public int length()
   {
     return (buffer.getShort(0) & 0xFFFF) + 2;
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
   }
   
   public int size()
@@ -153,16 +212,42 @@ public class ServerNameList extends Value implements Iterable<ServerNameList.Ser
 
   public static class ServerName implements Constructed
   {
-    private final ByteBuffer buffer;
+    private ByteBuffer buffer;
     
     public ServerName(final ByteBuffer buffer)
     {
       this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
     }
     
+    public ServerName(NameType type, String name)
+    {
+      CharsetEncoder utf8 = Charset.forName("UTF-8").newEncoder();
+      ByteBuffer nameBuf = null;
+      try
+        {
+          nameBuf = utf8.encode(CharBuffer.wrap(name));
+        }
+      catch (CharacterCodingException cce)
+        {
+          // We don't expect this to happen; it's UTF-8.
+          throw new IllegalArgumentException(cce);
+        }
+      int length = 3 + nameBuf.remaining();
+      buffer = ByteBuffer.allocate(length);
+      buffer.put((byte) type.getValue());
+      buffer.putShort((short) (length - 3));
+      buffer.put(nameBuf);
+      buffer.rewind();
+    }
+    
     public int length()
     {
-      return buffer.getShort(1) & 0xFFFF;
+      return (buffer.getShort(1) & 0xFFFF) + 3;
+    }
+    
+    public ByteBuffer buffer()
+    {
+      return (ByteBuffer) buffer.duplicate().limit(length());
     }
 
     public NameType type()

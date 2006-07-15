@@ -1,4 +1,4 @@
-/* TruncatedHMAC.java --
+/* ServerRSA_PSKParameters.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -33,44 +33,30 @@ module.  An independent module is a module which is not derived from
 or based on this library.  If you modify this library, you may extend
 this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.  */
+exception statement from your version. */
 
 
 package gnu.javax.net.ssl.provider;
 
-import gnu.javax.net.ssl.provider.Extension.Value;
-
 import java.nio.ByteBuffer;
 
 /**
- * The value type for the {@link Extension.Type#TRUNCATED_HMAC} extension.
- * This extension has an empty value; this class is thusly empty.
- * 
- * @author csm
+ * @author Casey Marshall (csm@gnu.org)
  */
-public class TruncatedHMAC extends Value
+public class ServerRSA_PSKParameters extends ServerPSKParameters
 {
-
-  public int length()
+  public ServerRSA_PSKParameters(ByteBuffer buffer)
   {
-    return 0;
-  }
-  
-  public ByteBuffer buffer()
-  {
-    return ByteBuffer.wrap(new byte[0]);
-  }
-  
-  public String toString()
-  {
-    return toString(null);
+    super(buffer);
   }
 
-  public String toString(String prefix)
+  public ServerRSA_PSKParameters(String identityHint)
   {
-    String s = "TruncatedHMAC;";
-    if (prefix != null)
-      s = prefix + s;
-    return s;
+    super(identityHint);
+  }
+
+  public @Override KeyExchangeAlgorithm algorithm()
+  {
+    return KeyExchangeAlgorithm.RSA_PSK;
   }
 }

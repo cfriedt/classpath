@@ -42,6 +42,8 @@ import gnu.java.security.Requires;
 
 import gnu.javax.net.ssl.provider.SimpleSessionContext;
 
+import java.util.Enumeration;
+
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPermission;
 import javax.net.ssl.SSLSession;
@@ -180,6 +182,33 @@ public abstract class AbstractSessionContext implements SSLSessionContext
         return null;
       }
     return s;
+  }
+  
+  public final SSLSession getSession(String host, int port)
+  {
+    for (Enumeration e = getIds(); e.hasMoreElements(); )
+      {
+        byte[] id = (byte[]) e.nextElement();
+        SSLSession s = getSession(id);
+        if (s == null) // session expired.
+          continue;
+        String host2 = s.getPeerHost();
+        if (host == null)
+          {
+            if (host2 != null)
+              continue;
+          }
+        else if (!host.equals(host2))
+          continue;
+        int port2 = s.getPeerPort();
+        if (port != port2)
+          continue;
+        
+        // Else, a match.
+        return s;
+      }
+    
+    return null;
   }
   
   /**

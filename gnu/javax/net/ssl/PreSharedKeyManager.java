@@ -1,4 +1,4 @@
-/* TruncatedHMAC.java --
+/* PreSharedKeyManager.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -33,44 +33,22 @@ module.  An independent module is a module which is not derived from
 or based on this library.  If you modify this library, you may extend
 this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.  */
+exception statement from your version. */
 
 
-package gnu.javax.net.ssl.provider;
+package gnu.javax.net.ssl;
 
-import gnu.javax.net.ssl.provider.Extension.Value;
+import java.security.KeyManagementException;
 
-import java.nio.ByteBuffer;
+import javax.crypto.SecretKey;
+import javax.net.ssl.KeyManager;
 
 /**
- * The value type for the {@link Extension.Type#TRUNCATED_HMAC} extension.
- * This extension has an empty value; this class is thusly empty.
- * 
- * @author csm
+ * @author Casey Marshall (csm@gnu.org)
  */
-public class TruncatedHMAC extends Value
+public interface PreSharedKeyManager extends KeyManager
 {
-
-  public int length()
-  {
-    return 0;
-  }
+  SecretKey getKey(String name) throws KeyManagementException;
   
-  public ByteBuffer buffer()
-  {
-    return ByteBuffer.wrap(new byte[0]);
-  }
-  
-  public String toString()
-  {
-    return toString(null);
-  }
-
-  public String toString(String prefix)
-  {
-    String s = "TruncatedHMAC;";
-    if (prefix != null)
-      s = prefix + s;
-    return s;
-  }
+  String chooseIdentityHint();
 }

@@ -39,6 +39,7 @@ exception statement from your version. */
 package gnu.javax.net.ssl.provider;
 
 import static gnu.javax.net.ssl.provider.ClientHandshake.State.*;
+import static gnu.javax.net.ssl.provider.KeyExchangeAlgorithm.*;
 
 import gnu.classpath.debug.Component;
 import gnu.java.security.action.GetSecurityPropertyAction;
@@ -48,6 +49,8 @@ import gnu.javax.net.ssl.Session;
 import gnu.javax.net.ssl.provider.Alert.Description;
 import gnu.javax.net.ssl.provider.Alert.Level;
 import gnu.javax.net.ssl.provider.CertificateRequest.ClientCertificateType;
+import gnu.javax.net.ssl.provider.ServerNameList.NameType;
+import gnu.javax.net.ssl.provider.ServerNameList.ServerName;
 
 import java.nio.ByteBuffer;
 import java.security.AccessController;
@@ -61,7 +64,9 @@ import java.security.PrivateKey;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -125,6 +130,9 @@ public class ClientHandshake extends AbstractHandshake
   private KeyPair dhPair;
   private String keyAlias;
   private PrivateKey privateKey;
+  private MaxFragmentLength maxFragmentLengthSent;
+  private boolean truncatedHMacSent;
+  private ProtocolVersion sentVersion;
   
   // Delegated tasks.
   private CertVerifier certVerifier;
@@ -190,7 +198,31 @@ public class ClientHandshake extends AbstractHandshake
               ((AbstractSessionContext) engine.contextImpl
                   .engineGetClientSessionContext()).put(engine.session());
             }
-          
+          ExtensionList extensions = hello.extensions();
+          if (extensions != null)
+            {
+              for (Extension extension : extensions)
+                {
+                  Extension.Type type = extension.type();
+                  if (type == null)
+                    continue;
+                  switch (type)
+                    {
+                      case MAX_FRAGMENT_LENGTH:
+                        MaxFragmentLength mfl
+                          = (MaxFragmentLength) extension.value();
+                        if (maxFragmentLengthSent == mfl)
+                          engine.session().setApplicationBufferSize(mfl.maxLength());
+                        break;
+
+                      case TRUNCATED_HMAC:
+                        if (truncatedHMacSent)
+                          engine.session().setTruncatedMac(true);
+                        break;
+                    }
+                }
+            }
+
           if (continuedSession)
             {
               byte[][] keys = generateKeys(clientRandom, serverRandom,
@@ -253,16 +285,16 @@ public class ClientHandshake extends AbstractHandshake
         case READ_SERVER_KEY_EXCHANGE:
         {
           CipherSuite s = engine.session().suite;
+          KeyExchangeAlgorithm kexalg = s.keyExchangeAlgorithm();
           // XXX also SRP.
-          if (!s.isEphemeralDH() &&
-              !(s.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN
-                && s.signatureAlgorithm() == SignatureAlgorithm.ANONYMOUS))
+          if (kexalg != DHE_DSS && kexalg != DHE_RSA && kexalg != DH_anon
+              && kexalg != DHE_PSK && kexalg != PSK && kexalg != RSA_PSK)
             throw new AlertException(new Alert(Level.FATAL,
                                                Description.UNEXPECTED_MESSAGE));
 
           ServerKeyExchange skex = (ServerKeyExchange) handshake.body();
           ByteBuffer paramsBuffer = null;
-          if (s.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+          if (kexalg == DHE_DSS || kexalg == DHE_RSA || kexalg == DH_anon)
             {
               ServerDHParams dhParams = (ServerDHParams) skex.params();
               ByteBuffer b = dhParams.buffer();
@@ -277,7 +309,7 @@ public class ClientHandshake extends AbstractHandshake
               tasks.add(paramsVerifier);
             }
           
-          if (s.keyExchangeAlgorithm() == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+          if (kexalg == DHE_DSS || kexalg == DHE_RSA || kexalg == DH_anon)
             {
               ServerDHParams dhParams = (ServerDHParams) skex.params();
               DHPublicKey serverKey = new GnuDHPublicKey(null,
@@ -455,7 +487,8 @@ outer_loop:
                 sid = continued.id();
               
               hello.setSessionId(sid.id());
-              hello.setVersion(chooseVersion());
+              sentVersion = chooseVersion();
+              hello.setVersion(sentVersion);
               hello.setCipherSuites(getSuites());
               hello.setCompressionMethods(getCompressionMethods());
               Random r = hello.random();
@@ -464,8 +497,44 @@ outer_loop:
               engine.session().random().nextBytes(nonce);
               r.setRandomBytes(nonce);
               clientRandom = r.copy();
-              // XXX extensions?
+              if (enableExtensions())
+                {
+                  List<Extension> extensions = new LinkedList<Extension>();
+                  MaxFragmentLength fraglen = maxFragmentLength();
+                  if (fraglen != null)
+                    {
+                      extensions.add(new Extension(Extension.Type.MAX_FRAGMENT_LENGTH,
+                                                   fraglen));
+                      maxFragmentLengthSent = fraglen;
+                    }
+
+                  String host = engine.getPeerHost();
+                  if (host != null)
+                    {
+                      ServerName name
+                        = new ServerName(NameType.HOST_NAME, host);
+                      ServerNameList names
+                        = new ServerNameList(Collections.singletonList(name));
+                      extensions.add(new Extension(Extension.Type.SERVER_NAME,
+                                                   names));
+                    }
+                  
+                  if (truncatedHMac())
+                    {
+                      extensions.add(new Extension(Extension.Type.TRUNCATED_HMAC,
+                                                   new TruncatedHMAC()));
+                      truncatedHMacSent = true;
+                    }
+
+                  ExtensionList elist = new ExtensionList(extensions);
+                  hello.setExtensions(elist.buffer());
+                }
+              else
+                hello.setDisableExtensions(true);
               
+              if (Debug.DEBUG)
+                logger.logv(Component.SSL_HANDSHAKE, "{0}", hello);
+
               fragment.putInt((Handshake.Type.CLIENT_HELLO.getValue() << 24)
                               | (hello.length() & 0xFFFFFF));
               outBuffer = hello.buffer();
@@ -517,7 +586,8 @@ outer_loop:
               ClientKeyExchangeBuilder ckex
                 = new ClientKeyExchangeBuilder(engine.session().suite,
                                                engine.session().version);
-              if (kea == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
+              if (kea == DHE_DSS || kea == DHE_RSA || kea == DH_anon
+                  || kea == DH_DSS || kea == DH_RSA)
                 {
                   assert(dhPair != null);
                   DHPublicKey pubkey = (DHPublicKey) dhPair.getPublic();
@@ -525,7 +595,7 @@ outer_loop:
                     = new ClientDiffieHellmanPublic(pubkey.getY());
                   ckex.setExchangeKeys(pub.buffer());
                 }
-              if (kea == KeyExchangeAlgorithm.RSA)
+              if (kea == RSA || kea == RSA_PSK)
                 {
                   assert(keyExchange instanceof RSAGen);
                   assert(keyExchange.hasRun());
@@ -536,7 +606,44 @@ outer_loop:
                   EncryptedPreMasterSecret epms
                     = new EncryptedPreMasterSecret(((RSAGen) keyExchange).encryptedSecret(),
                                                    engine.session().version);
-                  ckex.setExchangeKeys(epms.buffer());
+                  if (kea == RSA)
+                    ckex.setExchangeKeys(epms.buffer());
+                  else
+                    {
+                      String identity = getPSKIdentity();
+                      if (identity == null)
+                        throw new SSLException("no pre-shared-key identity;"
+                                               + " set the security property"
+                                               + " \"jessie.client.psk.identity\"");
+                      ClientRSA_PSKParameters params =
+                        new ClientRSA_PSKParameters(identity, epms,
+                                                    engine.session().version);
+                      ckex.setExchangeKeys(params.buffer());
+                    }
+                }
+              if (kea == DHE_PSK)
+                {
+                  assert(dhPair != null);
+                  String identity = getPSKIdentity();
+                  if (identity == null)
+                    throw new SSLException("no pre-shared key identity; set"
+                                           + " the security property"
+                                           + " \"jessie.client.psk.identity\"");
+                  DHPublicKey pubkey = (DHPublicKey) dhPair.getPublic();
+                  ClientDHE_PSKParameters params =
+                    new ClientDHE_PSKParameters(identity,
+                                                new ClientDiffieHellmanPublic(pubkey.getY()));
+                  ckex.setExchangeKeys(params.buffer());
+                }
+              if (kea == PSK)
+                {
+                  String identity = getPSKIdentity();
+                  if (identity == null)
+                    throw new SSLException("no pre-shared key identity; set"
+                                           + " the security property"
+                                           + " \"jessie.client.psk.identity\"");
+                  ClientPSKParameters params = new ClientPSKParameters(identity);
+                  ckex.setExchangeKeys(params.buffer());
                 }
               
               if (Debug.DEBUG)
@@ -697,6 +804,56 @@ outer_loop:
     return methods;
   }
   
+  private boolean enableExtensions()
+  {
+    GetSecurityPropertyAction action
+      = new GetSecurityPropertyAction("jessie.client.enable.extensions");
+    return Boolean.valueOf(AccessController.doPrivileged(action));
+  }
+  
+  private MaxFragmentLength maxFragmentLength()
+  {
+    GetSecurityPropertyAction action
+      = new GetSecurityPropertyAction("jessie.client.maxFragmentLength");
+    String s = AccessController.doPrivileged(action);
+    if (s != null)
+      {
+        try
+          {
+            int len = Integer.parseInt(s);
+            switch (len)
+              {
+                case 9:
+                case (1 <<  9): return MaxFragmentLength.LEN_2_9;
+                case 10:
+                case (1 << 10): return MaxFragmentLength.LEN_2_10;
+                case 11:
+                case (1 << 11): return MaxFragmentLength.LEN_2_11;
+                case 12:
+                case (1 << 12): return MaxFragmentLength.LEN_2_12;
+              }
+          }
+        catch (NumberFormatException nfe)
+          {
+          }
+      }
+    return null;
+  }
+  
+  private boolean truncatedHMac()
+  {
+    GetSecurityPropertyAction action
+      = new GetSecurityPropertyAction("jessie.client.truncatedHMac");
+    return Boolean.valueOf(AccessController.doPrivileged(action));
+  }
+  
+  private String getPSKIdentity()
+  {
+    GetSecurityPropertyAction action
+      = new GetSecurityPropertyAction("jessie.client.psk.identity");
+    return AccessController.doPrivileged(action);
+  }
+  
   // Delegated tasks.
   
   class ParamsVerifier extends DelegatedTask
@@ -832,10 +989,12 @@ outer_loop:
         }
       preMasterSecret = new byte[48];
       engine.session().random().nextBytes(preMasterSecret);
-      preMasterSecret[0] = (byte) engine.session().version.major();
-      preMasterSecret[1] = (byte) engine.session().version.minor();
+      preMasterSecret[0] = (byte) sentVersion.major();
+      preMasterSecret[1] = (byte) sentVersion.minor();
       Cipher rsa = Cipher.getInstance("RSA");
-      rsa.init(Cipher.ENCRYPT_MODE, engine.session().getPeerCertificates()[0]);
+      java.security.cert.Certificate cert
+        = engine.session().getPeerCertificates()[0];
+      rsa.init(Cipher.ENCRYPT_MODE, cert);
       encryptedPreMasterSecret = rsa.doFinal(preMasterSecret);
       
       // Generate our session keys, because we can.

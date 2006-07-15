@@ -67,6 +67,18 @@ public final class SystemLogger extends Logger
   }
 
   /**
+   * Fetch the system logger instance. The logger returned is meant for debug
+   * and diagnostic logging for Classpath internals.
+   *
+   * @return The system logger.
+   */
+  public static SystemLogger getSystemLogger()
+  {
+    // XXX Check some permission here?
+    return SYSTEM;
+  }
+  
+  /**
    * Keep only one instance of the system logger.
    */
   private SystemLogger()

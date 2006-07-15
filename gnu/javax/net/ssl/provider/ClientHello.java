@@ -38,24 +38,11 @@ exception statement from your version.  */
 
 package gnu.javax.net.ssl.provider;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
-import javax.net.ssl.SSLProtocolException;
 
 /**
  * A ClientHello handshake message.
@@ -87,6 +74,7 @@ public class ClientHello implements Handshake.Body
   protected static final int SESSID_OFFSET2 = SESSID_OFFSET + 1;
 
   protected ByteBuffer buffer;
+  protected boolean disableExtensions;
 
   // Constructor.
   // -------------------------------------------------------------------------
@@ -94,18 +82,19 @@ public class ClientHello implements Handshake.Body
   public ClientHello (final ByteBuffer buffer)
   {
     this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
+    disableExtensions = false;
   }
 
   // Instance methods.
   // -------------------------------------------------------------------------
 
-  public int length ()
+  public int length()
   {
     int len = SESSID_OFFSET2 + buffer.get(SESSID_OFFSET);
     len += (buffer.getShort(len) & 0xFFFF) + 2;
     len += (buffer.get(len) & 0xFF) + 1;
-    if (hasExtensions())
-      len += (buffer.get(len) & 0xFFFF) + 2;
+    if (!disableExtensions && len + 1 < buffer.capacity())
+      len += (buffer.getShort(len) & 0xFFFF) + 2;
     return len;
   }
 
@@ -164,22 +153,20 @@ public class ClientHello implements Handshake.Body
   public boolean hasExtensions()
   {
     int offset = getExtensionsOffset();
-    if (offset + 1 > buffer.limit())
-      return false;
-    return (buffer.getShort(offset) & 0xFFFF) == 0;
+    return (offset + 1 > buffer.capacity());
   }
 
   public ExtensionList extensions()
   {
     int offset = getExtensionsOffset ();
-    if (offset >= buffer.limit())
+    if (offset + 1 >= buffer.limit())
       return null;
     int len = buffer.getShort(offset) & 0xFFFF;
     if (len == 0)
       len = buffer.limit() - offset - 2;
-    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate ().position (offset)
-                       .limit (offset + len + 2)).slice ();
-    return new ExtensionList (ebuf);
+    ByteBuffer ebuf = ((ByteBuffer) buffer.duplicate().position(offset)
+                       .limit(offset + len + 2)).slice ();
+    return new ExtensionList(ebuf);
   }
   
   public int extensionsLength()

@@ -1,3 +1,41 @@
+/* CertificateURL.java --
+   Copyright (C) 2006  Free Software Foundation, Inc.
+
+This file is a part of GNU Classpath.
+
+GNU Classpath is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+GNU Classpath is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Classpath; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301
+USA
+
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version.  */
+
+
 package gnu.javax.net.ssl.provider;
 
 import gnu.javax.net.ssl.provider.Extension.Value;
@@ -5,7 +43,11 @@ import gnu.javax.net.ssl.provider.Extension.Value;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
@@ -41,16 +83,34 @@ opaque SHA1Hash[20];</pre>
  */
 public class CertificateURL extends Value implements Iterable<CertificateURL.URLAndOptionalHash>
 {
-  private final ByteBuffer buffer;
+  private ByteBuffer buffer;
   
   public CertificateURL(final ByteBuffer buffer)
   {
     this.buffer = buffer;
   }
   
+  public CertificateURL(CertChainType type, List<URLAndOptionalHash> urls)
+  {
+    int length = 3;
+    for (URLAndOptionalHash url : urls)
+      length += url.length();
+    buffer = ByteBuffer.allocate(length);
+    buffer.put((byte) type.getValue());
+    buffer.putShort((short) (length - 1));
+    for (URLAndOptionalHash url : urls)
+      buffer.put(url.buffer());
+    buffer.rewind();
+  }
+  
   public int length()
   {
     return 3 + (buffer.getShort(1) & 0xFFFF);
+  }
+  
+  public ByteBuffer buffer()
+  {
+    return (ByteBuffer) buffer.duplicate().limit(length());
   }
 
   public CertChainType type()
@@ -211,19 +271,47 @@ public class CertificateURL extends Value implements Iterable<CertificateURL.URL
     }
   }
   
-  public static class URLAndOptionalHash implements Constructed
+  public static class URLAndOptionalHash implements Builder, Constructed
   {
-    private final ByteBuffer buffer;
+    private ByteBuffer buffer;
     
     public URLAndOptionalHash (final ByteBuffer buffer)
     {
-      this.buffer = buffer;
+      this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
+    }
+    
+    public URLAndOptionalHash(String url)
+    {
+      this(url, null);
+    }
+    
+    public URLAndOptionalHash(String url, byte[] hash)
+    {
+      if (hash != null && hash.length < 20)
+        throw new IllegalArgumentException();
+      int length = 3 + url.length();
+      if (hash != null)
+        length += 20;
+      buffer = ByteBuffer.allocate(length);
+      buffer.putShort((short) url.length());
+      Charset cs = Charset.forName("US-ASCII");
+      CharsetEncoder ascii = cs.newEncoder();
+      ascii.encode(CharBuffer.wrap(url), buffer, true);
+      buffer.put((byte) (hash != null ? 1 : 0));
+      if (hash != null)
+        buffer.put(hash, 0, 20);
+      buffer.rewind();
     }
     
     public int length()
     {
       return ((buffer.getShort(0) & 0xFFFF)
               + (hashPresent() ? 23 : 3));
+    }
+    
+    public ByteBuffer buffer()
+    {
+      return (ByteBuffer) buffer.duplicate().limit(length());
     }
     
     public String url()

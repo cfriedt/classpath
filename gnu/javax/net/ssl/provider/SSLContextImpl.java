@@ -41,6 +41,7 @@ package gnu.javax.net.ssl.provider;
 import gnu.java.security.action.GetSecurityPropertyAction;
 import gnu.javax.net.ssl.AbstractSessionContext;
 import gnu.javax.net.ssl.NullManagerParameters;
+import gnu.javax.net.ssl.PreSharedKeyManager;
 import gnu.javax.net.ssl.SRPTrustManager;
 
 import java.security.AccessController;
@@ -75,6 +76,7 @@ public final class SSLContextImpl extends SSLContextSpi
   AbstractSessionContext serverContext;
   AbstractSessionContext clientContext;
   
+  PreSharedKeyManager pskManager;
   X509ExtendedKeyManager keyManager;
   X509TrustManager trustManager;
   SRPTrustManager srpTrustManager;
@@ -169,17 +171,16 @@ public final class SSLContextImpl extends SSLContextSpi
       {
         for (int i = 0; i < keyManagers.length; i++)
           {
-            if (keyManagers[i] instanceof X509ExtendedKeyManager)
-              {
-                keyManager = (X509ExtendedKeyManager) keyManagers[i];
-                break;
-              }
+            if ((keyManagers[i] instanceof X509ExtendedKeyManager)
+                && keyManager == null)
+              keyManager = (X509ExtendedKeyManager) keyManagers[i];
+            if (keyManagers[i] instanceof PreSharedKeyManagerFactoryImpl
+                && pskManager == null)
+              pskManager = (PreSharedKeyManager) keyManagers[i];
           }
       }
     if (keyManager == null)
-      {
-        keyManager = defaultKeyManager();
-      }
+      keyManager = defaultKeyManager();
     if (trustManagers != null)
       {
         for (int i = 0; i < trustManagers.length; i++)
@@ -187,16 +188,12 @@ public final class SSLContextImpl extends SSLContextSpi
             if (trustManagers[i] instanceof X509TrustManager)
               {
                 if (trustManager == null)
-                  {
-                    trustManager = (X509TrustManager) trustManagers[i];
-                  }
+                  trustManager = (X509TrustManager) trustManagers[i];
               }
             else if (trustManagers[i] instanceof SRPTrustManager)
               {
                 if (srpTrustManager == null)
-                  {
-                    srpTrustManager = (SRPTrustManager) trustManagers[i];
-                  }
+                  srpTrustManager = (SRPTrustManager) trustManagers[i];
               }
           }
       }

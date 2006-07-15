@@ -86,8 +86,16 @@ public class ClientKeyExchange implements Handshake.Body
     KeyExchangeAlgorithm alg = suite.keyExchangeAlgorithm();
     if (alg == KeyExchangeAlgorithm.RSA)
       return new EncryptedPreMasterSecret(buffer, version);
-    else if (alg == KeyExchangeAlgorithm.DIFFIE_HELLMAN)
-      return new ClientDiffieHellmanPublic(buffer);
+    else if (alg == KeyExchangeAlgorithm.DH_anon
+             || alg == KeyExchangeAlgorithm.DHE_DSS
+             || alg == KeyExchangeAlgorithm.DHE_RSA)
+      return new ClientDiffieHellmanPublic(buffer.duplicate());
+    else if (alg == KeyExchangeAlgorithm.DHE_PSK)
+      return new ClientDHE_PSKParameters(buffer.duplicate());
+    else if (alg == KeyExchangeAlgorithm.PSK)
+      return new ClientPSKParameters(buffer.duplicate());
+    else if (alg == KeyExchangeAlgorithm.RSA_PSK)
+      return new ClientRSA_PSKParameters(buffer.duplicate(), version);
     throw new IllegalArgumentException("unsupported key exchange");
   }
 
