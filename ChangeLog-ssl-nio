@@ -1,3 +1,54 @@
+2006-07-18  Casey Marshall  <csm@gnu.org>
+
+	* gnu/javax/net/ssl/provider/ClientHandshake.java
+	(implHandleInput, implHandleOutput): fix PSK exchange handling.
+	(ClientDHGen.full): new field.
+	(ClientDHGen.implRun): run full key exchange if `full' is true.
+	(ClientDHGen.serverKey): new method.
+	(RSAGen.full): new field.
+	(RSAGen.implRun): run full key exchange if `full' is true.
+	* gnu/javax/net/ssl/provider/ClientDHE_PSKParameters.java
+	(params): slice the buffer.
+	* gnu/javax/net/ssl/provider/ServerDHE_PSKParameters.java
+	(<init>): use `dhParams,' not `buffer.'
+	(params): slice the buffer.
+	* gnu/javax/net/ssl/provider/ServerKeyExchange.java (length):
+	handle case where parameters or signature are null.
+	* gnu/javax/net/ssl/provider/ClientRSA_PSKParameters.java
+	(version): removed.
+	(<init>): don't take version argument.
+	(<init>): don't take version argument; take buffer argument.
+	(secret): pass TLS_1 to EncryptedPreMasterSecret constructor.
+	* gnu/javax/net/ssl/provider/CipherSuite.java (isResolved): new
+	field.
+	(<init>, <init>): set `isResolved.'
+	(resolve): add PSK cipher suite detection.
+	(isResolved): new method.
+	* gnu/javax/net/ssl/provider/ServerHandshake.java (serverKey): new
+	field.
+	(chooseSuites): choose NONE key exchanges, too; omit unresolved
+	cipher suites.
+	(implHandleInput, implHandleOutput): fix PSK handling.
+	(checkKeyExchange): update for NONE and PSK exchanges.
+	(CertLoader.implRun): grab our private key here.
+	(RSAKeyExchange.implRun): initialize RSA cipher with our private
+	key.
+	(RSA_PSKExchange.implRun): likewise.
+	* gnu/javax/net/ssl/provider/ExchangeKeys.java (<init>): duplicate
+	and order the buffer; handle null argument.
+	* gnu/javax/net/ssl/provider/ClientKeyExchange.java
+	(exchangeKeys): handle NONE exchange.
+	* gnu/javax/net/ssl/provider/SSLContextImpl.java (engineInit):
+	handle PSK key managers properly.
+	* gnu/javax/net/ssl/provider/SSLEngineImpl.java (<init>): remove
+	debug logging.
+	* gnu/javax/net/ssl/provider/ServerDHParams.java (<init>):
+	duplicate and order the buffer.
+	* gnu/javax/crypto/RSACipherImpl.java (doFinal): allow short
+	input.
+	(rsaDecrypt): ensure there's a leading zero.
+	* gnu/javax/net/ssl/provider/EmptyExchangeKeys.java: new file.
+
 2006-07-14  Casey Marshall  <csm@gnu.org>
 
 	* gnu/java/net/protocol/http/HTTPConnection.java (getSocket):

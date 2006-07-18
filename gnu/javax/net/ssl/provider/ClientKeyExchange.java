@@ -95,8 +95,10 @@ public class ClientKeyExchange implements Handshake.Body
     else if (alg == KeyExchangeAlgorithm.PSK)
       return new ClientPSKParameters(buffer.duplicate());
     else if (alg == KeyExchangeAlgorithm.RSA_PSK)
-      return new ClientRSA_PSKParameters(buffer.duplicate(), version);
-    throw new IllegalArgumentException("unsupported key exchange");
+      return new ClientRSA_PSKParameters(buffer.duplicate());
+    else if (alg == KeyExchangeAlgorithm.NONE)
+      return new EmptyExchangeKeys();
+    throw new IllegalArgumentException("unsupported key exchange: " + alg);
   }
 
   public int length()

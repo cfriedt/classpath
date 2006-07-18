@@ -70,6 +70,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -140,6 +142,7 @@ class ServerHandshake extends AbstractHandshake
   private X509Certificate localCert = null;
   private boolean helloV2 = false;
   private KeyPair dhPair;
+  private PrivateKey serverKey;
   
   // Delegated tasks we use.
   private GenDH genDH;
@@ -198,6 +201,7 @@ class ServerHandshake extends AbstractHandshake
     // Figure out which SignatureAlgorithms we can support.
     HashSet<KeyExchangeAlgorithm> kexes = new HashSet<KeyExchangeAlgorithm>(8);
 
+    kexes.add(NONE);
     X509ExtendedKeyManager km = engine.contextImpl.keyManager;
     if (km != null)
       {
@@ -233,15 +237,20 @@ class ServerHandshake extends AbstractHandshake
           continue;
         if (!kexes.contains(suite.keyExchangeAlgorithm()))
           continue;
-        suites.add (suite);
+        suites.add(suite);
       }
     for (CipherSuite suite : clientSuites)
       {
-        if (suites.contains (suite))
-          return suite.resolve();
+        CipherSuite resolved = suite.resolve();
+        if (!resolved.isResolved())
+          continue;
+        if (suites.contains(resolved))
+          return resolved;
       }
-    throw new AlertException (new Alert (Alert.Level.FATAL,
-                                         Alert.Description.INSUFFICIENT_SECURITY));
+    
+    // We didn't find a match?
+    throw new AlertException(new Alert(Alert.Level.FATAL,
+                                       Alert.Description.INSUFFICIENT_SECURITY));
   }
 
   /**
@@ -496,44 +505,7 @@ class ServerHandshake extends AbstractHandshake
                   {
                     ClientPSKParameters params = (ClientPSKParameters)
                       kex.exchangeKeys();
-                    SecretKey key = null;
-                    try
-                      {
-                        key = engine.contextImpl.pskManager.getKey(params.identity());
-                      }
-                    catch (KeyManagementException kme)
-                      {
-                        // Ignore; we hide the fact that a PSK identity was
-                        // not found.
-                      }
-                    if (key != null)
-                      {
-                        byte[] keyb = key.getEncoded();
-                        preMasterSecret = new byte[(2 * keyb.length) + 4];
-                        preMasterSecret[0] = (byte) (keyb.length >>> 8);
-                        preMasterSecret[1] = (byte)  keyb.length;
-                        preMasterSecret[keyb.length + 2]
-                          = (byte) (keyb.length >>> 8);
-                        preMasterSecret[keyb.length + 3]
-                          = (byte)  keyb.length;
-                        System.arraycopy(keyb, 0, preMasterSecret,
-                                         keyb.length + 4, keyb.length);
-                      }
-                    else
-                      {
-                        // Generate a random, fake secret.
-                        preMasterSecret = new byte[8];
-                        preMasterSecret[1] = 2;
-                        preMasterSecret[5] = 2;
-                        preMasterSecret[6] = (byte) engine.session().random().nextInt();
-                        preMasterSecret[7] = (byte) engine.session().random().nextInt();
-                      }
-                    
-                    generateMasterSecret(clientRandom, serverRandom,
-                                         engine.session());
-                    byte[][] keys = generateKeys(clientRandom, serverRandom,
-                                                 engine.session());
-                    setupSecurityParameters(keys, false, engine, compression);
+                    generatePSKSecret(params.identity(), null, false);
                   }
                   break;
                   
@@ -553,12 +525,6 @@ class ServerHandshake extends AbstractHandshake
                       }
                     catch (KeyManagementException kme)
                       {
-                      }
-                    if (psk == null)
-                      {
-                        byte[] fakeKey = new byte[16];
-                        engine.session().random().nextBytes(fakeKey);
-                        psk = new SecretKeySpec(fakeKey, "DHE_PSK");
                       }
                     keyExchangeTask = new DHE_PSKGen(clientKey, psk, false);
                     tasks.add(keyExchangeTask);
@@ -586,6 +552,25 @@ class ServerHandshake extends AbstractHandshake
                     keyExchangeTask =
                       new RSA_PSKExchange(params.secret().encryptedSecret(), psk);
                     tasks.add(keyExchangeTask);
+                  }
+                  break;
+                  
+                case NONE:
+                  {
+                    Inflater inflater = null;
+                    Deflater deflater = null;
+                    if (compression == CompressionMethod.ZLIB)
+                      {
+                        inflater = new Inflater();
+                        deflater = new Deflater();
+                      }
+                    inParams = new InputSecurityParameters(null, null, inflater,
+                                                           engine.session(),
+                                                           engine.session().suite);
+                    outParams = new OutputSecurityParameters(null, null, deflater,
+                                                             engine.session(),
+                                                             engine.session().suite);
+                    engine.session().privateData.masterSecret = new byte[0];
                   }
                   break;
               }
@@ -863,6 +848,7 @@ output_loop:
               outBuffer.position(outBuffer.position() + l);
 
               CipherSuite cs = engine.session().suite;
+              KeyExchangeAlgorithm kex = cs.keyExchangeAlgorithm();
               if (continuedSession)
                 {
                   byte[][] keys = generateKeys(clientRandom, serverRandom,
@@ -871,27 +857,24 @@ output_loop:
                   engine.changeCipherSpec();
                   state = WRITE_FINISHED;
                 }
-              else if (cs.signatureAlgorithm() != SignatureAlgorithm.ANONYMOUS
-                       || cs.keyExchangeAlgorithm() == RSA_PSK)
+              else if (kex == DHE_DSS || kex == DHE_RSA || kex == RSA
+                       || kex == RSA_PSK)
                 {
                   certLoader = new CertLoader();
                   tasks.add(certLoader);
                   state = WRITE_CERTIFICATE;
-                  if (cs.keyExchangeAlgorithm() == DHE_DSS
-                      || cs.keyExchangeAlgorithm() == DHE_RSA)
+                  if (kex == DHE_DSS || kex == DHE_RSA)
                     {
                       genDH = new GenDH();
                       tasks.add(genDH);
-                      state = WRITE_SERVER_KEY_EXCHANGE;
                     }
                   break output_loop;
                 }
-              else if (engine.session().suite.keyExchangeAlgorithm() == PSK)
+              else if (kex == PSK)
                 {
                   state = WRITE_SERVER_KEY_EXCHANGE;
                 }
-              else if (cs.keyExchangeAlgorithm() == DHE_PSK
-                       || cs.keyExchangeAlgorithm() == DH_anon)
+              else if (kex == DHE_PSK || kex == DH_anon)
                 {
                   genDH = new GenDH();
                   tasks.add(genDH);
@@ -957,6 +940,8 @@ output_loop:
                   state = WRITE_SERVER_KEY_EXCHANGE;
                   break output_loop;
                 }
+              else if (kexalg == RSA_PSK)
+                state = WRITE_SERVER_KEY_EXCHANGE;
               else if (engine.getWantClientAuth() || engine.getNeedClientAuth())
                 {
                   state = WRITE_CERTIFICATE_REQUEST;
@@ -1003,23 +988,47 @@ output_loop:
                       paramBuffer = psk.buffer();
                     }
                 }
+              if (kex == RSA_PSK)
+                {
+                  String idHint = engine.contextImpl.pskManager.chooseIdentityHint();
+                  if (idHint != null)
+                    {
+                      ServerRSA_PSKParameters params
+                        = new ServerRSA_PSKParameters(idHint);
+                      paramBuffer = params.buffer();
+                    }
+                }
+              if (kex == PSK)
+                {
+                  String idHint = engine.contextImpl.pskManager.chooseIdentityHint();
+                  if (idHint != null)
+                    {
+                      ServerPSKParameters params
+                        = new ServerPSKParameters(idHint);
+                      paramBuffer = params.buffer();
+                    }
+                }
               // XXX handle SRP
               
-              ServerKeyExchangeBuilder ske
-                = new ServerKeyExchangeBuilder(engine.session().suite);
-              ske.setParams(paramBuffer);
-              if (sigBuffer != null)
-                ske.setSignature(sigBuffer);
+              if (paramBuffer != null)
+                {
+                  ServerKeyExchangeBuilder ske
+                    = new ServerKeyExchangeBuilder(engine.session().suite);
+                  ske.setParams(paramBuffer);
+                  if (sigBuffer != null)
+                    ske.setSignature(sigBuffer);
                   
-              if (Debug.DEBUG)
-                logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
+                  if (Debug.DEBUG)
+                    logger.log(Component.SSL_HANDSHAKE, "{0}", ske);
                   
-              outBuffer = ske.buffer();
-              int l = Math.min(fragment.remaining(), outBuffer.remaining());
-              fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
-                              | (ske.length() & 0xFFFFFF));
-              fragment.put((ByteBuffer) outBuffer.duplicate().limit(outBuffer.position() + l));
-              outBuffer.position(outBuffer.position() + l);
+                  outBuffer = ske.buffer();
+                  int l = Math.min(fragment.remaining(), outBuffer.remaining());
+                  fragment.putInt((SERVER_KEY_EXCHANGE.getValue() << 24)
+                                  | (ske.length() & 0xFFFFFF));
+                  fragment.put((ByteBuffer) outBuffer.duplicate().limit
+                               (outBuffer.position() + l));
+                  outBuffer.position(outBuffer.position() + l);
+                }
               
               if (engine.getWantClientAuth() || engine.getNeedClientAuth())
                 state = WRITE_CERTIFICATE_REQUEST;
@@ -1162,6 +1171,9 @@ output_loop:
   {
     if (continuedSession) // No key exchange needed.
       return;
+    KeyExchangeAlgorithm kex = engine.session().suite.keyExchangeAlgorithm();
+    if (kex == NONE || kex == PSK || kex == RSA_PSK) // Don't need one.
+      return;
     if (keyExchangeTask == null) // An error if we never created one.
       throw new AlertException(new Alert(Alert.Level.FATAL,
                                          Alert.Description.INTERNAL_ERROR));
@@ -1261,6 +1273,7 @@ output_loop:
       X509Certificate[] chain = km.getCertificateChain(keyAlias);
       engine.session().setLocalCertificates(chain);
       localCert = chain[0];
+      serverKey = km.getPrivateKey(keyAlias);
       if (kexalg == DH_DSS || kexalg == DH_RSA)
         dhPair = new KeyPair(localCert.getPublicKey(),
                              km.getPrivateKey(keyAlias));
@@ -1318,6 +1331,7 @@ output_loop:
              NoSuchAlgorithmException, NoSuchPaddingException, SSLException
     {
       Cipher rsa = Cipher.getInstance("RSA");
+      rsa.init(Cipher.DECRYPT_MODE, serverKey);
       rsa.init(Cipher.DECRYPT_MODE, localCert);
       preMasterSecret = rsa.doFinal(encryptedPreMasterSecret);
       generateMasterSecret(clientRandom, serverRandom, engine.session());
@@ -1342,6 +1356,7 @@ output_loop:
              NoSuchAlgorithmException, NoSuchPaddingException, SSLException
     {
       Cipher rsa = Cipher.getInstance("RSA");
+      rsa.init(Cipher.DECRYPT_MODE, serverKey);
       rsa.init(Cipher.DECRYPT_MODE, localCert);
       byte[] rsaSecret = rsa.doFinal(encryptedPreMasterSecret);
       byte[] psSecret = psKey.getEncoded();

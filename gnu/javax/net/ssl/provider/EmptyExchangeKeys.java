@@ -1,4 +1,4 @@
-/* ClientDHE_PSKParameters.java -- 
+/* EmptyExchangeKeys.java -- 
    Copyright (C) 2006  Free Software Foundation, Inc.
 
 This file is a part of GNU Classpath.
@@ -39,58 +39,17 @@ exception statement from your version. */
 package gnu.javax.net.ssl.provider;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 
 /**
- * <pre>
-      struct {
-          select (KeyExchangeAlgorithm) {
-              /* other cases for rsa, diffie_hellman, etc. &#42;/
-              case diffie_hellman_psk:   /* NEW &#42;/
-                  opaque psk_identity<0..2^16-1>;
-                  ClientDiffieHellmanPublic public;
-          } exchange_keys;
-      } ClientKeyExchange;</pre>
- *
  * @author Casey Marshall (csm@gnu.org)
  */
-public class ClientDHE_PSKParameters extends ExchangeKeys implements Builder, Constructed
+public class EmptyExchangeKeys
+  extends ExchangeKeys
 {
-  public ClientDHE_PSKParameters(ByteBuffer buffer)
-  {
-    super(buffer);
-  }
-  
-  public ClientDHE_PSKParameters(String identity, ClientDiffieHellmanPublic dh)
-  {
-    super(null);
-    Charset utf8 = Charset.forName("UTF-8");
-    ByteBuffer idBuf = utf8.encode(identity);
-    buffer = ByteBuffer.allocate(2 + idBuf.remaining() + dh.length());
-    buffer.putShort((short) idBuf.remaining());
-    buffer.put(idBuf);
-    buffer.put(dh.buffer());
-    buffer.rewind();
-  }
 
-  /* (non-Javadoc)
-   * @see gnu.javax.net.ssl.provider.Builder#buffer()
-   */
-  public ByteBuffer buffer()
+  public EmptyExchangeKeys()
   {
-    return (ByteBuffer) buffer.duplicate().rewind().limit(length());
-  }
-  
-  private int identityLength()
-  {
-    return (buffer.getShort(0) & 0xFFFF) + 2;
-  }
-  
-  public String identity()
-  {
-    Charset utf8 = Charset.forName("UTF-8");
-    return utf8.decode((ByteBuffer) buffer.duplicate().position(2).limit
-                       (identityLength())).toString();
+    super(ByteBuffer.allocate(0));
   }
 
   /* (non-Javadoc)
@@ -98,16 +57,12 @@ public class ClientDHE_PSKParameters extends ExchangeKeys implements Builder, Co
    */
   public int length()
   {
-    int length = (buffer.getShort(0) & 0xFFFF) + 2;
-    // XXX always explicit?
-    length += (buffer.getShort(length) & 0xFFFF) + 2;
-    return length;
+    return 0;
   }
 
-  public ClientDiffieHellmanPublic params()
+  public String toString()
   {
-    return new ClientDiffieHellmanPublic(((ByteBuffer) buffer.duplicate()
-                                          .position(identityLength()).limit(length())).slice());
+    return toString(null);
   }
   
   /* (non-Javadoc)
@@ -115,8 +70,8 @@ public class ClientDHE_PSKParameters extends ExchangeKeys implements Builder, Co
    */
   public String toString(String prefix)
   {
-    // TODO Auto-generated method stub
-    return null;
+    String ret = "struct { };";
+    if (prefix != null) ret = prefix + ret;
+    return ret;
   }
-
 }

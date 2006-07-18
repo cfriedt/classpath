@@ -38,6 +38,9 @@ exception statement from your version. */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
@@ -78,7 +81,7 @@ public class ServerDHE_PSKParameters implements Constructed, Builder, ServerKeyE
     buffer = ByteBuffer.allocate(2 + hintBuf.remaining() + dhParams.remaining());
     buffer.putShort((short) hintBuf.remaining());
     buffer.put(hintBuf);
-    buffer.put(buffer);    
+    buffer.put(dhParams);    
   }
 
   public KeyExchangeAlgorithm algorithm()
@@ -108,8 +111,8 @@ public class ServerDHE_PSKParameters implements Constructed, Builder, ServerKeyE
   
   public ServerDHParams params()
   {
-    return new ServerDHParams((ByteBuffer) buffer.duplicate().position
-                              (hintLength()).limit(buffer.capacity()));
+    return new ServerDHParams(((ByteBuffer) buffer.duplicate().position
+                               (hintLength()).limit(buffer.capacity())).slice());
   }
 
   /* (non-Javadoc)

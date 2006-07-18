@@ -42,6 +42,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * The server's Diffie-Hellman parameters message.
@@ -61,7 +62,7 @@ public class ServerDHParams implements Builder, ServerKeyExchangeParams
 
   public ServerDHParams (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
   
   public ServerDHParams (final BigInteger p, final BigInteger g,

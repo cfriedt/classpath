@@ -56,6 +56,7 @@ import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.KeyManagementException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
@@ -69,11 +70,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.crypto.interfaces.DHPrivateKey;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
@@ -223,6 +227,7 @@ public class ClientHandshake extends AbstractHandshake
                 }
             }
 
+          KeyExchangeAlgorithm kex = engine.session().suite.keyExchangeAlgorithm();
           if (continuedSession)
             {
               byte[][] keys = generateKeys(clientRandom, serverRandom,
@@ -230,8 +235,13 @@ public class ClientHandshake extends AbstractHandshake
               setupSecurityParameters(keys, true, engine, compression);
               state = READ_FINISHED;
             }
-          else
+          else if (kex == RSA || kex == DH_DSS || kex == DH_RSA
+                   || kex == DHE_DSS || kex == DHE_RSA || kex == RSA_PSK)
             state = READ_CERTIFICATE;
+          else if (kex == DH_anon || kex == PSK || kex == DHE_PSK)
+            state = READ_SERVER_KEY_EXCHANGE;
+          else
+            state = READ_CERTIFICATE_REQUEST;
         }
         break;
         
@@ -269,12 +279,15 @@ public class ClientHandshake extends AbstractHandshake
           tasks.add(certVerifier);
           
           // If we are doing an RSA key exchange, generate our parameters.
-          if (engine.session().suite.keyExchangeAlgorithm()
-              == KeyExchangeAlgorithm.RSA)
+          KeyExchangeAlgorithm kea = engine.session().suite.keyExchangeAlgorithm();
+          if (kea == RSA || kea == RSA_PSK)
             {
-              keyExchange = new RSAGen();
+              keyExchange = new RSAGen(kea == RSA);
               tasks.add(keyExchange);
-              state = READ_CERTIFICATE_REQUEST;
+              if (kea == RSA)
+                state = READ_CERTIFICATE_REQUEST;
+              else
+                state = READ_SERVER_KEY_EXCHANGE;
             }
           else
             state = READ_SERVER_KEY_EXCHANGE;
@@ -291,6 +304,15 @@ public class ClientHandshake extends AbstractHandshake
               && kexalg != DHE_PSK && kexalg != PSK && kexalg != RSA_PSK)
             throw new AlertException(new Alert(Level.FATAL,
                                                Description.UNEXPECTED_MESSAGE));
+          
+          if (handshake.type() != Handshake.Type.SERVER_KEY_EXCHANGE)
+            {
+              if (kexalg != RSA_PSK && kexalg != PSK)
+                throw new AlertException(new Alert(Level.FATAL,
+                                                   Description.UNEXPECTED_MESSAGE));
+              state = READ_CERTIFICATE_REQUEST;
+              return HandshakeStatus.NEED_UNWRAP;
+            }
 
           ServerKeyExchange skex = (ServerKeyExchange) handshake.body();
           ByteBuffer paramsBuffer = null;
@@ -318,7 +340,21 @@ public class ClientHandshake extends AbstractHandshake
                                                          dhParams.y());
               DHParameterSpec params = new DHParameterSpec(dhParams.p(),
                                                            dhParams.g());
-              keyExchange = new ClientDHGen(serverKey, params);
+              keyExchange = new ClientDHGen(serverKey, params, true);
+              tasks.add(keyExchange);
+            }
+          if (kexalg == DHE_PSK)
+            {
+              ServerDHE_PSKParameters pskParams = (ServerDHE_PSKParameters)
+                skex.params();
+              ServerDHParams dhParams = pskParams.params();
+              DHPublicKey serverKey = new GnuDHPublicKey(null,
+                                                         dhParams.p(),
+                                                         dhParams.g(),
+                                                         dhParams.y());
+              DHParameterSpec params = new DHParameterSpec(dhParams.p(),
+                                                           dhParams.g());
+              keyExchange = new ClientDHGen(serverKey, params, false);
               tasks.add(keyExchange);
             }
           state = READ_CERTIFICATE_REQUEST;
@@ -616,13 +652,14 @@ outer_loop:
                                                + " set the security property"
                                                + " \"jessie.client.psk.identity\"");
                       ClientRSA_PSKParameters params =
-                        new ClientRSA_PSKParameters(identity, epms,
-                                                    engine.session().version);
+                        new ClientRSA_PSKParameters(identity, epms.buffer());
                       ckex.setExchangeKeys(params.buffer());
+                      generatePSKSecret(identity, preMasterSecret, true);
                     }
                 }
               if (kea == DHE_PSK)
                 {
+                  assert(keyExchange instanceof ClientDHGen);
                   assert(dhPair != null);
                   String identity = getPSKIdentity();
                   if (identity == null)
@@ -634,6 +671,7 @@ outer_loop:
                     new ClientDHE_PSKParameters(identity,
                                                 new ClientDiffieHellmanPublic(pubkey.getY()));
                   ckex.setExchangeKeys(params.buffer());
+                  generatePSKSecret(identity, preMasterSecret, true);
                 }
               if (kea == PSK)
                 {
@@ -642,8 +680,26 @@ outer_loop:
                     throw new SSLException("no pre-shared key identity; set"
                                            + " the security property"
                                            + " \"jessie.client.psk.identity\"");
+                  generatePSKSecret(identity, null, true);
                   ClientPSKParameters params = new ClientPSKParameters(identity);
                   ckex.setExchangeKeys(params.buffer());
+                }
+              if (kea == NONE)
+                {
+                  Inflater inflater = null;
+                  Deflater deflater = null;
+                  if (compression == CompressionMethod.ZLIB)
+                    {
+                      inflater = new Inflater();
+                      deflater = new Deflater();
+                    }
+                  inParams = new InputSecurityParameters(null, null, inflater,
+                                                         engine.session(),
+                                                         engine.session().suite);
+                  outParams = new OutputSecurityParameters(null, null, deflater,
+                                                           engine.session(),
+                                                           engine.session().suite);
+                  engine.session().privateData.masterSecret = new byte[0];
                 }
               
               if (Debug.DEBUG)
@@ -894,11 +950,13 @@ outer_loop:
   {
     private final DHPublicKey serverKey;
     private final DHParameterSpec params;
+    private final boolean full;
     
-    ClientDHGen(DHPublicKey serverKey, DHParameterSpec params)
+    ClientDHGen(DHPublicKey serverKey, DHParameterSpec params, boolean full)
     {
       this.serverKey = serverKey;
       this.params = params;
+      this.full = full;
     }
     
     public void implRun()
@@ -930,12 +988,18 @@ outer_loop:
                     "client keys public:{0} private:{1}", dhPair.getPublic(),
                     dhPair.getPrivate());
 
-      // We have enough info to do the full key exchange; so let's do it.
       initDiffieHellman((DHPrivateKey) dhPair.getPrivate(), engine.session().random());
-      DHPhase phase = new DHPhase(serverKey);
+
+      // We have enough info to do the full key exchange; so let's do it.
+      DHPhase phase = new DHPhase(serverKey, full);
       phase.run();
       if (phase.thrown() != null)
         throw new SSLException(phase.thrown());
+    }
+    
+    DHPublicKey serverKey()
+    {
+      return serverKey;
     }
   }
   
@@ -966,6 +1030,17 @@ outer_loop:
   class RSAGen extends DelegatedTask
   {
     private byte[] encryptedPreMasterSecret;
+    private final boolean full;
+    
+    RSAGen()
+    {
+      this(true);
+    }
+    
+    RSAGen(boolean full)
+    {
+      this.full = full;
+    }
     
     public void implRun()
       throws BadPaddingException, IllegalBlockSizeException, InvalidKeyException,
@@ -998,9 +1073,12 @@ outer_loop:
       encryptedPreMasterSecret = rsa.doFinal(preMasterSecret);
       
       // Generate our session keys, because we can.
-      generateMasterSecret(clientRandom, serverRandom, engine.session());
-      byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
-      setupSecurityParameters(keys, true, engine, compression);
+      if (full)
+        {
+          generateMasterSecret(clientRandom, serverRandom, engine.session());
+          byte[][] keys = generateKeys(clientRandom, serverRandom, engine.session());
+          setupSecurityParameters(keys, true, engine, compression);
+        }
     }
     
     byte[] encryptedSecret()

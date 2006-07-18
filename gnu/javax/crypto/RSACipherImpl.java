@@ -204,8 +204,6 @@ public class RSACipherImpl extends CipherSpi
     engineUpdate (in, offset, length);
     if (opmode == Cipher.DECRYPT_MODE)
       {
-        if (pos < dataBuffer.length)
-          throw new IllegalBlockSizeException ("expecting exactly " + dataBuffer.length + " bytes");
         BigInteger enc = new BigInteger (1, dataBuffer);
         byte[] dec = rsaDecrypt (enc);
         logger.log (Component.CRYPTO, "RSA: decryption produced\n{0}",
@@ -292,6 +290,13 @@ public class RSACipherImpl extends CipherSpi
         dec = dec.multiply (r.modInverse (n)).mod (n);
       }
 
-    return dec.toByteArray ();
+    byte[] decb = dec.toByteArray();
+    if (decb[0] != 0x00)
+      {
+        byte[] b = new byte[decb.length + 1];
+        System.arraycopy(decb, 0, b, 1, decb.length);
+        decb = b;
+      }
+    return decb;
   }
 }

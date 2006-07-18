@@ -39,6 +39,7 @@ exception statement from your version.  */
 package gnu.javax.net.ssl.provider;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public abstract class ExchangeKeys implements Constructed
 {
@@ -47,6 +48,7 @@ public abstract class ExchangeKeys implements Constructed
 
   public ExchangeKeys (final ByteBuffer buffer)
   {
-    this.buffer = buffer;
+    if (buffer != null)
+      this.buffer = buffer.duplicate().order(ByteOrder.BIG_ENDIAN);
   }
 }

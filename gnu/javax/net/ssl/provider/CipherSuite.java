@@ -492,6 +492,7 @@ public final class CipherSuite implements Constructed
   private final int keyLength;
   private final byte[] id;
   private final String name;
+  private final boolean isResolved;
 
   // Constructors.
   // -------------------------------------------------------------------------
@@ -535,6 +536,7 @@ public final class CipherSuite implements Constructed
       {
         tlsSuiteNames.add(name);
       }
+    isResolved = true;
   }
 
   private CipherSuite(byte[] id)
@@ -549,6 +551,7 @@ public final class CipherSuite implements Constructed
     keyLength = 0;
     this.id = id;
     name = null;
+    isResolved = false;
   }
 
   // Class methods.
@@ -688,7 +691,7 @@ public final class CipherSuite implements Constructed
   
   public CipherSuite resolve()
   {
-    if (id[0] == 0x00) switch (id[1])
+    if (id[0] == 0x00) switch (id[1] & 0xFF)
       {
       case 0x00: return TLS_NULL_WITH_NULL_NULL;
       case 0x01: return TLS_RSA_WITH_NULL_MD5;
@@ -745,8 +748,25 @@ public final class CipherSuite implements Constructed
       case 0x7C: return TLS_RSA_WITH_3DES_EDE_CBC_RMD;
       case 0x7D: return TLS_RSA_WITH_AES_128_CBC_RMD;
       case 0x7E: return TLS_RSA_WITH_AES_256_CBC_RMD;*/
+      case 0x8A: return TLS_PSK_WITH_RC4_128_SHA;
+      case 0x8B: return TLS_PSK_WITH_3DES_EDE_CBC_SHA;
+      case 0x8C: return TLS_PSK_WITH_AES_128_CBC_SHA;
+      case 0x8D: return TLS_PSK_WITH_AES_256_CBC_SHA;
+      case 0x8E: return TLS_DHE_PSK_WITH_RC4_128_SHA;
+      case 0x8F: return TLS_DHE_PSK_WITH_3DES_EDE_CBC_SHA;
+      case 0x90: return TLS_DHE_PSK_WITH_AES_128_CBC_SHA;
+      case 0x91: return TLS_DHE_PSK_WITH_AES_256_CBC_SHA;
+      case 0x92: return TLS_RSA_PSK_WITH_RC4_128_SHA;
+      case 0x93: return TLS_RSA_PSK_WITH_3DES_EDE_CBC_SHA;
+      case 0x94: return TLS_RSA_PSK_WITH_AES_128_CBC_SHA;
+      case 0x95: return TLS_RSA_PSK_WITH_AES_256_CBC_SHA;
       }
     return this;
+  }
+  
+  public boolean isResolved()
+  {
+    return isResolved;
   }
 
   public int keyLength()

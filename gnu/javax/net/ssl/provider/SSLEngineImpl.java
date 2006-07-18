@@ -104,8 +104,6 @@ public final class SSLEngineImpl extends SSLEngine
   SSLEngineImpl (SSLContextImpl contextImpl, String host, int port)
   {
     super(host, port);
-    logger.logv(java.util.logging.Level.INFO, "creating SSLEngine {0} {1}:{2}",
-                this, host, port);
     this.contextImpl = contextImpl;
     handlers = new SSLRecordHandler[256];
     session = new SessionImpl();

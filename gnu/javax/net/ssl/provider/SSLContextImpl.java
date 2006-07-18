@@ -174,7 +174,7 @@ public final class SSLContextImpl extends SSLContextSpi
             if ((keyManagers[i] instanceof X509ExtendedKeyManager)
                 && keyManager == null)
               keyManager = (X509ExtendedKeyManager) keyManagers[i];
-            if (keyManagers[i] instanceof PreSharedKeyManagerFactoryImpl
+            if (keyManagers[i] instanceof PreSharedKeyManager
                 && pskManager == null)
               pskManager = (PreSharedKeyManager) keyManagers[i];
           }

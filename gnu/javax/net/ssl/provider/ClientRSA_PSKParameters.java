@@ -38,6 +38,9 @@ exception statement from your version. */
 
 package gnu.javax.net.ssl.provider;
 
+import gnu.classpath.debug.Component;
+import gnu.classpath.debug.SystemLogger;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
@@ -49,26 +52,21 @@ import java.nio.charset.Charset;
  */
 public class ClientRSA_PSKParameters extends ExchangeKeys implements Builder, Constructed
 {
-  private final ProtocolVersion version;
-  
-  public ClientRSA_PSKParameters(ByteBuffer buffer, ProtocolVersion version)
+  public ClientRSA_PSKParameters(ByteBuffer buffer)
   {
     super(buffer);
-    this.version = version;
   }
 
-  public ClientRSA_PSKParameters(String identity, EncryptedPreMasterSecret epms,
-                                 ProtocolVersion version)
+  public ClientRSA_PSKParameters(String identity, ByteBuffer epms)
   {
     super(null);
     Charset utf8 = Charset.forName("UTF-8");
     ByteBuffer idBuf = utf8.encode(identity);
-    buffer = ByteBuffer.allocate(2 + idBuf.remaining() + epms.length());
+    buffer = ByteBuffer.allocate(2 + idBuf.remaining() + epms.remaining());
     buffer.putShort((short) idBuf.remaining());
     buffer.put(idBuf);
-    buffer.put(epms.buffer());
+    buffer.put(epms);
     buffer.rewind();
-    this.version = version;
   }
 
   /* (non-Javadoc)
@@ -102,8 +100,8 @@ public class ClientRSA_PSKParameters extends ExchangeKeys implements Builder, Co
   public EncryptedPreMasterSecret secret()
   {
     return new EncryptedPreMasterSecret
-      ((ByteBuffer) buffer.duplicate().position(identityLength())
-       .limit(buffer.capacity()), version);
+      (((ByteBuffer) buffer.duplicate().position(identityLength())
+        .limit(buffer.capacity())).slice(), ProtocolVersion.TLS_1);
   }
 
   /* (non-Javadoc)

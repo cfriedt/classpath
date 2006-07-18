@@ -82,7 +82,14 @@ public class ServerKeyExchange implements Handshake.Body
   {
     if (suite.keyExchangeAlgorithm ().equals (KeyExchangeAlgorithm.NONE))
       return 0;
-    return params().length() + signature().length();
+    int len = 0;
+    ServerKeyExchangeParams params = params();
+    Signature sig = signature();
+    if (params != null)
+      len += params.length();
+    if (sig != null)
+      len += sig.length();
+    return len;
   }
 
   /**
