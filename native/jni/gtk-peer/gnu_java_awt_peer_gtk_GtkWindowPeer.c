@@ -1245,6 +1245,38 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_gtkWindowSetModal
 }
 
 JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkWindowPeer_gtkWindowSetAlwaysOnTop
+  (JNIEnv *env, jobject obj, jboolean alwaysOnTop)
+{
+  void *ptr;
+
+  gdk_threads_enter ();
+
+  ptr = NSA_GET_PTR (env, obj);
+
+  gtk_window_set_keep_above (GTK_WINDOW (ptr), alwaysOnTop);
+
+  gdk_threads_leave ();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_gnu_java_awt_peer_gtk_GtkWindowPeer_gtkWindowHasFocus
+(JNIEnv *env, jobject obj)
+{
+  void *ptr;
+  jboolean retval;
+
+  gdk_threads_enter ();
+
+  ptr = NSA_GET_PTR (env, obj);
+
+  retval = gtk_window_has_toplevel_focus (GTK_WINDOW (ptr));
+
+  gdk_threads_leave ();
+  return retval;
+}
+
+JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkWindowPeer_setVisibleNative
   (JNIEnv *env, jobject obj, jboolean visible)
 {

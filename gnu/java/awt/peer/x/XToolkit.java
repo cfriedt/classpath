@@ -67,11 +67,11 @@ import java.awt.ScrollPane;
 import java.awt.Scrollbar;
 import java.awt.TextArea;
 import java.awt.TextField;
+import java.awt.Transparency;
 import java.awt.Window;
 import java.awt.datatransfer.Clipboard;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.peer.DragSourceContextPeer;
-import java.awt.font.FontRenderContext;
 import java.awt.im.InputMethodHighlight;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
@@ -101,12 +101,12 @@ import java.awt.peer.ScrollbarPeer;
 import java.awt.peer.TextAreaPeer;
 import java.awt.peer.TextFieldPeer;
 import java.awt.peer.WindowPeer;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.text.AttributedString;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -114,6 +114,7 @@ import java.util.WeakHashMap;
 
 import javax.imageio.ImageIO;
 
+import gnu.classpath.SystemProperties;
 import gnu.java.awt.ClasspathToolkit;
 import gnu.java.awt.EmbeddedWindow;
 import gnu.java.awt.peer.ClasspathFontPeer;
@@ -131,7 +132,10 @@ public class XToolkit
    */
   static boolean DEBUG = false;
 
-  private XGraphicsEnvironment env;
+  /**
+   * Maps AWT colors to X colors.
+   */
+  HashMap colorMap = new HashMap();
 
   /**
    * The system event queue.
@@ -155,14 +159,14 @@ public class XToolkit
 
   public XToolkit()
   {
-    System.setProperty("gnu.javax.swing.noGraphics2D", "true");
+    SystemProperties.setProperty("gnu.javax.swing.noGraphics2D", "true");
+    SystemProperties.setProperty("java.awt.graphicsenv",
+                                 "gnu.java.awt.peer.x.XGraphicsEnvironment");
   }
 
   public GraphicsEnvironment getLocalGraphicsEnvironment()
   {
-    if (env == null)
-      env = new XGraphicsEnvironment();
-    return env;
+    return new XGraphicsEnvironment();
   }
 
   /**
@@ -176,15 +180,20 @@ public class XToolkit
   public ClasspathFontPeer getClasspathFontPeer(String name, Map attrs)
   {
     String canonical = XFontPeer.encodeFont(name, attrs);
-    XFontPeer font;
+    ClasspathFontPeer font;
     if (!fontCache.containsKey(canonical))
       {
-        font = new XFontPeer(name, attrs);
+        String graphics2d =
+          SystemProperties.getProperty("gnu.xawt.graphics2d");
+        if (graphics2d != null && graphics2d.equals("gl"))
+          font = new XFontPeer2(name, attrs);
+        else
+          font = new XFontPeer(name, attrs);
         fontCache.put(canonical, font);
       }
     else
       {
-        font = (XFontPeer) fontCache.get(canonical);
+        font = (ClasspathFontPeer) fontCache.get(canonical);
       }
     return font;
   }
@@ -282,8 +291,7 @@ public class XToolkit
 
   protected DialogPeer createDialog(Dialog target)
   {
-    // TODO: Implement this.
-    throw new UnsupportedOperationException("Not yet implemented.");
+    return new XDialogPeer(target);
   }
 
   protected MenuBarPeer createMenuBar(MenuBar target)
@@ -361,7 +369,7 @@ public class XToolkit
 
   public FontMetrics getFontMetrics(Font name)
   {
-    XFontPeer peer = (XFontPeer) name.getPeer();
+    ClasspathFontPeer peer = (ClasspathFontPeer) name.getPeer();
     return peer.getFontMetrics(name);
   }
 
@@ -459,16 +467,7 @@ public class XToolkit
     Image image;
     try
       {
-        BufferedImage buffered = ImageIO.read(url);
-        if (buffered != null)
-          {
-            ImageConverter conv = new ImageConverter();
-            ImageProducer source = buffered.getSource();
-            source.startProduction(conv);
-            return conv.getXImage();
-          }
-        else return createErrorImage();
-          
+        image = createImage(url.openStream());
       }
     catch (IOException ex)
       {
@@ -504,14 +503,48 @@ public class XToolkit
 
   public Image createImage(ImageProducer producer)
   {
-    // TODO: Implement this.
-    throw new UnsupportedOperationException("Not yet implemented.");
+    ImageConverter conv = new ImageConverter();
+    producer.startProduction(conv);
+    Image image = conv.getXImage();
+    return image;
   }
 
   public Image createImage(byte[] data, int offset, int len)
   {
-    // TODO: Implement this.
-    throw new UnsupportedOperationException("Not yet implemented.");
+    Image image;
+    try
+      {
+        ByteArrayInputStream i = new ByteArrayInputStream(data, offset, len);
+        image = createImage(i);
+      }
+    catch (IOException ex)
+      {
+        image = createErrorImage();
+      }
+    return image;
+  }
+
+  private Image createImage(InputStream i)
+    throws IOException
+  {
+    Image image;
+    BufferedImage buffered = ImageIO.read(i);
+    // If the bufferedimage is opaque, then we can copy it over to an
+    // X Pixmap for faster drawing.
+    if (buffered != null && buffered.getTransparency() == Transparency.OPAQUE)
+      {
+        ImageProducer source = buffered.getSource();
+        image = createImage(source);
+      }
+    else if (buffered != null)
+      {
+        image = buffered;
+      }
+    else
+      {
+        image = createErrorImage();
+      }
+    return image;
   }
 
   public PrintJob getPrintJob(Frame frame, String title, Properties props)

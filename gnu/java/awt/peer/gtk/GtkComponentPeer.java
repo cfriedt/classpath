@@ -57,6 +57,7 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.ItemSelectable;
+import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
@@ -68,13 +69,13 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.PaintEvent;
 import java.awt.event.TextEvent;
-import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.ImageObserver;
 import java.awt.image.ImageProducer;
 import java.awt.image.VolatileImage;
 import java.awt.peer.ComponentPeer;
 import java.awt.peer.ContainerPeer;
+import java.awt.peer.LightweightPeer;
 import java.awt.peer.WindowPeer;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -111,6 +112,9 @@ public class GtkComponentPeer extends GtkGenericPeer
   native void gtkWidgetRequestFocus ();
   native void gtkWidgetDispatchKeyEvent (int id, long when, int mods,
                                          int keyCode, int keyLocation);
+  native boolean gtkWidgetHasFocus();
+  native boolean gtkWidgetCanFocus();
+
   native void realize();
   native void setNativeEventMask ();
 
@@ -367,7 +371,7 @@ public class GtkComponentPeer extends GtkGenericPeer
 
   public void print (Graphics g) 
   {
-    throw new RuntimeException ();
+    g.drawImage( ComponentGraphics.grab( this ), 0, 0, null );
   }
 
   public void repaint (long tm, int x, int y, int width, int height)
@@ -416,8 +420,7 @@ public class GtkComponentPeer extends GtkGenericPeer
 
   public void requestFocus ()
   {
-    gtkWidgetRequestFocus();
-    postFocusEvent(FocusEvent.FOCUS_GAINED, false);
+    assert false: "Call new requestFocus() method instead";
   }
 
   public void reshape (int x, int y, int width, int height) 
@@ -511,7 +514,7 @@ public class GtkComponentPeer extends GtkGenericPeer
 	y = 0;
       }
 
-    if (Thread.currentThread() == GtkToolkit.mainThread)
+    if (Thread.currentThread() == GtkMainThread.mainThread)
       gtkWidgetSetCursorUnlocked(cursor.getType(), image, x, y);
     else
       gtkWidgetSetCursor(cursor.getType(), image, x, y);
@@ -559,7 +562,7 @@ public class GtkComponentPeer extends GtkGenericPeer
 	b = (bounds.width > 0) && (bounds.height > 0);
       }
 
-    if (Thread.currentThread() == GtkToolkit.mainThread)
+    if (Thread.currentThread() == GtkMainThread.mainThread)
       setVisibleNativeUnlocked (b);
     else
       setVisibleNative (b);
@@ -630,6 +633,12 @@ public class GtkComponentPeer extends GtkGenericPeer
       q.postEvent(keyEvent);
   }
 
+  /**
+   * Referenced from native code.
+   *
+   * @param id
+   * @param temporary
+   */
   protected void postFocusEvent (int id, boolean temporary)
   {
     q().postEvent (new FocusEvent (awtComponent, id, temporary));
@@ -665,10 +674,72 @@ public class GtkComponentPeer extends GtkGenericPeer
     return false;
   }
 
-  public boolean requestFocus (Component source, boolean b1, 
-                               boolean b2, long x)
+  public boolean requestFocus (Component request, boolean temporary, 
+                               boolean allowWindowFocus, long time)
   {
-    return false;
+    assert request == awtComponent || isLightweightDescendant(request);
+    boolean retval = false;
+    if (gtkWidgetHasFocus())
+      {
+        KeyboardFocusManager kfm =
+          KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        Component currentFocus = kfm.getFocusOwner();
+        if (currentFocus == request)
+          // Nothing to do in this trivial case.
+          retval = true;
+        else
+          {
+            // Requested component is a lightweight descendant of this one
+            // or the actual heavyweight.
+            // Since this (native) component is already focused, we simply
+            // change the actual focus and be done.
+            postFocusEvent(FocusEvent.FOCUS_GAINED, temporary);
+            retval = true;
+          }
+      }
+    else
+      {
+        if (gtkWidgetCanFocus())
+          {
+            if (allowWindowFocus)
+              {
+                Window window = getWindowFor(request);
+                GtkWindowPeer wPeer = (GtkWindowPeer) window.getPeer();
+                if (! wPeer.gtkWindowHasFocus())
+                  wPeer.requestWindowFocus();
+              }
+            // Store requested focus component so that the corresponding
+            // event is dispatched correctly.
+            gtkWidgetRequestFocus();
+            retval = true;
+          }
+      }
+    return retval;
+  }
+
+  private Window getWindowFor(Component c)
+  {
+    Component comp = c;
+    while (! (comp instanceof Window))
+      comp = comp.getParent();
+    return (Window) comp;
+  }
+
+  /**
+   * Returns <code>true</code> if the component is a direct (== no intermediate
+   * heavyweights) lightweight descendant of this peer's component.
+   *
+   * @param c the component to check
+   *
+   * @return <code>true</code> if the component is a direct (== no intermediate
+   *         heavyweights) lightweight descendant of this peer's component
+   */
+  protected boolean isLightweightDescendant(Component c)
+  {
+    Component comp = c;
+    while (comp.getPeer() instanceof LightweightPeer)
+      comp = comp.getParent();
+    return comp == awtComponent;
   }
 
   public boolean isObscured ()

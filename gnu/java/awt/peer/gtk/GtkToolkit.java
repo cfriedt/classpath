@@ -102,6 +102,7 @@ import java.awt.peer.LabelPeer;
 import java.awt.peer.ListPeer;
 import java.awt.peer.MenuBarPeer;
 import java.awt.peer.MenuItemPeer;
+import java.awt.peer.MouseInfoPeer;
 import java.awt.peer.MenuPeer;
 import java.awt.peer.PanelPeer;
 import java.awt.peer.PopupMenuPeer;
@@ -130,37 +131,30 @@ import javax.imageio.spi.IIORegistry;
 
 public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 {
-  Hashtable containers = new Hashtable();
-  static EventQueue q;
-  static Thread mainThread;
+  private static EventQueue q;
 
   static native void gtkInit(int portableNativeSync);
+
+  static native void gtkMain();
+
+  static native void gtkQuit();
 
   static
   {
     System.loadLibrary("gtkpeer");
-
+      
     int portableNativeSync;     
     String portNatSyncProp = 
       System.getProperty("gnu.classpath.awt.gtk.portable.native.sync");
-    
+      
     if (portNatSyncProp == null)
       portableNativeSync = -1;  // unset
     else if (Boolean.valueOf(portNatSyncProp).booleanValue())
       portableNativeSync = 1;   // true
     else
       portableNativeSync = 0;   // false
-
+      
     gtkInit(portableNativeSync);
-
-    mainThread = new Thread ("GTK main thread")
-      {
-        public void run ()
-        {
-          gtkMain ();
-        }
-      };
-    mainThread.start ();
   }
 
   public GtkToolkit ()
@@ -168,6 +162,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
   }
 
   public native void beep();
+
   private native void getScreenSizeDimensions(int[] xy);
   
   public int checkImage (Image image, int width, int height, 
@@ -461,6 +456,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   protected DialogPeer createDialog (Dialog d)
   {
+    GtkMainThread.createWindow();
     return new GtkDialogPeer (d);
   }
 
@@ -471,6 +467,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   protected FramePeer createFrame (Frame f)
   {
+    GtkMainThread.createWindow();
     return new GtkFramePeer (f);
   }
 
@@ -531,11 +528,13 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   protected WindowPeer createWindow (Window w)
   {
+    GtkMainThread.createWindow();
     return new GtkWindowPeer (w);
   }
 
   public EmbeddedWindowPeer createEmbeddedWindow (EmbeddedWindow w)
   {
+    GtkMainThread.createWindow();
     return new GtkEmbeddedWindowPeer (w);
   }
 
@@ -614,8 +613,16 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
                                                            DragGestureListener l)
   {
     if (recognizer.getName().equals("java.awt.dnd.MouseDragGestureRecognizer"))
-      return new GtkMouseDragGestureRecognizer(ds, comp, actions, l);
-    return null;
+      {
+        GtkMouseDragGestureRecognizer gestureRecognizer
+          = new GtkMouseDragGestureRecognizer(ds, comp, actions, l);
+        gestureRecognizer.registerListeners();
+        return gestureRecognizer;
+      }
+    else
+      {
+        return null;
+      }
   }
 
   public Map mapInputMethodHighlight(InputMethodHighlight highlight)
@@ -652,5 +659,11 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
     GdkPixbufDecoder.registerSpis(reg);
   }
 
-  public static native void gtkMain();
+  protected MouseInfoPeer getMouseInfoPeer()
+  {
+    return new GtkMouseInfoPeer();
+  }
+
+  public native int getMouseNumberOfButtons();
+
 } // class GtkToolkit

@@ -37,6 +37,8 @@ exception statement from your version. */
 
 package gnu.javax.imageio.gif;
 
+import gnu.javax.imageio.IIOInputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
 import javax.imageio.*;
@@ -74,7 +76,7 @@ public class GIFImageReader extends ImageReader
 	if( input instanceof InputStream )
 	  file = new GIFFile( (InputStream)input );
 	else
-	  file = new GIFFile( new GIFStream((ImageInputStream)input) );
+	  file = new GIFFile( new IIOInputStream((ImageInputStream)input) );
       }
     catch(GIFFile.GIFException ge)
       {
@@ -231,9 +233,6 @@ public class GIFImageReader extends ImageReader
 					      new int[] {0xFF});
 	break;
       }
-    byte[] bits = f.getRawImage();
-    for(int i = 0; i < 5; i++)
-      System.out.println("Bits "+i+":"+bits[i]);
     DataBuffer db = new DataBufferByte(f.getRawImage(), width * height, 0);
     WritableRaster raster = Raster.createWritableRaster(sm, db, null);
     

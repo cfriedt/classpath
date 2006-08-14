@@ -217,7 +217,6 @@ class GenKeyCmd extends Command
   protected String _providerClassName;
   private int keySize;
   private X500DistinguishedName distinguishedName;
-  private Parser cmdOptionsParser;
 
   // default 0-arguments constructor
 
@@ -303,7 +302,7 @@ class GenKeyCmd extends Command
 
   void setup() throws Exception
   {
-    setKeyStoreParams(_providerClassName, _ksType, _ksPassword, _ksURL);
+    setKeyStoreParams(true, _providerClassName, _ksType, _ksPassword, _ksURL);
     setAliasParam(_alias);
     setKeyPasswordParam(_password);
     setAlgorithmParams(_keyAlgorithm, _sigAlgorithm);

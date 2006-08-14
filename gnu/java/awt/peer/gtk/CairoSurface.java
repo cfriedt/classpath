@@ -38,34 +38,24 @@ exception statement from your version. */
 
 package gnu.java.awt.peer.gtk;
 
-import java.awt.Graphics;
-import java.awt.Color;
-import java.awt.Image;
 import java.awt.Point;
 import java.awt.Graphics2D;
-import java.awt.GraphicsConfiguration;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.DirectColorModel;
-import java.io.File;
-import java.io.IOException;
+import java.awt.image.SinglePixelPackedSampleModel;
 import java.nio.ByteOrder;
 import java.util.Hashtable;
-import java.util.Vector;
-import java.io.ByteArrayOutputStream;
-import java.io.BufferedInputStream;
-import java.net.URL;
-import gnu.classpath.Pointer;
 
 /**
  * CairoSurface - wraps a Cairo surface.
  *
  * @author Sven de Marothy
  */
-public class CairoSurface extends DataBuffer
+public class CairoSurface extends WritableRaster
 {
   int width = -1, height = -1;
 
@@ -79,11 +69,10 @@ public class CairoSurface extends DataBuffer
    */
   long bufferPointer;
 
-
-  static ColorModel nativeModel = new DirectColorModel(32, 
-						       0x000000FF,
-						       0x0000FF00,
+  static ColorModel nativeModel = new DirectColorModel(32,
 						       0x00FF0000,
+						       0x0000FF00,
+						       0x000000FF,
 						       0xFF000000);
 
   /**
@@ -149,18 +138,22 @@ public class CairoSurface extends DataBuffer
    */
   public CairoSurface(int width, int height)
   {
-    super(DataBuffer.TYPE_INT, width * height);
+    super( new SinglePixelPackedSampleModel
+	   (DataBuffer.TYPE_INT, width, height,
+	    new int[]{ 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 }),
+	   null, new Point(0, 0) );
 
     if(width <= 0 || height <= 0)
       throw new IllegalArgumentException("Image must be at least 1x1 pixels.");
-
+    
     this.width = width;
     this.height = height;
-
     create(width, height, width);
 
     if(surfacePointer == 0 || bufferPointer == 0)
       throw new Error("Could not allocate bitmap.");
+
+    dataBuffer = new CairoDataBuffer();
   }
 
   /**
@@ -169,59 +162,42 @@ public class CairoSurface extends DataBuffer
    */
   CairoSurface(GtkImage image)
   {
-    super(DataBuffer.TYPE_INT, image.width * image.height);
-
-    if(image.width <= 0 || image.height <= 0)
-      throw new IllegalArgumentException("Image must be at least 1x1 pixels.");
-
-    width = image.width;
-    height = image.height;
-
-    create(width, height, width);
-
-    if(surfacePointer == 0 || bufferPointer == 0)
-      throw new Error("Could not allocate bitmap.");
+    this(image.width, image.height);
 
     // Copy the pixel data from the GtkImage.
     int[] data = image.getPixels();
 
     // Swap ordering from GdkPixbuf to Cairo
-    for(int i = 0; i < data.length; i++ )
+    if (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN)
       {
-	if (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN)
+	for (int i = 0; i < data.length; i++ )
 	  {
 	    // On a big endian system we get a RRGGBBAA data array.
-	    int alpha = (data[i] & 0xFF);
+	    int alpha = data[i] & 0xFF;
 	    if( alpha == 0 ) // I do not know why we need this, but it works.
 	      data[i] = 0;
 	    else
 	      {
-		int r = (((data[i] & 0xFF000000) >> 24));
-		int g = (((data[i] & 0x00FF0000) >> 16));
-		int b = (((data[i] & 0x0000FF00) >> 8));
 		// Cairo needs a ARGB32 native array.
-		data[i] = (( alpha << 24 ) & 0xFF000000)
-		  | (( r << 16 ) & 0x00FF0000)
-		  | (( g << 8 )  & 0x0000FF00)
-		  | ( b  & 0x000000FF);
+		data[i] = (data[i] >>> 8) | (alpha << 24);
 	      }
 	  }
-	else
+      }
+    else
+      {
+	for (int i = 0; i < data.length; i++ )
 	  {
 	    // On a little endian system we get a AABBGGRR data array.
-	    int alpha = (data[i] & 0xFF000000) >> 24;
+	    int alpha = data[i] & 0xFF000000;
 	    if( alpha == 0 ) // I do not know why we need this, but it works.
 	      data[i] = 0;
 	    else
 	      {
-		int b = (((data[i] & 0x00FF0000) >> 16));
-		int g = (((data[i] & 0x0000FF00) >> 8));
-		int r = ((data[i] & 0x000000FF));
+		int b = (data[i] & 0xFF0000) >> 16;
+		int g = (data[i] & 0xFF00);
+		int r = (data[i] & 0xFF) << 16;
 		// Cairo needs a ARGB32 native array.
-		data[i] = (( alpha << 24 ) & 0xFF000000)
-		  | (( r << 16 ) & 0x00FF0000)
-		  | (( g << 8 )  & 0x0000FF00)
-		  | ( b  & 0x000000FF);
+		data[i] = alpha | r | g | b;
 	      }
 	  }
       }
@@ -277,32 +253,35 @@ public class CairoSurface extends DataBuffer
    */    
   public static BufferedImage getBufferedImage(CairoSurface surface)
   {
-    WritableRaster raster = Raster.createPackedRaster
-      (surface, surface.width, surface.height, surface.width, 
-       new int[]{ 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 },
-       new Point(0,0));
-
-    return new BufferedImage(nativeModel, raster, true, new Hashtable());
+    return new BufferedImage(nativeModel, surface, true, new Hashtable());
   }
 
-  /**
-   * DataBank.getElem implementation
-   */
-  public int getElem(int bank, int i)
+  private class CairoDataBuffer extends DataBuffer
   {
-    if(bank != 0 || i < 0 || i >= width*height)
-      throw new IndexOutOfBoundsException(i+" size: "+width*height);
-    return nativeGetElem(bufferPointer, i);
-  }
+    public CairoDataBuffer()
+    {
+      super(DataBuffer.TYPE_INT, width * height);
+    }
+
+    /**
+     * DataBuffer.getElem implementation
+     */
+    public int getElem(int bank, int i)
+    {
+      if(bank != 0 || i < 0 || i >= width * height)
+	throw new IndexOutOfBoundsException(i+" size: "+width * height);
+      return nativeGetElem(bufferPointer, i);
+    }
   
-  /**
-   * DataBank.setElem implementation
-   */
-  public void setElem(int bank, int i, int val)
-  {
-    if(bank != 0 || i < 0 || i >= width*height)
-      throw new IndexOutOfBoundsException(i+" size: "+width*height);
-    nativeSetElem(bufferPointer, i, val);
+    /**
+     * DataBuffer.setElem implementation
+     */
+    public void setElem(int bank, int i, int val)
+    {
+      if(bank != 0 || i < 0 || i >= width*height)
+	throw new IndexOutOfBoundsException(i+" size: "+width * height);
+      nativeSetElem(bufferPointer, i, val);
+    }
   }
 
   /**

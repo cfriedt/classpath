@@ -83,7 +83,6 @@ import javax.swing.text.Highlighter;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.Keymap;
 import javax.swing.text.Position;
-import javax.swing.text.Utilities;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 
@@ -240,6 +239,12 @@ public abstract class BasicTextUI extends TextUI
 	return view.getPreferredSpan(axis);
 
       return Integer.MAX_VALUE;
+    }
+
+    public void setSize(float w, float h)
+    {
+      if (view != null)
+        view.setSize(w, h);
     }
 
     /**
@@ -861,6 +866,7 @@ public abstract class BasicTextUI extends TextUI
   protected void uninstallListeners()
   {
     textComponent.removeFocusListener(focuslistener);
+    textComponent.getDocument().removeDocumentListener(documentHandler);
   }
 
   /**
@@ -892,14 +898,19 @@ public abstract class BasicTextUI extends TextUI
    */
   public Dimension getPreferredSize(JComponent c)
   {
-    View v = getRootView(textComponent);
-
-    float w = v.getPreferredSpan(View.X_AXIS);
-    float h = v.getPreferredSpan(View.Y_AXIS);
-
+    Dimension d = c.getSize();
     Insets i = c.getInsets();
-    return new Dimension((int) w + i.left + i.right,
+    if (d.width > (i.left + i.right) && d.height > (i.top + i.bottom))
+      {
+        rootView.setSize(d.width - i.left - i.right,
+                         d.height - i.top - i.bottom);
+      }
+    float w = rootView.getPreferredSpan(View.X_AXIS);
+    float h = rootView.getPreferredSpan(View.Y_AXIS);
+
+    Dimension size =  new Dimension((int) w + i.left + i.right,
                          (int) h + i.top + i.bottom);
+    return size;
   }
 
   /**
@@ -1042,7 +1053,7 @@ public abstract class BasicTextUI extends TextUI
    */
   public void damageRange(JTextComponent t, int p0, int p1)
   {
-    damageRange(t, p0, p1, null, null);
+    damageRange(t, p0, p1, Position.Bias.Forward, Position.Bias.Backward);
   }
 
   /**
@@ -1062,105 +1073,35 @@ public abstract class BasicTextUI extends TextUI
   public void damageRange(JTextComponent t, int p0, int p1,
                           Position.Bias firstBias, Position.Bias secondBias)
   {
-    // Do nothing if the component cannot be properly displayed.
-    if (t.getWidth() == 0 || t.getHeight() == 0)
-      return;
-    
-    try
+    Rectangle alloc = getVisibleEditorRect();
+    if (alloc != null)
       {
-        // Limit p0 and p1 to sane values to prevent unfriendly
-        // BadLocationExceptions. This makes it possible for the highlighter
-        // to send us illegal values which can happen when a large number
-        // of selected characters are removed (eg. by pressing delete
-        // or backspace).
-        // The reference implementation does not throw an exception, too.
-        p0 = Math.min(p0, t.getDocument().getLength());
-        p1 = Math.min(p1, t.getDocument().getLength());
+        Document doc = t.getDocument();
 
-        Rectangle l1 = modelToView(t, p0, firstBias);
-        Rectangle l2 = modelToView(t, p1, secondBias);
-        if (l1 == null || l2 == null)
+        // Acquire lock here to avoid structural changes in between.
+        if (doc instanceof AbstractDocument)
+          ((AbstractDocument) doc).readLock();
+        try
           {
-            // Unable to determine the start or end of the selection.
-            t.repaint();
+            rootView.setSize(alloc.width, alloc.height);
+            Shape damage = rootView.modelToView(p0, firstBias, p1, secondBias,
+                                                alloc);
+            Rectangle r = damage instanceof Rectangle ? (Rectangle) damage
+                                                      : damage.getBounds();
+            textComponent.repaint(r.x, r.y, r.width, r.height);
           }
-        else if (l1.y == l2.y)
+        catch (BadLocationException ex)
           {
-            SwingUtilities.computeUnion(l2.x, l2.y, l2.width, l2.height, l1);
-            t.repaint(l1);
+            // Lets ignore this as it causes no serious problems.
+            // For debugging, comment this out.
+            // ex.printStackTrace();
           }
-        else
+        finally
           {
-            // The two rectangles lie on different lines and we need a
-            // different algorithm to calculate the damaged area:
-            // 1. The line of p0 is damaged from the position of p0
-            // to the right border.
-            // 2. All lines between the ones where p0 and p1 lie on
-            // are completely damaged. Use the allocation area to find
-            // out the bounds.
-            // 3. The final line is damaged from the left bound to the
-            // position of p1.
-            Insets insets = t.getInsets();
-
-            // Damage first line until the end.
-            l1.width = insets.right + t.getWidth() - l1.x;
-            t.repaint(l1);
-            
-            // Note: Utilities.getPositionBelow() may return the offset
-            // that was put in. In that case there is no next line and
-            // we should stop searching for one.
-            
-            int posBelow = Utilities.getPositionBelow(t, p0, l1.x);
-            int p1RowStart = Utilities.getRowStart(t, p1);
-            
-            if (posBelow != -1
-                && posBelow != p0
-                && Utilities.getRowStart(t, posBelow) != p1RowStart)
-              {
-                // Take the rectangle of the offset we just found and grow it
-                // to the maximum width. Retain y because this is our start
-                // height.
-                Rectangle grow = modelToView(t, posBelow);
-                grow.x = insets.left;
-                grow.width = t.getWidth() + insets.right;
-                
-                // Find further lines which have to be damaged completely.
-                int nextPosBelow = posBelow;
-                while (nextPosBelow != -1
-                       && posBelow != nextPosBelow
-                       && Utilities.getRowStart(t, nextPosBelow) != p1RowStart)
-                  {
-                    posBelow = nextPosBelow;
-                    nextPosBelow = Utilities.getPositionBelow(t, posBelow, 
-                                                              l1.x);
-                    
-                    if (posBelow == nextPosBelow)
-                      break;
-                  }
-                // Now posBelow is an offset on the last line which has to be 
-                // damaged completely. (newPosBelow is on the same line as p1)
-                 
-                // Retrieve the rectangle of posBelow and use its y and height
-                // value to calculate the final height of the multiple line
-                // spanning rectangle.
-                Rectangle end = modelToView(t, posBelow);
-                grow.height = end.y + end.height - grow.y;
-                
-                // Mark that area as damage.
-                t.repaint(grow);
-              }
-            
-            // Damage last line from its beginning to the position of p1.
-            l2.width += l2.x;
-            l2.x = insets.left;
-            t.repaint(l2);
+            // Release lock.
+            if (doc instanceof AbstractDocument)
+              ((AbstractDocument) doc).readUnlock();
           }
-      }
-    catch (BadLocationException ex)
-      {
-        AssertionError err = new AssertionError("Unexpected bad location");
-        err.initCause(ex);
-        throw err;
       }
   }
 
@@ -1258,10 +1199,29 @@ public abstract class BasicTextUI extends TextUI
   public Rectangle modelToView(JTextComponent t, int pos, Position.Bias bias)
     throws BadLocationException
   {
-    Rectangle r = getVisibleEditorRect();
-    
-    return (r != null) ? rootView.modelToView(pos, r, bias).getBounds()
-                       : null;
+    // We need to read-lock here because we depend on the document
+    // structure not beeing changed in between.
+    Document doc = textComponent.getDocument();
+    if (doc instanceof AbstractDocument)
+      ((AbstractDocument) doc).readLock();
+    Rectangle rect = null;
+    try
+      {
+        Rectangle r = getVisibleEditorRect();
+        if (r != null)
+          {
+            rootView.setSize(r.width, r.height);
+            Shape s = rootView.modelToView(pos, r, bias);
+            if (s != null)
+              rect = s.getBounds();
+          }
+      }
+    finally
+      {
+        if (doc instanceof AbstractDocument)
+          ((AbstractDocument) doc).readUnlock();
+      }
+    return rect;
   }
 
   /**
@@ -1276,7 +1236,7 @@ public abstract class BasicTextUI extends TextUI
    */
   public int viewToModel(JTextComponent t, Point pt)
   {
-    return viewToModel(t, pt, null);
+    return viewToModel(t, pt, new Position.Bias[1]);
   }
 
   /**

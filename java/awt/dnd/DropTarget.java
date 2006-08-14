@@ -45,10 +45,12 @@ import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
 import java.awt.Point;
 import java.awt.datatransfer.FlavorMap;
+import java.awt.datatransfer.SystemFlavorMap;
 import java.awt.dnd.peer.DropTargetPeer;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.peer.ComponentPeer;
+import java.awt.peer.LightweightPeer;
 import java.io.Serializable;
 import java.util.EventListener;
 import java.util.TooManyListenersException;
@@ -112,7 +114,7 @@ public class DropTarget
    */
   public DropTarget ()
   {
-    this (null, 0, null, true, null);
+    this (null, DnDConstants.ACTION_COPY_OR_MOVE, null, true, null);
   }
   
   /**
@@ -123,7 +125,7 @@ public class DropTarget
    */
   public DropTarget (Component c, DropTargetListener dtl)
   {
-    this (c, 0, dtl, true, null);
+    this (c, DnDConstants.ACTION_COPY_OR_MOVE, dtl, true, null);
   }
   
   /**
@@ -160,12 +162,19 @@ public class DropTarget
     if (GraphicsEnvironment.isHeadless ())
       throw new HeadlessException ();
 
-    component = c;
-    actions = i;
+    setComponent(c);
+    setDefaultActions(i);
     dropTargetListener = dtl;
-    flavorMap = fm;
+    
+    if (fm == null)
+      flavorMap = SystemFlavorMap.getDefaultFlavorMap();
+    else
+      flavorMap = fm;
     
     setActive (b);
+    
+    if (c != null)
+      c.setDropTarget(this);
   }
 
   /**
@@ -221,8 +230,14 @@ public class DropTarget
   public void addDropTargetListener (DropTargetListener dtl)
     throws TooManyListenersException
   {
+    if (dtl == null)
+      return;
+    
+    if (dtl.equals(this))
+      throw new IllegalArgumentException();
+    
     if (dropTargetListener != null)
-      throw new TooManyListenersException ();
+      throw new TooManyListenersException();
     
     dropTargetListener = dtl;
   }
@@ -275,9 +290,16 @@ public class DropTarget
 
   public void addNotify(ComponentPeer p)
   {
+    Component c = component;
+    while (c != null && p instanceof LightweightPeer)
+      {
+        p = c.getPeer();
+        c = c.getParent();
+      }
+
     if (p instanceof DropTargetPeer)
       {
-        peer = (DropTargetPeer) p;
+        peer = ((DropTargetPeer) p);
         peer.addDropTarget(this);
       }
     else

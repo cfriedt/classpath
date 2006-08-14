@@ -66,6 +66,11 @@ public class List extends Component
  * Static Variables
  */
 
+/**
+ * The number used to generate the name returned by getName.
+ */
+private static transient long next_list_number;  
+
 // Serialization constant
 private static final long serialVersionUID = -3304312411574666869L;
 
@@ -103,14 +108,13 @@ private int[] selected;
   * @serial An index value used by <code>makeVisible()</code> and
   * <code>getVisibleIndex</code>.
   */
-private int visibleIndex;
+private int visibleIndex = -1;
 
 // The list of ItemListeners for this object.
 private ItemListener item_listeners;
 
 // The list of ActionListeners for this object.
 private ActionListener action_listeners;
-
 
 /*************************************************************************/
 
@@ -171,6 +175,7 @@ List(int rows, boolean multipleMode)
 
   if (GraphicsEnvironment.isHeadless())
     throw new HeadlessException ();
+  
 }
 
 /*************************************************************************/
@@ -309,12 +314,13 @@ setMultipleMode(boolean multipleMode)
   */
 public void
 setMultipleSelections(boolean multipleMode)
-{
+{  
   this.multipleMode = multipleMode;
 
   ListPeer peer = (ListPeer) getPeer ();
   if (peer != null)
     peer.setMultipleMode (multipleMode);
+      
 }
 
 /*************************************************************************/
@@ -514,6 +520,12 @@ add(String item, int index)
 public void
 addItem(String item, int index)
 {
+  if (item == null)
+    item = ""; 
+  
+  if (index < -1)
+    index = -1;
+  
   if ((index == -1) || (index >= items.size ()))
     items.addElement (item);
   else
@@ -538,7 +550,17 @@ addItem(String item, int index)
 public void
 delItem(int index) throws IllegalArgumentException
 {
+  boolean selected = false;
+  if (isSelected(index))
+    {
+      selected = true;
+      deselect(index);   
+    }
+  
   items.removeElementAt (index);
+  
+  if (selected)
+    select(index);
 
   ListPeer peer = (ListPeer) getPeer ();
   if (peer != null)
@@ -575,15 +597,6 @@ remove(int index) throws IllegalArgumentException
 public synchronized void
 delItems(int start, int end) throws IllegalArgumentException
 {
-  if ((start < 0) || (start >= items.size()))
-    throw new IllegalArgumentException("Bad list start index value: " + start);
-
-  if ((start < 0) || (start >= items.size()))
-    throw new IllegalArgumentException("Bad list start index value: " + start);
-
-  if (start > end)
-    throw new IllegalArgumentException("Start is greater than end!");
-
   // We must run the loop in reverse direction.
   for (int i = end; i >= start; --i)
     items.removeElementAt (i);
@@ -639,6 +652,8 @@ clear()
   ListPeer peer = (ListPeer) getPeer ();
   if (peer != null)
     peer.removeAll ();
+  
+  selected = new int[0];
 }
 
 /*************************************************************************/
@@ -690,6 +705,7 @@ getSelectedIndex()
 
   if (selected == null || selected.length != 1)
     return -1;
+  
   return selected[0];
 }
 
@@ -708,7 +724,8 @@ getSelectedIndexes()
     {
       ListPeer l = (ListPeer) peer;
       selected = l.getSelectedIndexes ();
-    }
+    }   
+  
   return selected;
 }
 
@@ -857,13 +874,38 @@ getVisibleIndex()
   *
   * @param index The index of the item to select.
   */
-public synchronized void
-select(int index)
-{
-  ListPeer lp = (ListPeer)getPeer();
-  if (lp != null)
-    lp.select(index);
-}
+  public synchronized void select(int index)
+  {
+    ListPeer lp = (ListPeer) getPeer();
+    if (lp != null)
+      lp.select(index);
+    
+   if (selected != null)
+     {
+       boolean found = false;
+       for (int i = 0; i < selected.length; i++)
+         {
+           if (selected[i] == index)
+           found = true;
+         }
+       if (! found)
+         {
+           if (! isMultipleMode())
+             {
+               selected = new int[] { index };
+               return;
+             }       
+           int[] temp = new int[selected.length + 1];
+           System.arraycopy(selected, 0, temp, 0, selected.length);
+           temp[selected.length] = index;
+           selected = temp;
+         }
+     } else 
+       {
+         selected = new int[1];
+         selected[0] = index;
+       }
+  }
 
 /*************************************************************************/
 
@@ -875,9 +917,26 @@ select(int index)
 public synchronized void
 deselect(int index)
 {
-  ListPeer lp = (ListPeer)getPeer();
-  if (lp != null)
-    lp.deselect(index);
+  if (isSelected(index))
+    {
+      ListPeer lp = (ListPeer)getPeer();
+      if (lp != null)
+        lp.deselect(index);
+
+      int[] temp = new int[selected.length - 1];
+      for (int i = 0; i < temp.length; i++)
+        {
+          if (selected[i] != index)
+            temp[i] = selected[i];
+          else
+            {
+              System.arraycopy(selected, i + 1, temp, i, 
+                               selected.length - i - 1);
+              break;
+            }
+        }
+      selected = temp;
+    }
 }
 
 /*************************************************************************/
@@ -1265,5 +1324,20 @@ paramString()
     if (accessibleContext == null)
       accessibleContext = new AccessibleAWTList();
     return accessibleContext;
+  }
+  
+  /**
+   * Generate a unique name for this <code>List</code>.
+   *
+   * @return A unique name for this <code>List</code>.
+   */
+  String generateName()
+  {
+    return "list" + getUniqueLong();
+  }
+
+  private static synchronized long getUniqueLong()
+  {
+    return next_list_number++;
   }
 } // class List

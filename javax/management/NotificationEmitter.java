@@ -1,5 +1,5 @@
-/* GIFStream.java --
-   Copyright (C)  2006  Free Software Foundation, Inc.
+/* NotificationEmitter.java -- Refined interface for broadcasters.
+   Copyright (C) 2006 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -35,68 +35,42 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
-package gnu.javax.imageio.gif;
-
-import java.io.InputStream;
-import java.io.IOException;
-import javax.imageio.stream.ImageInputStream;
+package javax.management;
 
 /**
- * Implements InputStream on an ImageInputStream
- * The purpose of this is to avoid IIO dependencies in GIFFile
- * (which only uses read() anyway).
+ * Represents a bean that can emit notifications when
+ * events occur.  Other beans can use this interface
+ * to add themselves to the list of recipients of such
+ * notifications.
+ *
+ * @author Andrew John Hughes (gnu_andrew@member.fsf.org)
+ * @since 1.5
  */
-public class GIFStream extends InputStream
+public interface NotificationEmitter
+  extends NotificationBroadcaster
 {
-  private ImageInputStream is;
+  
+  /**
+   * Removes the specified listener from the list of recipients
+   * of notifications from this bean.  Only the first instance with
+   * the supplied filter and passback object is removed.
+   * <code>null</code> is used as a valid value for these parameters,
+   * rather than as a way to remove all registration instances for
+   * the specified listener; for this behaviour instead, see the details
+   * of the same method in {@link NotificationBroadcaster}.
+   *
+   * @param listener the listener to remove.
+   * @param filter the filter of the listener to remove.
+   * @param passback the passback object of the listener to remove.
+   * @throws ListenerNotFoundException if the specified listener
+   *                                   is not registered with this bean.
+   * @see #addNotificationListener(NotificationListener, NotificationFilter,
+   *                               java.lang.Object)
+   */
+  void removeNotificationListener(NotificationListener listener,
+				  NotificationFilter filter,
+				  Object passback)
+    throws ListenerNotFoundException;
 
-  public GIFStream( ImageInputStream is )
-  {
-    this.is = is;
-  }
-
-  public int available()
-  {
-    return 0;
-  }
-
-  public void close() throws IOException
-  {
-    is.close();
-  }
-
-  public void mark(int readlimit)
-  {
-    is.mark();
-  }
-
-  public boolean markSupported()
-  {
-    return true;
-  }
-
-  public int read() throws IOException
-  {
-    return is.read();    
-  }
-
-  public int read(byte[] b) throws IOException
-  {
-    return is.read(b);
-  }
-
-  public int read(byte[] b, int offset, int length) throws IOException
-  {
-    return is.read(b, offset, length);
-  }
-
-  public void reset() throws IOException
-  {
-    is.reset();
-  }
-
-  public long skip(long n) throws IOException
-  {
-    return is.skipBytes(n);
-  }
 }
+

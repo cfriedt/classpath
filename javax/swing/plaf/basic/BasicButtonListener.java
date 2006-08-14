@@ -38,6 +38,8 @@ exception statement from your version. */
 
 package javax.swing.plaf.basic;
 
+import gnu.classpath.SystemProperties;
+
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
@@ -71,10 +73,12 @@ public class BasicButtonListener implements MouseListener, MouseMotionListener,
     // Store the TextLayout for this in a client property for speed-up
     // painting of the label.
     String property = e.getPropertyName();
-    if (property.equals(AbstractButton.TEXT_CHANGED_PROPERTY)
-        || property.equals("font"))
+    AbstractButton b = (AbstractButton) e.getSource();
+    if ((property.equals(AbstractButton.TEXT_CHANGED_PROPERTY)
+         || property.equals("font"))
+        && SystemProperties.getProperty("gnu.javax.swing.noGraphics2D")
+        == null)
       {
-        AbstractButton b = (AbstractButton) e.getSource();
         String text = b.getText();
         if (text == null)
           text = "";
@@ -82,6 +86,10 @@ public class BasicButtonListener implements MouseListener, MouseMotionListener,
                                                       false, false);
         TextLayout layout = new TextLayout(text, b.getFont(), frc);
         b.putClientProperty(BasicGraphicsUtils.CACHED_TEXT_LAYOUT, layout);
+      }
+    if (property.equals(AbstractButton.TEXT_CHANGED_PROPERTY))
+      {
+        BasicHTML.updateRenderer(b, b.getText());
       }
   }
   
@@ -176,11 +184,14 @@ public class BasicButtonListener implements MouseListener, MouseMotionListener,
       {
         AbstractButton button = (AbstractButton) e.getSource();
         ButtonModel model = button.getModel();
-        if (e.getButton() == MouseEvent.BUTTON1)
+        if (SwingUtilities.isLeftMouseButton(e))
           {
             // It is important that these transitions happen in this order.
             model.setArmed(true);
             model.setPressed(true);
+
+            if (! button.isFocusOwner() && button.isRequestFocusEnabled())
+              button.requestFocus();
           }
       }
   }

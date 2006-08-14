@@ -1,5 +1,6 @@
-/* GtkDropTargetPeer.java --
-   Copyright (C) 2006 Free Software Foundation, Inc.
+/* GtkToolkit.java -- Implements an AWT Toolkit using GTK for peers
+   Copyright (C) 2006
+   Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -35,26 +36,41 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+package gnu.java.awt.peer.gtk;
 
-package gnu.java.awt.dnd.peer.gtk;
+import java.awt.Point;
+import java.awt.GraphicsDevice;
+import java.awt.Window;
+import java.awt.peer.MouseInfoPeer;
 
-import java.awt.dnd.DropTarget;
-import java.awt.dnd.peer.DropTargetPeer;
-
-public class GtkDropTargetPeer
-    implements DropTargetPeer
+/**
+ * The MouseInfoPeer is so small, I'm including it here.
+ */
+public class GtkMouseInfoPeer implements MouseInfoPeer
 {
-
-  public void addDropTarget(DropTarget target)
+  private static GdkGraphicsEnvironment gde = new GdkGraphicsEnvironment();
+  
+  public int fillPointWithCoords(Point p)
   {
-    // FIXME: Not Implemented
-
+    int[] coords = gde.getMouseCoordinates();
+      p.x = coords[1]; 
+      p.y = coords[2];
+      return coords[0];
   }
-
-  public void removeDropTarget(DropTarget target)
+  
+  public boolean isWindowUnderMouse(Window w)
   {
-    // FIXME: Not Implemented
+    int[] coords = gde.getMouseCoordinates();
+    GraphicsDevice[] gds = gde.getScreenDevices();
 
-  }
+    // Check if the screen  of the Window and the cursor match
+    if( gds[ coords[0] ] != w.getGraphicsConfiguration().getDevice() )
+      return false;
 
+    // Return the bounds-check.
+    Point p = w.getLocationOnScreen();
+    return (coords[1] >= p.x && coords[1] < p.x + w.getWidth() &&
+	    coords[2] >= p.y && coords[2] < p.y + w.getHeight() );
+    }
 }
+

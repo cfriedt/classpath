@@ -1,5 +1,5 @@
-/* ByteArray.java -- wrapper around a byte array, with nice toString output.
-   Copyright (C) 2005  Free Software Foundation, Inc.
+/* PNGPhys.java --
+   Copyright (C) 2006 Free Software Foundation
 
 This file is part of GNU Classpath.
 
@@ -35,75 +35,78 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+package gnu.javax.imageio.png;
 
-package gnu.classpath;
+/**
+ * A PNG "pHYS" chunk - pixel physical dimensions
+ */
+public class PNGPhys extends PNGChunk 
+{ 
+  long x, y;
+  double ratio;
+  boolean usesRatio;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
-public final class ByteArray
-{
-  private final byte[] value;
-
-  public ByteArray (final byte[] value)
+  protected PNGPhys( int type, byte[] data, int crc ) throws PNGException
   {
-    this.value = value;
-  }
-
-  public byte[] getValue ()
-  {
-    return value;
-  }
-
-  public String toString ()
-  {
-    StringWriter str = new StringWriter ();
-    PrintWriter out = new PrintWriter (str);
-    int i = 0;
-    int len = value.length;
-    while (i < len)
+    super( type, data, crc );
+    if( data.length < 9 )
+      throw new PNGException("Unexpected size of pHYS chunk.");
+    x = ((data[0] & 0xFF) << 24) | ( (data[1] & 0xFF) << 16 ) | 
+      ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+    y = ((data[4] & 0xFF) << 24) | ( (data[5] & 0xFF) << 16 ) | 
+      ((data[6] & 0xFF) << 8) | (data[7] & 0xFF);
+    if(data[8] == 0)
       {
-	out.print (formatInt (i, 16, 8));
-	out.print ("  ");
-	int l = Math.min (16, len - i);
-	String s = toHexString (value, i, l, ' ');
-	out.print (s);
-	for (int j = 56 - (56 - s.length ()); j < 56; j++)
-	  out.print (" ");
-	for (int j = 0; j < l; j++)
-	  {
-	    byte b = value[i+j];
-	    if ((b & 0xFF) < 0x20 || (b & 0xFF) > 0x7E)
-	      out.print (".");
-	    else
-	      out.print ((char) (b & 0xFF));
-	  }
-	out.println ();
-	i += 16;
+	ratio = ((double)x)/((double)y);
+	usesRatio = true;
       }
-    return str.toString ();
   }
 
-  public static String toHexString (byte[] buf, int off, int len, char sep)
+  public PNGPhys( double ratio )
   {
-    StringBuffer str = new StringBuffer();
-    for (int i = 0; i < len; i++)
+    super( TYPE_PHYS );
+
+    this.ratio = ratio;
+    usesRatio = true;
+
+    if( ratio < 1.0 )
       {
-	str.append (Character.forDigit (buf[i+off] >>> 4 & 0x0F, 16));
-	str.append (Character.forDigit (buf[i+off] & 0x0F, 16));
-        if (i < len - 1)
-          str.append(sep);
+	y = 0xFFFFFFFF;
+	x = (long)(0xFFFFFFFFL * ratio);
       }
-    return str.toString();
+    else
+      {
+	x = 0xFFFFFFFF;
+	y = (long)(0xFFFFFFFFL * ratio);
+      }
+    makeData();
   }
 
-  public static String formatInt (int value, int radix, int len)
+  public PNGPhys( int x, int y )
   {
-    String s = Integer.toString (value, radix);
-    StringBuffer buf = new StringBuffer ();
-    for (int j = 0; j < len - s.length(); j++)
-      buf.append ("0");
-    buf.append (s);
-    return buf.toString();
+    super( TYPE_PHYS );
+    usesRatio = false;
+    this.x = x;
+    this.y = y;
+    makeData();
+  }
+
+  private void makeData()
+  {
+    data = new byte[ 9 ];
+    byte[] a = getInt( (int)x );
+    byte[] b = getInt( (int)y );
+    data[0] = a[0]; data[1] = a[1]; data[2] = a[2]; data[3] = a[3]; 
+    data[4] = b[0]; data[5] = b[1]; data[6] = b[2]; data[7] = b[3]; 
+    data[7] = (usesRatio) ? 0 : (byte)0xFF;
+  }
+
+  public String toString()
+  {
+    String s = "PNG Physical pixel size chunk.";
+    if( usesRatio )
+      return s + " Aspect ratio (x/y): " + ratio;
+    else
+      return s + " " + x + " by " + y + " pixels per meter. (x, y).";
   }
 }

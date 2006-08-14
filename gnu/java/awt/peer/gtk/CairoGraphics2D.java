@@ -40,8 +40,8 @@ package gnu.java.awt.peer.gtk;
 
 import gnu.java.awt.ClasspathToolkit;
 
-import java.awt.AlphaComposite;
 import java.awt.AWTPermission;
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Composite;
@@ -53,11 +53,11 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.Image;
 import java.awt.Paint;
+import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.Stroke;
-import java.awt.Polygon;
 import java.awt.TexturePaint;
 import java.awt.Toolkit;
 import java.awt.font.FontRenderContext;
@@ -66,6 +66,7 @@ import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Area;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.PathIterator;
@@ -322,6 +323,11 @@ public abstract class CairoGraphics2D extends Graphics2D
    * Set the current transform matrix
    */
   private native void cairoSetMatrix(long pointer, double[] m);
+  
+  /**
+   * Scaling method
+   */
+  private native void cairoScale(long pointer, double x, double y);
 
   /**
    * Set the compositing operator
@@ -369,6 +375,18 @@ public abstract class CairoGraphics2D extends Graphics2D
    */
   private native void cairoRectangle(long pointer, double x, double y,
                                      double width, double height);
+  
+  /**
+   * Appends an arc to the current path
+   */
+  private native void cairoArc(long pointer, double x, double y,
+                               double radius, double angle1, double angle2);
+
+  /**
+   * Save / restore a cairo path
+   */
+  private native void cairoSave(long pointer);
+  private native void cairoRestore(long pointer);
 
   /**
    * New current path
@@ -665,8 +683,8 @@ public abstract class CairoGraphics2D extends Graphics2D
 	int width = (int) tp.getAnchorRect().getWidth();
 	int height = (int) tp.getAnchorRect().getHeight();
 
-	double scaleX = (width+1) / (double) img.getWidth();
-	double scaleY = (height+1) / (double) img.getHeight();
+	double scaleX = width / (double) img.getWidth();
+	double scaleY = height / (double) img.getHeight();
 
 	AffineTransform at = new AffineTransform(scaleX, 0, 0, scaleY, 0, 0);
 	AffineTransformOp op = new AffineTransformOp(at, getRenderingHints());
@@ -903,53 +921,79 @@ public abstract class CairoGraphics2D extends Graphics2D
   public void draw(Shape s)
   {
     if ((stroke != null && ! (stroke instanceof BasicStroke))
-        || (comp instanceof AlphaComposite
-            && ((AlphaComposite) comp).getAlpha() != 1.0))
+        || (comp instanceof AlphaComposite && ((AlphaComposite) comp).getAlpha() != 1.0))
       {
-        // FIXME: This is a hack to work around BasicStrokes's current
-        // limitations wrt cubic curves.
-        // See CubicSegment.getDisplacedSegments().
-        if (stroke instanceof BasicStroke)
-          {
-            PathIterator flatten = s.getPathIterator(null, 1.0);
-            GeneralPath p = new GeneralPath();
-            p.append(flatten, false);
-            s = p;
-          }
-	fill(stroke.createStrokedShape(s));
-	return;
+        // Cairo doesn't support stroking with alpha, so we create the stroked
+        // shape and fill with alpha instead
+        fill(stroke.createStrokedShape(s));
+        return;
       }
 
-    cairoNewPath(nativePointer);
-
-    if (s instanceof Rectangle2D)
-      {
-	Rectangle2D r = (Rectangle2D) s;
-	cairoRectangle(nativePointer, shifted(r.getX(), shiftDrawCalls),
-	               shifted(r.getY(), shiftDrawCalls), r.getWidth(),
-	               r.getHeight());
-      }
-    else
-      walkPath(s.getPathIterator(null), shiftDrawCalls);
+    createPath(s);
     cairoStroke(nativePointer);
   }
 
   public void fill(Shape s)
   {
-    cairoNewPath(nativePointer);
-    if (s instanceof Rectangle2D)
-      {
-	Rectangle2D r = (Rectangle2D) s;
-	cairoRectangle(nativePointer, r.getX(), r.getY(), r.getWidth(),
-                       r.getHeight());
-      }
-    else
-      walkPath(s.getPathIterator(null), false);
+    createPath(s);
 
     double alpha = 1.0;
     if (comp instanceof AlphaComposite)
       alpha = ((AlphaComposite) comp).getAlpha();
     cairoFill(nativePointer, alpha);
+  }
+
+  private void createPath(Shape s)
+  {
+    cairoNewPath(nativePointer);
+
+    // Optimize rectangles, since there is a direct Cairo function
+    if (s instanceof Rectangle2D)
+      {
+        Rectangle2D r = (Rectangle2D) s;
+        cairoRectangle(nativePointer, shifted(r.getX(), shiftDrawCalls),
+                       shifted(r.getY(), shiftDrawCalls), r.getWidth(),
+                       r.getHeight());
+      }
+
+    // We can optimize ellipses too; however we don't bother optimizing arcs:
+    // the iterator is fast enough (an ellipse requires 5 steps using the
+    // iterator, while most arcs are only 2-3)
+    else if (s instanceof Ellipse2D)
+      {
+        Ellipse2D e = (Ellipse2D) s;
+
+        double radius = Math.min(e.getHeight(), e.getWidth()) / 2;
+
+        // Cairo only draws circular shapes, but we can use a stretch to make
+        // them into ellipses
+        double xscale = 1, yscale = 1;
+        if (e.getHeight() != e.getWidth())
+          {
+            cairoSave(nativePointer);
+
+            if (e.getHeight() < e.getWidth())
+              xscale = e.getWidth() / (radius * 2);
+            else
+              yscale = e.getHeight() / (radius * 2);
+
+            if (xscale != 1 || yscale != 1)
+              cairoScale(nativePointer, xscale, yscale);
+          }
+
+        cairoArc(nativePointer,
+                 shifted(e.getCenterX() / xscale, shiftDrawCalls),
+                 shifted(e.getCenterY() / yscale, shiftDrawCalls), radius, 0,
+                 Math.PI * 2);
+
+        if (xscale != 1 || yscale != 1)
+          cairoRestore(nativePointer);
+      }
+
+    // All other shapes are broken down and drawn in steps using the
+    // PathIterator
+    else
+      walkPath(s.getPathIterator(null), shiftDrawCalls);
   }
 
   /**
@@ -985,9 +1029,13 @@ public abstract class CairoGraphics2D extends Graphics2D
 
   public void drawLine(int x1, int y1, int x2, int y2)
   {
-    cairoDrawLine(nativePointer, shifted(x1, shiftDrawCalls),
-                  shifted(y1, shiftDrawCalls), shifted(x2, shiftDrawCalls),
-                  shifted(y2, shiftDrawCalls));
+    // The coordinates being pairwise identical means one wants
+    // to draw a single pixel. This is emulated by drawing
+    // a one pixel sized rectangle.
+    if (x1 == x2 && y1 == y2)
+      cairoFillRect(nativePointer, x1, y1, 1, 1);
+    else
+      cairoDrawLine(nativePointer, x1 + 0.5, y1 + 0.5, x2 + 0.5, y2 + 0.5);
   }
 
   public void drawRect(int x, int y, int width, int height)
@@ -1185,6 +1233,9 @@ public abstract class CairoGraphics2D extends Graphics2D
     if (img == null)
       return false;
 
+    if (xform == null)
+      xform = new AffineTransform();
+
     // In this case, xform is an AffineTransform that transforms bounding
     // box of the specified image from image space to user space. However
     // when we pass this transform to cairo, cairo will use this transform
@@ -1218,7 +1269,7 @@ public abstract class CairoGraphics2D extends Graphics2D
       }
 
     BufferedImage b = (BufferedImage) img;
-    DataBuffer db;
+    Raster raster;
     double[] i2u = new double[6];
     int width = b.getWidth();
     int height = b.getHeight();
@@ -1227,9 +1278,9 @@ public abstract class CairoGraphics2D extends Graphics2D
     // use the cached CairoSurface that BIG is drawing onto
     
     if( BufferedImageGraphics.bufferedImages.get( b ) != null )
-      db = (DataBuffer)BufferedImageGraphics.bufferedImages.get( b );
+      raster = (Raster)BufferedImageGraphics.bufferedImages.get( b );
     else
-      db = b.getRaster().getDataBuffer();
+      raster = b.getRaster();
 
     invertedXform.getMatrix(i2u);
 
@@ -1237,9 +1288,9 @@ public abstract class CairoGraphics2D extends Graphics2D
     if (comp instanceof AlphaComposite)
       alpha = ((AlphaComposite) comp).getAlpha();
 
-    if(db instanceof CairoSurface)
+    if(raster instanceof CairoSurface)
       {
-	((CairoSurface)db).drawSurface(nativePointer, i2u, alpha);
+	((CairoSurface)raster).drawSurface(nativePointer, i2u, alpha);
         updateColor();
 	return true;
       }
@@ -1283,7 +1334,9 @@ public abstract class CairoGraphics2D extends Graphics2D
 
   public void drawImage(BufferedImage image, BufferedImageOp op, int x, int y)
   {
-    Image filtered = op.filter(image, null);
+    Image filtered = image;
+    if (op != null)
+      filtered = op.filter(image, null);
     drawImage(filtered, new AffineTransform(1f, 0f, 0f, 1f, x, y), null, null);
   }
 
@@ -1405,8 +1458,11 @@ public abstract class CairoGraphics2D extends Graphics2D
         float[] positions = gv.getGlyphPositions (0, n, null);
 
         setFont (gv.getFont ());
-        cairoDrawGlyphVector(nativePointer, (GdkFontPeer)getFont().getPeer(),
-                             x, y, n, codes, positions);
+	synchronized( this.font ) 
+	  { 
+	    cairoDrawGlyphVector(nativePointer, (GdkFontPeer)getFont().getPeer(),
+				 x, y, n, codes, positions);
+	  }
       }
     else
       {

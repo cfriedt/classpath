@@ -42,6 +42,7 @@ package java.awt;
 import java.awt.event.ComponentListener;
 import java.awt.event.ContainerEvent;
 import java.awt.event.ContainerListener;
+import java.awt.event.HierarchyEvent;
 import java.awt.event.KeyEvent;
 import java.awt.peer.ComponentPeer;
 import java.awt.peer.ContainerPeer;
@@ -88,14 +89,16 @@ public class Container extends Component
   Dimension maxSize;
 
   /**
-   * Keeps track if the Container was cleared during a paint/update.
-   */
-  private boolean backCleared;
-
-  /**
    * @since 1.4
    */
   boolean focusCycleRoot;
+
+  /**
+   * Indicates if this container provides a focus traversal policy.
+   *
+   * @since 1.5
+   */
+  private boolean focusTraversalPolicyProvider;
 
   int containerSerializedDataVersion;
 
@@ -205,10 +208,12 @@ public class Container extends Component
    */
   public Insets insets()
   {
-    if (peer == null)
-      return new Insets (0, 0, 0, 0);
-
-    return ((ContainerPeer) peer).getInsets ();
+    Insets i;
+    if (peer == null || peer instanceof LightweightPeer)
+      i = new Insets (0, 0, 0, 0);
+    else
+      i = ((ContainerPeer) peer).getInsets ();
+    return i;
   }
 
   /**
@@ -362,6 +367,16 @@ public class Container extends Component
             ++ncomponents;
           }
 
+        // Update the counter for Hierarchy(Bounds)Listeners.
+        int childHierarchyListeners = comp.numHierarchyListeners;
+        if (childHierarchyListeners > 0)
+          updateHierarchyListenerCount(AWTEvent.HIERARCHY_EVENT_MASK,
+                                       childHierarchyListeners);
+        int childHierarchyBoundsListeners = comp.numHierarchyBoundsListeners;
+        if (childHierarchyBoundsListeners > 0)
+          updateHierarchyListenerCount(AWTEvent.HIERARCHY_BOUNDS_EVENT_MASK,
+                                       childHierarchyListeners);
+
         // Notify the layout manager.
         if (layoutMgr != null)
           {
@@ -388,6 +403,10 @@ public class Container extends Component
         ContainerListener[] listeners = getContainerListeners();
         for (int i = 0; i < listeners.length; i++)
           listeners[i].componentAdded(ce);
+
+        // Notify hierarchy listeners.
+        comp.fireHierarchyEvent(HierarchyEvent.HIERARCHY_CHANGED, comp,
+                                this, HierarchyEvent.PARENT_CHANGED);
       }
   }
 
@@ -412,6 +431,16 @@ public class Container extends Component
                          ncomponents - index - 1);
         component[--ncomponents] = null;
 
+        // Update the counter for Hierarchy(Bounds)Listeners.
+        int childHierarchyListeners = r.numHierarchyListeners;
+        if (childHierarchyListeners > 0)
+          updateHierarchyListenerCount(AWTEvent.HIERARCHY_EVENT_MASK,
+                                       -childHierarchyListeners);
+        int childHierarchyBoundsListeners = r.numHierarchyBoundsListeners;
+        if (childHierarchyBoundsListeners > 0)
+          updateHierarchyListenerCount(AWTEvent.HIERARCHY_BOUNDS_EVENT_MASK,
+                                       -childHierarchyListeners);
+
         invalidate();
 
         if (layoutMgr != null)
@@ -423,10 +452,14 @@ public class Container extends Component
           {
             // Post event to notify of removing the component.
             ContainerEvent ce = new ContainerEvent(this,
-                                                   ContainerEvent.COMPONENT_REMOVED,
-                                                   r);
+                                               ContainerEvent.COMPONENT_REMOVED,
+                                               r);
             getToolkit().getSystemEventQueue().postEvent(ce);
           }
+
+        // Notify hierarchy listeners.
+        r.fireHierarchyEvent(HierarchyEvent.HIERARCHY_CHANGED, r,
+                             this, HierarchyEvent.PARENT_CHANGED);
       }
   }
 
@@ -475,26 +508,43 @@ public class Container extends Component
             
             r.removeNotify();
 
+            // Update the counter for Hierarchy(Bounds)Listeners.
+            int childHierarchyListeners = r.numHierarchyListeners;
+            if (childHierarchyListeners > 0)
+              updateHierarchyListenerCount(AWTEvent.HIERARCHY_EVENT_MASK,
+                                           -childHierarchyListeners);
+            int childHierarchyBoundsListeners = r.numHierarchyBoundsListeners;
+            if (childHierarchyBoundsListeners > 0)
+              updateHierarchyListenerCount(AWTEvent.HIERARCHY_BOUNDS_EVENT_MASK,
+                                           -childHierarchyListeners);
+
             if (layoutMgr != null)
               layoutMgr.removeLayoutComponent(r);
 
             r.parent = null;
 
-            if (isShowing ())
+            // Send ContainerEvent if necessary.
+            if (containerListener != null
+                || (eventMask & AWTEvent.CONTAINER_EVENT_MASK) != 0)
               {
                 // Post event to notify of removing the component.
                 ContainerEvent ce
                   = new ContainerEvent(this,
                                        ContainerEvent.COMPONENT_REMOVED,
                                        r);
-                
-                getToolkit().getSystemEventQueue().postEvent(ce);
+                dispatchEvent(ce);
               }
-            }
-          
+
+            // Send HierarchyEvent if necessary.
+            fireHierarchyEvent(HierarchyEvent.HIERARCHY_CHANGED, r, this,
+                               HierarchyEvent.PARENT_CHANGED);
+
+          }
+
+        if (valid)
           invalidate();
         
-          ncomponents = 0;
+        ncomponents = 0;
       }
   }
 
@@ -573,19 +623,22 @@ public class Container extends Component
    */
   void invalidateTree()
   {
-    super.invalidate();  // Clean cached layout state.
-    for (int i = 0; i < ncomponents; i++)
+    synchronized (getTreeLock())
       {
-        Component comp = component[i];
-        comp.invalidate();
-        if (comp instanceof Container)
-          ((Container) comp).invalidateTree();
-      }
+        super.invalidate();  // Clean cached layout state.
+        for (int i = 0; i < ncomponents; i++)
+          {
+            Component comp = component[i];
+            comp.invalidate();
+            if (comp instanceof Container)
+              ((Container) comp).invalidateTree();
+          }
 
-    if (layoutMgr != null && layoutMgr instanceof LayoutManager2)
-      {
-        LayoutManager2 lm2 = (LayoutManager2) layoutMgr;
-        lm2.invalidateLayout(this);
+        if (layoutMgr != null && layoutMgr instanceof LayoutManager2)
+          {
+            LayoutManager2 lm2 = (LayoutManager2) layoutMgr;
+            lm2.invalidateLayout(this);
+          }
       }
   }
 
@@ -672,21 +725,25 @@ public class Container extends Component
    */
   public Dimension preferredSize()
   {
-    synchronized(treeLock)
-      {  
-        if(valid && prefSize != null)
-          return new Dimension(prefSize);
-        LayoutManager layout = getLayout();
-        if (layout != null)
+    Dimension size = prefSize;
+    // Try to return cached value if possible.
+    if (size == null || !(prefSizeSet || valid))
+      {
+        // Need to lock here.
+        synchronized (getTreeLock())
           {
-            Dimension layoutSize = layout.preferredLayoutSize(this);
-            if(valid)
-              prefSize = layoutSize;
-            return new Dimension(layoutSize);
+            LayoutManager l = layoutMgr;
+            if (l != null)
+              prefSize = l.preferredLayoutSize(this);
+            else
+              prefSize = super.preferredSizeImpl();
+            size = prefSize;
           }
-        else
-          return super.preferredSize ();
       }
+    if (size != null)
+      return new Dimension(size);
+    else
+      return size;
   }
 
   /**
@@ -708,17 +765,25 @@ public class Container extends Component
    */
   public Dimension minimumSize()
   {
-    if(valid && minSize != null)
-      return new Dimension(minSize);
-
-    LayoutManager layout = getLayout();
-    if (layout != null)
+    Dimension size = minSize;
+    // Try to return cached value if possible.
+    if (size == null || !(minSizeSet || valid))
       {
-        minSize = layout.minimumLayoutSize (this);
-        return minSize;
-      }    
+        // Need to lock here.
+        synchronized (getTreeLock())
+          {
+            LayoutManager l = layoutMgr;
+            if (l != null)
+              minSize = l.minimumLayoutSize(this);
+            else
+              minSize = super.minimumSizeImpl();
+            size = minSize;
+          }
+      }
+    if (size != null)
+      return new Dimension(size);
     else
-      return super.minimumSize ();
+      return size;
   }
 
   /**
@@ -728,18 +793,25 @@ public class Container extends Component
    */
   public Dimension getMaximumSize()
   {
-    if (valid && maxSize != null)
-      return new Dimension(maxSize);
-
-    LayoutManager layout = getLayout();
-    if (layout != null && layout instanceof LayoutManager2)
+    Dimension size = maxSize;
+    // Try to return cached value if possible.
+    if (size == null || !(maxSizeSet || valid))
       {
-        LayoutManager2 lm2 = (LayoutManager2) layout;
-        maxSize = lm2.maximumLayoutSize(this);
-        return maxSize;
+        // Need to lock here.
+        synchronized (getTreeLock())
+          {
+            LayoutManager l = layoutMgr;
+            if (l instanceof LayoutManager2)
+              maxSize = ((LayoutManager2) l).maximumLayoutSize(this);
+            else
+              maxSize = super.maximumSizeImpl();
+            size = maxSize;
+          }
       }
+    if (size != null)
+      return new Dimension(size);
     else
-      return super.getMaximumSize();
+      return size;
   }
 
   /**
@@ -755,8 +827,11 @@ public class Container extends Component
     float alignmentX = 0.0F;
     if (layout != null && layout instanceof LayoutManager2)
       {
-        LayoutManager2 lm2 = (LayoutManager2) layout;
-        alignmentX = lm2.getLayoutAlignmentX(this);
+        synchronized (getTreeLock())
+          {
+            LayoutManager2 lm2 = (LayoutManager2) layout;
+            alignmentX = lm2.getLayoutAlignmentX(this);
+          }
       }
     else
       alignmentX = super.getAlignmentX();
@@ -776,8 +851,11 @@ public class Container extends Component
     float alignmentY = 0.0F;
     if (layout != null && layout instanceof LayoutManager2)
       {
-        LayoutManager2 lm2 = (LayoutManager2) layout;
-        alignmentY = lm2.getLayoutAlignmentY(this);
+        synchronized (getTreeLock())
+          {
+            LayoutManager2 lm2 = (LayoutManager2) layout;
+            alignmentY = lm2.getLayoutAlignmentY(this);
+          }
       }
     else
       alignmentY = super.getAlignmentY();
@@ -795,13 +873,10 @@ public class Container extends Component
    */
   public void paint(Graphics g)
   {
-    if (!isShowing())
-      return;
-
-    // Visit heavyweights if the background was cleared
-    // for this container.
-    visitChildren(g, GfxPaintVisitor.INSTANCE, !backCleared);
-    backCleared = false;
+    if (isShowing())
+      {
+        visitChildren(g, GfxPaintVisitor.INSTANCE, true);
+      }
   }
 
   /**
@@ -831,14 +906,15 @@ public class Container extends Component
     // that overrides isLightweight() to return false, the background is
     // also not cleared. So we do a check on !(peer instanceof LightweightPeer)
     // instead.
-    ComponentPeer p = peer;
-    if (p != null && ! (p instanceof LightweightPeer))
+    if (isShowing())
       {
-        g.clearRect(0, 0, getWidth(), getHeight());
-        backCleared = true;
+        ComponentPeer p = peer;
+        if (! (p instanceof LightweightPeer))
+          {
+            g.clearRect(0, 0, getWidth(), getHeight());
+          }
+        paint(g);
       }
-
-    paint(g);
   }
 
   /**
@@ -1174,8 +1250,11 @@ public class Container extends Component
    */
   public void addNotify()
   {
-    super.addNotify();
-    addNotifyContainerChildren();
+    synchronized (getTreeLock())
+      {
+        super.addNotify();
+        addNotifyContainerChildren();
+      }
   }
 
   /**
@@ -1550,6 +1629,42 @@ public class Container extends Component
   }
 
   /**
+   * Set to <code>true</code> if this container provides a focus traversal
+   * policy, <code>false</code> when the root container's focus
+   * traversal policy should be used.
+   *
+   * @return <code>true</code> if this container provides a focus traversal
+   *        policy, <code>false</code> when the root container's focus
+   *        traversal policy should be used
+   *
+   * @see #setFocusTraversalPolicyProvider(boolean)
+   *
+   * @since 1.5
+   */
+  public final boolean isFocusTraversalPolicyProvider()
+  {
+    return focusTraversalPolicyProvider;
+  }
+
+  /**
+   * Set to <code>true</code> if this container provides a focus traversal
+   * policy, <code>false</code> when the root container's focus
+   * traversal policy should be used.
+   *
+   * @param b <code>true</code> if this container provides a focus traversal
+   *        policy, <code>false</code> when the root container's focus
+   *        traversal policy should be used
+   * 
+   * @see #isFocusTraversalPolicyProvider()
+   *
+   * @since 1.5
+   */
+  public final void setFocusTraversalPolicyProvider(boolean b)
+  {
+    focusTraversalPolicyProvider = b;
+  }
+
+  /**
    * Check whether this Container is a focus cycle root.
    *
    * @return true if this is a focus cycle root, false otherwise
@@ -1656,24 +1771,27 @@ public class Container extends Component
     if (comp == this)
       throw new IllegalArgumentException("cannot add component to itself");
 
-    // FIXME: Implement reparenting.
-    if ( comp.getParent() != this)
-      throw new AssertionError("Reparenting is not implemented yet");
-    else
+    synchronized (getTreeLock())
       {
-        // Find current component index.
-        int currentIndex = getComponentZOrder(comp);
-        if (currentIndex < index)
-          {
-            System.arraycopy(component, currentIndex + 1, component,
-                             currentIndex, index - currentIndex);
-          }
+        // FIXME: Implement reparenting.
+        if ( comp.getParent() != this)
+          throw new AssertionError("Reparenting is not implemented yet");
         else
           {
-            System.arraycopy(component, index, component, index + 1,
-                             currentIndex - index);
+            // Find current component index.
+            int currentIndex = getComponentZOrder(comp);
+            if (currentIndex < index)
+              {
+                System.arraycopy(component, currentIndex + 1, component,
+                                 currentIndex, index - currentIndex);
+              }
+            else
+              {
+                System.arraycopy(component, index, component, index + 1,
+                                 currentIndex - index);
+              }
+            component[index] = comp;
           }
-        component[index] = comp;
       }
   }
 
@@ -1692,19 +1810,22 @@ public class Container extends Component
    */
   public final int getComponentZOrder(Component comp)
   {
-    int index = -1;
-    if (component != null)
+    synchronized (getTreeLock())
       {
-        for (int i = 0; i < ncomponents; i++)
+        int index = -1;
+        if (component != null)
           {
-            if (component[i] == comp)
+            for (int i = 0; i < ncomponents; i++)
               {
-                index = i;
-                break;
+                if (component[i] == comp)
+                  {
+                    index = i;
+                    break;
+                  }
               }
           }
+        return index;
       }
-    return index;
   }
 
   // Hidden helper methods.
@@ -1857,6 +1978,85 @@ public class Container extends Component
           }
 
         return null;
+      }
+  }
+
+  /**
+   * Fires hierarchy events to the children of this container and this
+   * container itself. This overrides {@link Component#fireHierarchyEvent}
+   * in order to forward this event to all children.
+   */
+  void fireHierarchyEvent(int id, Component changed, Container parent,
+                          long flags)
+  {
+    // Only propagate event if there is actually a listener waiting for it.
+    if ((id == HierarchyEvent.HIERARCHY_CHANGED && numHierarchyListeners > 0)
+        || ((id == HierarchyEvent.ANCESTOR_MOVED
+             || id == HierarchyEvent.ANCESTOR_RESIZED)
+            && numHierarchyBoundsListeners > 0))
+      {
+        for (int i = 0; i < ncomponents; i++)
+          component[i].fireHierarchyEvent(id, changed, parent, flags);
+        super.fireHierarchyEvent(id, changed, parent, flags);
+      }
+  }
+
+  /**
+   * Adjusts the number of hierarchy listeners of this container and all of
+   * its parents. This is called by the add/remove listener methods and
+   * structure changing methods in Container.
+   *
+   * @param type the type, either {@link AWTEvent#HIERARCHY_BOUNDS_EVENT_MASK}
+   *        or {@link AWTEvent#HIERARCHY_EVENT_MASK}
+   * @param delta the number of listeners added or removed
+   */
+  void updateHierarchyListenerCount(long type, int delta)
+  {
+    if (type == AWTEvent.HIERARCHY_BOUNDS_EVENT_MASK)
+      numHierarchyBoundsListeners += delta;
+    else if (type == AWTEvent.HIERARCHY_EVENT_MASK)
+      numHierarchyListeners += delta;
+    else
+      assert false : "Should not reach here";
+
+    if (parent != null)
+      parent.updateHierarchyListenerCount(type, delta);
+  }
+
+  /**
+   * Notifies interested listeners about resizing or moving the container.
+   * This performs the super behaviour (sending component events) and
+   * additionally notifies any hierarchy bounds listeners on child components.
+   *
+   * @param resized true if the component has been resized, false otherwise
+   * @param moved true if the component has been moved, false otherwise
+   */
+  void notifyReshape(boolean resized, boolean moved)
+  {
+    // Notify component listeners.
+    super.notifyReshape(resized, moved);
+
+    if (ncomponents > 0)
+      {
+        // Notify hierarchy bounds listeners.
+        if (resized)
+          {
+            for (int i = 0; i < getComponentCount(); i++)
+              {
+                Component child = getComponent(i);
+                child.fireHierarchyEvent(HierarchyEvent.ANCESTOR_RESIZED,
+                                         this, parent, 0);
+              }
+          }
+        if (moved)
+          {
+            for (int i = 0; i < getComponentCount(); i++)
+              {
+                Component child = getComponent(i);
+                child.fireHierarchyEvent(HierarchyEvent.ANCESTOR_MOVED,
+                                         this, parent, 0);
+              }
+          }
       }
   }
 
