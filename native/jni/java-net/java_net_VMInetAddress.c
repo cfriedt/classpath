@@ -208,7 +208,7 @@ Java_java_net_VMInetAddress_getHostByName (JNIEnv * env,
   int result;
   jclass arr_class;
   jobjectArray addrs;
-  jint i, j;
+  jint i;
   jbyte *octets;
   jarray ret_octets;
 

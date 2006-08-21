@@ -1,3 +1,27 @@
+2006-08-20  Mark Wielaard  <mark@klomp.org>
+
+	* doc/tools.texinfo: Add file from trunk.
+	* native/jni/Makefile.am (DIST_SUBDIRS): Add native-lib.
+	* native/jni/java-io/java_io_VMFile.c: Include lstat and readlink
+	headers.
+	* native/jni/java-lang/java_lang_VMProcess.c
+	(Java_java_lang_VMProcess_nativeSpawn): Remove redirect argument.
+	* native/jni/java-net/java_net_VMInetAddress.c
+	(Java_java_net_VMInetAddress_getHostByName): Remove unused variable.
+	* native/jni/native-lib/Makefile.am: Remove empty and nonexisting
+	files.
+	* native/jni/native-lib/cpio.c (cpio_setFileReadonly): Use correct
+	mask.
+	* native/jni/native-lib/cpnet.c (cpnet_connect): Removed unused
+	theaddr.
+	* native/jni/native-lib/cpnet.h (cpnet_freeAddresses): Moved from
+	cpnet.h.
+	* native/jni/native-lib/cpnet.h (cpnet_freeAddresses): Declare,
+	don't implement.
+	* vm/reference/java/lang/VMProcess.java: Removed unused redirect
+	argument.
+	* include/java_lang_VMProcess.h: Regenerated.
+	
 2006-08-14  Guilhem Lavaux  <guilhem@kaffe.org>
 	
 	* Merged HEAD as of 2006-08-14 0:00.

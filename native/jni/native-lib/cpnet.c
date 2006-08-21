@@ -180,8 +180,6 @@ jint cpnet_connect(JNIEnv *env UNUSED, jint fd, cpnet_address *addr)
   int ret;
 
   /* TODO: implement socket time out */
-  struct sockaddr_in *theaddr = (struct sockaddr_in *)addr->data;
-
   ret = connect(fd, (struct sockaddr *)addr->data, addr->len);
   if (ret != 0)
     return errno;
@@ -696,4 +694,12 @@ jint cpnet_getHostByAddr (JNIEnv *env UNUSED, cpnet_address *addr, char *hostnam
   strncpy(hostname, ret->h_name, hostname_len);
 
   return 0;
+}
+
+void cpnet_freeAddresses(JNIEnv * env, cpnet_address **addr, jint addresses_count)
+{
+  jint i;
+
+  for (i = 0; i < addresses_count; i++)
+    cpnet_freeAddress(env, addr[i]);
 }

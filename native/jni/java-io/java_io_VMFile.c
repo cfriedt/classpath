@@ -42,6 +42,12 @@ exception statement from your version. */
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined (HAVE_LSTAT) && defined (HAVE_READLINK)
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include <jni.h>
 #include <jcl.h>
 #include "cpio.h"

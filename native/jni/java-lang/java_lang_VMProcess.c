@@ -123,8 +123,7 @@ copy_elem (JNIEnv * env, jobject stringArray, jint i)
 JNIEXPORT void JNICALL
 Java_java_lang_VMProcess_nativeSpawn (JNIEnv * env, jobject this,
 				      jobjectArray cmdArray,
-				      jobjectArray envArray, jobject dirFile,
-				      jboolean redirect)
+				      jobjectArray envArray, jobject dirFile)
 {
   int fds[CPIO_EXEC_NUM_PIPES];
   jobject streams[CPIO_EXEC_NUM_PIPES] = { NULL, NULL, NULL };

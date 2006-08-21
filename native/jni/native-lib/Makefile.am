@@ -3,9 +3,7 @@ libclasspathnative_la_SOURCES = cpnet.c \
 				cpnet.h \
 				cpio.c \
 				cpio.h \
-				cpnative.c \
 				cpnative.h \
-				cpmath.h \
 				cpproc.h \
 				cpproc.c
 
