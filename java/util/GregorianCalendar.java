@@ -510,71 +510,78 @@ public class GregorianCalendar extends Calendar
     int month = fields[MONTH];
     int day = fields[DAY_OF_MONTH];
 
+    int hour = fields[HOUR_OF_DAY];
     int minute = fields[MINUTE];
     int second = fields[SECOND];
     int millis = fields[MILLISECOND];
     int[] month_days = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     int[] dayCount = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
-    int hour = 0;
 
     if (! isLenient())
       nonLeniencyCheck();
 
-    if (! isSet[MONTH] && (! isSet[DAY_OF_WEEK] || isSet[WEEK_OF_YEAR]))
+    if (isSet[YEAR])
       {
-	// 5: YEAR + DAY_OF_WEEK + WEEK_OF_YEAR
-	if (isSet[WEEK_OF_YEAR])
+	if (isSet[MONTH])
 	  {
-	    int first = getFirstDayOfMonth(year, 0);
-	    int offs = 1;
-	    int daysInFirstWeek = getFirstDayOfWeek() - first;
-	    if (daysInFirstWeek <= 0)
-	      daysInFirstWeek += 7;
+	    if (isSet[DAY_OF_MONTH])
+	      {
+		// 1: YEAR + MONTH + DAY_OF_MONTH
+	      }
+	    else if (isSet[DAY_OF_WEEK])
+	      {
+		int first = getFirstDayOfMonth(year, month);
 
-	    if (daysInFirstWeek < getMinimalDaysInFirstWeek())
-	      offs += daysInFirstWeek;
-	    else
-	      offs -= 7 - daysInFirstWeek;
-	    month = 0;
-	    day = offs + 7 * (fields[WEEK_OF_YEAR] - 1);
-	    offs = fields[DAY_OF_WEEK] - getFirstDayOfWeek();
+		if (isSet[WEEK_OF_MONTH])
+		  {
+		    // 2: YEAR + MONTH + WEEK_OF_MONTH + DAY_OF_WEEK
+		    int offs = 1;
+		    int daysInFirstWeek = getFirstDayOfWeek() - first;
+		    if (daysInFirstWeek <= 0)
+		      daysInFirstWeek += 7;
 
-	    if (offs < 0)
-	      offs += 7;
-	    day += offs;
+		    if (daysInFirstWeek < getMinimalDaysInFirstWeek())
+		      offs += daysInFirstWeek;
+		    else
+		      offs -= 7 - daysInFirstWeek;
+
+		    day = offs + 7 * (fields[WEEK_OF_MONTH] - 1);
+		    offs = fields[DAY_OF_WEEK] - getFirstDayOfWeek();
+		    if (offs < 0)
+		      offs += 7;
+		    day += offs;
+		  }
+		else if (isSet[DAY_OF_WEEK_IN_MONTH])
+		  {
+		    // 3: YEAR + MONTH + DAY_OF_WEEK_IN_MONTH + DAY_OF_WEEK
+		    if (fields[DAY_OF_WEEK_IN_MONTH] < 0)
+		      {
+			month++;
+			first = getFirstDayOfMonth(year, month);
+			day = 1 + 7 * (fields[DAY_OF_WEEK_IN_MONTH]);
+		      }
+		    else
+		      day = 1 + 7 * (fields[DAY_OF_WEEK_IN_MONTH] - 1);
+
+		    int offs = fields[DAY_OF_WEEK] - first;
+		    if (offs < 0)
+		      offs += 7;
+		    day += offs;
+		  }
+	      }
 	  }
 	else
 	  {
-	    // 4:  YEAR + DAY_OF_YEAR
-	    month = 0;
-	    day = fields[DAY_OF_YEAR];
-	  }
-      }
-    else
-      {
-	if (isSet[DAY_OF_WEEK])
-	  {
-	    int first = getFirstDayOfMonth(year, month);
-
-	    // 3: YEAR + MONTH + DAY_OF_WEEK_IN_MONTH + DAY_OF_WEEK
-	    if (isSet[DAY_OF_WEEK_IN_MONTH])
+	    if (isSet[DAY_OF_YEAR])
 	      {
-		if (fields[DAY_OF_WEEK_IN_MONTH] < 0)
-		  {
-		    month++;
-		    first = getFirstDayOfMonth(year, month);
-		    day = 1 + 7 * (fields[DAY_OF_WEEK_IN_MONTH]);
-		  }
-		else
-		  day = 1 + 7 * (fields[DAY_OF_WEEK_IN_MONTH] - 1);
-
-		int offs = fields[DAY_OF_WEEK] - first;
-		if (offs < 0)
-		  offs += 7;
-		day += offs;
+		// 4:  YEAR + DAY_OF_YEAR
+		month = 0;
+		day = fields[DAY_OF_YEAR];
 	      }
-	    else
-	      { // 2: YEAR + MONTH + WEEK_OF_MONTH + DAY_OF_WEEK
+	    else if (isSet[DAY_OF_WEEK] && isSet[WEEK_OF_YEAR])
+	      {
+		// 5: YEAR + DAY_OF_WEEK + WEEK_OF_YEAR
+		int first = getFirstDayOfMonth(year, 0);
 		int offs = 1;
 		int daysInFirstWeek = getFirstDayOfWeek() - first;
 		if (daysInFirstWeek <= 0)
@@ -584,31 +591,34 @@ public class GregorianCalendar extends Calendar
 		  offs += daysInFirstWeek;
 		else
 		  offs -= 7 - daysInFirstWeek;
-
-		day = offs + 7 * (fields[WEEK_OF_MONTH] - 1);
+		month = 0;
+		day = offs + 7 * (fields[WEEK_OF_YEAR] - 1);
 		offs = fields[DAY_OF_WEEK] - getFirstDayOfWeek();
+
 		if (offs < 0)
 		  offs += 7;
 		day += offs;
 	      }
 	  }
-
-	// 1:  YEAR + MONTH + DAY_OF_MONTH
       }
     if (era == BC && year > 0)
       year = 1 - year;
 
     // rest of code assumes day/month/year set
     // should negative BC years be AD?
+
     // get the hour (but no check for validity)
-    if (isSet[HOUR])
+    if (isSet[HOUR_OF_DAY])
       {
+	// 1. HOUR_OF_DAY
+      }
+    else if (isSet[HOUR] && isSet[AM_PM])
+      {
+	// 2. AM_PM + HOUR
 	hour = fields[HOUR];
 	if (fields[AM_PM] == PM)
 	  hour += 12;
       }
-    else
-      hour = fields[HOUR_OF_DAY];
 
     // Read the era,year,month,day fields and convert as appropriate.
     // Calculate number of milliseconds into the day

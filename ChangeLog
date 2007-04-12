@@ -1,3 +1,8 @@
+2007-04-12  Gary Benson  <gbenson@redhat.com>
+
+	* java/util/GregorianCalendar.java
+	(computeTime): Reorder the cases into priority order.
+
 2007-04-12  Christian Thalinger  <twisti@complang.tuwien.ac.at>
 
 	* native/jni/gtk-peer/gnu_java_awt_peer_gtk_GtkClipboard.c
