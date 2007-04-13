@@ -495,18 +495,30 @@ public class GregorianCalendar extends Calendar
       throw new IllegalArgumentException("Illegal DST_OFFSET.");
   }
 
+  // Default values for all fields, except DAY_OF_WEEK which
+  // defaults to getFirstDayOfWeek().  Note that according to
+  // the spec DAY_OF_WEEK_IN_MONTH defaults to 1, but Sun set
+  // it to 0 so we do too.
+  private int[] defaults = {
+    AD, 1970, JANUARY, 0, 0, 1, 0, -1, 0, AM, 0, 0, 0, 0, 0, 0, 0
+  };
+
   /**
    * Set all fields to their default values.
    */
   private void setDefaultFields()
   {
-    // According to the spec DAY_OF_WEEK_IN_MONTH defaults to 1,
-    // but Sun set it to 0 so we do too.
-    int[] defaults = {
-      AD, 1970, JANUARY, 0, 0, 1, 0, -1, 0, AM, 0, 0, 0, 0, 0, 0, 0
-    };
-    System.arraycopy(defaults, 0, fields, 0, FIELD_COUNT);
-    fields[DAY_OF_WEEK] = getFirstDayOfWeek();
+    for (int i = 0; i < FIELD_COUNT; i++)
+      {
+	if (isSet[i])
+	  continue;
+
+	if (i == DAY_OF_WEEK)
+	  fields[i] = getFirstDayOfWeek();
+	else
+	  fields[i] = defaults[i];
+      }
+
     // It seems odd that a call to computeTime() should cause
     // areFieldsSet to become true, but that's what Sun do...
     areFieldsSet = true;
