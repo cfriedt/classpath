@@ -1,5 +1,5 @@
 /* Calendar.java --
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004, 2005, 2006,  
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007 
    Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
@@ -443,13 +443,6 @@ public abstract class Calendar
   private int minimalDaysInFirstWeek;
 
   /**
-   * Is set to true if DST_OFFSET is explicitly set. In that case
-   * it's value overrides the value computed from the current
-   * time and the timezone.
-   */
-  private boolean explicitDSTOffset = false;
-
-  /**
    * The version of the serialized data on the stream.
    * <dl><dt>0 or not present</dt>
    * <dd> JDK 1.1.5 or later.</dd>
@@ -846,12 +839,10 @@ public abstract class Calendar
 	isSet[AM_PM] = true;
 	isSet[HOUR_OF_DAY] = false;
 	break;
-      case DST_OFFSET:
-	explicitDSTOffset = true;
       }
 
     // May have crossed over a DST boundary.
-    if (! explicitDSTOffset && (field != DST_OFFSET && field != ZONE_OFFSET))
+    if (field != DST_OFFSET && field != ZONE_OFFSET)
       isSet[DST_OFFSET] = false;
   }
 
@@ -875,8 +866,7 @@ public abstract class Calendar
     isSet[DAY_OF_WEEK_IN_MONTH] = false;
     isSet[ERA] = false;
 
-    if (! explicitDSTOffset)
-      isSet[DST_OFFSET] = false; // May have crossed a DST boundary.
+    isSet[DST_OFFSET] = false; // May have crossed a DST boundary.
   }
 
   /**

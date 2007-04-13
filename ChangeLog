@@ -1,3 +1,10 @@
+2007-04-13  Gary Benson  <gbenson@redhat.com>
+
+	* java/util/Calendar.java
+	(explicitDSTOffset): Remove.
+	(set(int, int)): Remove explicitDSTOffset stuff.
+	(set(int, int, int)): Likewise.
+
 2007-04-12  Gary Benson  <gbenson@redhat.com>
 
 	* java/util/GregorianCalendar.java
