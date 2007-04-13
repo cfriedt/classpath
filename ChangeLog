@@ -1,5 +1,11 @@
 2007-04-13  Gary Benson  <gbenson@redhat.com>
 
+	* java/util/GregorianCalendar.java
+	(setDefaultFields): Change DAY_OF_WEEK_IN_MONTH default,
+	and add some comments.
+
+2007-04-13  Gary Benson  <gbenson@redhat.com>
+
 	* java/util/Calendar.java
 	(clear()): Zero cleared fields rather than using a default.
 	(clear(int)): Likewise.

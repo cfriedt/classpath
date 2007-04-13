@@ -500,11 +500,15 @@ public class GregorianCalendar extends Calendar
    */
   private void setDefaultFields()
   {
+    // According to the spec DAY_OF_WEEK_IN_MONTH defaults to 1,
+    // but Sun set it to 0 so we do too.
     int[] defaults = {
-      AD, 1970, JANUARY, 0, 0, 1, 0, -1, 1, AM, 0, 0, 0, 0, 0, 0, 0
+      AD, 1970, JANUARY, 0, 0, 1, 0, -1, 0, AM, 0, 0, 0, 0, 0, 0, 0
     };
     System.arraycopy(defaults, 0, fields, 0, FIELD_COUNT);
     fields[DAY_OF_WEEK] = getFirstDayOfWeek();
+    // It seems odd that a call to computeTime() should cause
+    // areFieldsSet to become true, but that's what Sun do...
     areFieldsSet = true;
   }
   
