@@ -508,10 +508,14 @@ public class GregorianCalendar extends Calendar
    */
   private void setDefaultFields()
   {
+    boolean areAnyFieldsSet = false;
     for (int i = 0; i < FIELD_COUNT; i++)
       {
 	if (isSet[i])
-	  continue;
+	  {
+	    areAnyFieldsSet = true;
+	    continue;
+	  }
 
 	if (i == DAY_OF_WEEK)
 	  fields[i] = getFirstDayOfWeek();
@@ -521,7 +525,8 @@ public class GregorianCalendar extends Calendar
 
     // It seems odd that a call to computeTime() should cause
     // areFieldsSet to become true, but that's what Sun do...
-    areFieldsSet = true;
+    if (!areAnyFieldsSet)
+      areFieldsSet = true;
   }
   
   /**
@@ -735,7 +740,10 @@ public class GregorianCalendar extends Calendar
                                       - zone.getRawOffset());
 
     time -= rawOffset + dstOffset;
-  }
+
+    if (!areFieldsSet)
+      internalComputeFields();
+}
 
   /**
    * Get the linear day in days since the epoch, using the
@@ -848,6 +856,18 @@ public class GregorianCalendar extends Calendar
    */
   protected synchronized void computeFields()
   {
+    internalComputeFields();
+    for (int i = 0; i < FIELD_COUNT; i++)
+      isSet[i] = true;
+  }
+  
+  /**
+   * Converts the milliseconds since the epoch UTC
+   * (<code>time</code>) to time fields
+   * (<code>fields</code>).
+   */  
+  private void internalComputeFields()
+  {
     boolean gregorian = (time >= gregorianCutover);
 
     TimeZone zone = getTimeZone();
@@ -916,7 +936,7 @@ public class GregorianCalendar extends Calendar
     fields[SECOND] = millisInDay / (1000);
     fields[MILLISECOND] = millisInDay % 1000;
 
-    areFieldsSet = isSet[ERA] = isSet[YEAR] = isSet[MONTH] = isSet[WEEK_OF_YEAR] = isSet[WEEK_OF_MONTH] = isSet[DAY_OF_MONTH] = isSet[DAY_OF_YEAR] = isSet[DAY_OF_WEEK] = isSet[DAY_OF_WEEK_IN_MONTH] = isSet[AM_PM] = isSet[HOUR] = isSet[HOUR_OF_DAY] = isSet[MINUTE] = isSet[SECOND] = isSet[MILLISECOND] = isSet[ZONE_OFFSET] = isSet[DST_OFFSET] = true;
+    areFieldsSet = true;
   }
   
   /**

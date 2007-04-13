@@ -1,6 +1,14 @@
 2007-04-13  Gary Benson  <gbenson@redhat.com>
 
 	* java/util/GregorianCalendar.java
+	(computeFields): Moved the majority of the logic into...
+	(internalComputeFields): New method.
+	(setDefaultFields): Only set areFieldsSet all fields were set.
+	(computeTime): Sometimes call internalComputeFields.
+
+2007-04-13  Gary Benson  <gbenson@redhat.com>
+
+	* java/util/GregorianCalendar.java
 	(defaults): Moved from within setDefaultFields.
 	(setDefaultFields): Only set fields that are undefined.
 
