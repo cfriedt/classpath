@@ -911,15 +911,11 @@ public abstract class Calendar
   {
     isTimeSet = false;
     areFieldsSet = false;
-    int zoneOffs = zone.getRawOffset();
-    int[] tempFields = 
-                       {
-                         1, 1970, JANUARY, 1, 1, 1, 1, THURSDAY, 1, AM, 0, 0, 0,
-                         0, 0, zoneOffs, 0
-                       };
-    fields = tempFields;
     for (int i = 0; i < FIELD_COUNT; i++)
-      isSet[i] = false;
+      {
+	fields[i] = 0;
+	isSet[i] = false;
+      }
   }
 
   /**
@@ -931,16 +927,11 @@ public abstract class Calendar
    */
   public final void clear(int field)
   {
-    int[] tempFields = 
-                       {
-                         1, 1970, JANUARY, 1, 1, 1, 1, THURSDAY, 1, AM, 0, 0, 0,
-                         0, 0, zone.getRawOffset(), 0
-                       };
     complete();
     isTimeSet = false;
     areFieldsSet = false;
     isSet[field] = false;
-    fields[field] = tempFields[field];
+    fields[field] = 0;
   }
 
   /**

@@ -496,6 +496,19 @@ public class GregorianCalendar extends Calendar
   }
 
   /**
+   * Set all fields to their default values.
+   */
+  private void setDefaultFields()
+  {
+    int[] defaults = {
+      AD, 1970, JANUARY, 0, 0, 1, 0, -1, 1, AM, 0, 0, 0, 0, 0, 0, 0
+    };
+    System.arraycopy(defaults, 0, fields, 0, FIELD_COUNT);
+    fields[DAY_OF_WEEK] = getFirstDayOfWeek();
+    areFieldsSet = true;
+  }
+  
+  /**
    * Converts the time field values (<code>fields</code>) to
    * milliseconds since the epoch UTC (<code>time</code>).
    *
@@ -504,6 +517,9 @@ public class GregorianCalendar extends Calendar
    */
   protected synchronized void computeTime()
   {
+    if (!areFieldsSet)
+      setDefaultFields();
+    
     int millisInDay = 0;
     int era = fields[ERA];
     int year = fields[YEAR];

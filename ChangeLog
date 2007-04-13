@@ -1,6 +1,15 @@
 2007-04-13  Gary Benson  <gbenson@redhat.com>
 
 	* java/util/Calendar.java
+	(clear()): Zero cleared fields rather than using a default.
+	(clear(int)): Likewise.
+	* java/util/GregorianCalendar.java
+	(setDefaultFields): New method.
+	(computeTime): Call setDefaultFields if fields are not set.
+
+2007-04-13  Gary Benson  <gbenson@redhat.com>
+
+	* java/util/Calendar.java
 	(explicitDSTOffset): Remove.
 	(set(int, int)): Remove explicitDSTOffset stuff.
 	(set(int, int, int)): Likewise.
