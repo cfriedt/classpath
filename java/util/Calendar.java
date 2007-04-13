@@ -927,7 +927,6 @@ public abstract class Calendar
    */
   public final void clear(int field)
   {
-    complete();
     isTimeSet = false;
     areFieldsSet = false;
     isSet[field] = false;
