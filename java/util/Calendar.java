@@ -951,10 +951,19 @@ public abstract class Calendar
    */
   protected void complete()
   {
-    if (! isTimeSet)
-      computeTime();
-    if (! areFieldsSet)
-      computeFields();
+    // computeFields() sets areFieldsSet, but computeTime()
+    // does not set isTimeSet.  This seems odd, but it's what
+    // Sun's implementation does.
+    if (!isTimeSet)
+      {
+	computeTime();
+	isTimeSet = true;
+	computeFields();
+      }
+    else if (!areFieldsSet)
+      {
+	computeFields();
+      }
   }
 
   /**

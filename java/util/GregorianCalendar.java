@@ -723,8 +723,6 @@ public class GregorianCalendar extends Calendar
                                       - zone.getRawOffset());
 
     time -= rawOffset + dstOffset;
-
-    isTimeSet = true;
   }
 
   /**
