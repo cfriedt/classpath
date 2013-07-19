@@ -69,7 +69,13 @@ Java_gnu_java_awt_peer_gtk_GtkChoicePeer_create
   gtkpeer_set_global_ref (env, obj);
   
   eventbox = gtk_event_box_new ();
+  
+  #if GTK_MAJOR_VERSION == 2
   combobox = gtk_combo_box_new_text ();
+  #elif GTK_MAJOR_VERSION == 3
+  combobox = gtk_combo_box_text_new();
+  #endif
+
   gtk_container_add (GTK_CONTAINER (eventbox), combobox);
   gtk_widget_show (combobox);  
 
@@ -118,8 +124,12 @@ Java_gnu_java_awt_peer_gtk_GtkChoicePeer_add
     
   label = (*env)->GetStringUTFChars (env, item, 0);      
 
+  #if GTK_MAJOR_VERSION == 2
   gtk_combo_box_insert_text (GTK_COMBO_BOX (bin), index, label);
-
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT (bin), index, label);
+  #endif
+ 
   (*env)->ReleaseStringUTFChars (env, item, label);
 
   gdk_threads_leave ();
@@ -139,8 +149,12 @@ Java_gnu_java_awt_peer_gtk_GtkChoicePeer_nativeRemove
 
   /* First, unselect everything, to avoid problems when removing items. */
   gtk_combo_box_set_active (GTK_COMBO_BOX (bin), -1);
+  
+  #if GTK_MAJOR_VERSION == 2
   gtk_combo_box_remove_text (GTK_COMBO_BOX (bin), index);
-
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(bin), index);
+  #endif
   gdk_threads_leave ();
 }
 
@@ -165,7 +179,13 @@ Java_gnu_java_awt_peer_gtk_GtkChoicePeer_nativeRemoveAll
   gtk_combo_box_set_active (GTK_COMBO_BOX (bin), -1);
 
   for (i = count - 1; i >= 0; i--) {
+  
+    #if GTK_MAJOR_VERSION == 2
     gtk_combo_box_remove_text (GTK_COMBO_BOX (bin), i);
+    #elif GTK_MAJOR_VERSION == 3
+    gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(bin), i);
+    #endif
+
   }
 
   gdk_threads_leave ();

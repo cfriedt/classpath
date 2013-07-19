@@ -73,7 +73,7 @@ classpath_jawt_get_default_display (JNIEnv* env, jobject canvas)
 
   widget = GTK_WIDGET (ptr);
 
-  if (GTK_WIDGET_REALIZED (widget))
+  if (gtk_widget_get_realized(widget))
     {
       display = gtk_widget_get_display (widget);
 
@@ -109,7 +109,7 @@ classpath_jawt_get_visualID (JNIEnv* env, jobject canvas)
 
   widget = GTK_WIDGET (ptr);
 
-  if (GTK_WIDGET_REALIZED (widget))
+  if (gtk_widget_get_realized(widget))
     {
       visual = gdk_x11_visual_get_xvisual (gtk_widget_get_visual (widget));
       g_assert (visual != NULL);
@@ -144,12 +144,12 @@ classpath_jawt_get_depth (JNIEnv* env, jobject canvas)
 
   widget = GTK_WIDGET (ptr);
 
-  if (GTK_WIDGET_REALIZED (widget))
+  if (gtk_widget_get_realized(widget))
     {
       visual = gtk_widget_get_visual (widget);
       g_assert (visual != NULL);
 
-      return visual->depth;
+      return gdk_visual_get_depth(visual);
     }
   else
     return (VisualID) NULL;
@@ -179,9 +179,10 @@ classpath_jawt_get_drawable (JNIEnv* env, jobject canvas)
 
   widget = GTK_WIDGET (ptr);
 
-  if (GTK_WIDGET_REALIZED (widget))
+  if (gtk_widget_get_realized(widget))
     {
-      drawable = GDK_DRAWABLE_XID (widget->window);
+      //drawable = GDK_DRAWABLE_XID (gtk_widget_get_window(widget)); 
+      drawable = GDK_WINDOW_XID (gtk_widget_get_window(widget)); 
 
       return drawable;
     }

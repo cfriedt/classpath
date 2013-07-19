@@ -39,20 +39,21 @@ exception statement from your version. */
 
 #include "gtkpeer.h"
 #include "gnu_java_awt_peer_gtk_GtkEmbeddedWindowPeer.h"
-
+#include <gtk/gtk.h>
 JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkEmbeddedWindowPeer_create
   (JNIEnv *env, jobject obj, jlong socket_id)
 {
   GtkWidget *window;
   GtkWidget *fixed;
-
+  
   gdk_threads_enter ();
-
+  
   gtkpeer_set_global_ref (env, obj);
-
-  window = gtk_plug_new ((GdkNativeWindow) socket_id);
-
+  
+  //window = gtk_plug_new ((GdkNativeWindow) socket_id);
+  window = gtk_plug_new (socket_id);
+  
   gtk_window_set_decorated (GTK_WINDOW (window), FALSE);
 
   fixed = gtk_fixed_new ();
@@ -75,10 +76,12 @@ Java_gnu_java_awt_peer_gtk_GtkEmbeddedWindowPeer_construct
 
   ptr = gtkpeer_get_widget (env, obj);
 
-  if (GTK_WIDGET_REALIZED (GTK_WIDGET (ptr)))
+  //if (GTK_WIDGET_REALIZED (GTK_WIDGET (ptr)))
+    if (gtk_widget_get_realized (GTK_WIDGET (ptr)))
     g_printerr ("ERROR: GtkPlug is already realized\n");
 
-  gtk_plug_construct (GTK_PLUG (ptr), (GdkNativeWindow) socket_id);
+  //gtk_plug_construct (GTK_PLUG (ptr), (GdkNativeWindow) socket_id);
+   gtk_plug_construct (GTK_PLUG (ptr), socket_id);
 
   gdk_threads_leave ();
 }

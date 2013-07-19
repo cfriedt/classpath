@@ -241,13 +241,25 @@ Java_gnu_java_awt_peer_gtk_GdkGraphicsEnvironment_getMouseCoordinates
   GdkDisplay *display;
   gint x, y, screenIndex;
   GdkScreen *screen;
+  #if GTK_MAJOR_VERSION == 3
+  GdkDeviceManager *device_manager;
+  GdkDevice *device;
+  #endif
+ 
 
   display = (GdkDisplay *) gtkpeer_get_display(env, obj);
   g_assert (display != NULL);
   
   gdk_threads_enter ();
   
+  #if GTK_MAJOR_VERSION == 2
   gdk_display_get_pointer (display, &screen, &x, &y, NULL);
+  #elif GTK_MAJOR_VERSION == 3
+  device_manager = gdk_display_get_device_manager (display);
+  device = gdk_device_manager_get_client_pointer (device_manager);
+  gdk_device_get_position (device, &screen, &x, &y);
+  #endif
+  
   screenIndex = gdk_screen_get_number( screen );
 
   gdk_threads_leave ();
@@ -274,7 +286,10 @@ Java_gnu_java_awt_peer_gtk_GdkGraphicsEnvironment_isWindowUnderMouse
   GtkWidget *windowToTest = NULL;
   GdkWindow *windowAtPointer = NULL;
   jboolean retVal = JNI_FALSE;
-
+  #if GTK_MAJOR_VERSION == 3
+  GdkDeviceManager *device_manager;
+  GdkDevice *device;
+  #endif
   display = (GdkDisplay *) gtkpeer_get_display (env, obj);
   g_assert (display != NULL);
 
@@ -282,10 +297,17 @@ Java_gnu_java_awt_peer_gtk_GdkGraphicsEnvironment_isWindowUnderMouse
 
   gdk_threads_enter ();
 
+ #if GTK_MAJOR_VERSION == 3
+  device_manager = gdk_display_get_device_manager (display);
+  device = gdk_device_manager_get_client_pointer (device_manager);
+  windowAtPointer = gdk_device_get_window_at_position(device, &x,  &y);
+ #elif GTK_MAJOR_VERSION == 2
   windowAtPointer = gdk_display_get_window_at_pointer (display, &x, &y);
+ #endif   
 
   while (windowAtPointer
-         && windowAtPointer != windowToTest->window)
+         //&& windowAtPointer != windowToTest->window)
+         && windowAtPointer != gtk_widget_get_window(windowToTest))
     windowAtPointer = gdk_window_get_parent (windowAtPointer);
 
   gdk_threads_leave ();

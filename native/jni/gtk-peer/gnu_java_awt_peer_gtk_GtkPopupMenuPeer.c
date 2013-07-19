@@ -73,7 +73,7 @@ Java_gnu_java_awt_peer_gtk_GtkPopupMenuPeer_show
   p->x = x;
   p->y = y;
   
-  gtk_menu_popup (GTK_MENU (GTK_MENU_ITEM (ptr)->submenu), 
+  gtk_menu_popup (GTK_MENU (gtk_menu_item_get_submenu(GTK_MENU_ITEM (ptr))), 
 		  NULL, NULL, menu_pos, p, 0, time);
 
   g_free (p);
@@ -95,7 +95,7 @@ Java_gnu_java_awt_peer_gtk_GtkPopupMenuPeer_setupAccelGroup
 
   ptr1 = gtkpeer_get_widget (env, obj);
 
-  menu = GTK_MENU (GTK_MENU_ITEM (ptr1)->submenu);
+  menu = GTK_MENU (gtk_menu_item_get_submenu(GTK_MENU_ITEM (ptr1)));
   gtk_menu_set_accel_group (menu, gtk_accel_group_new ());
   /* FIXME: update this to use GTK-2.4 GtkActions. */
   // FIXME: _gtk_accel_group_attach is a GTK-private function, so

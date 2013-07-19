@@ -39,8 +39,11 @@ exception statement from your version. */
 #include "gdkfont.h"
 #include "cairographics2d.h"
 #include "gnu_java_awt_peer_gtk_CairoGraphics2D.h"
-#include <gdk/gdktypes.h>
-#include <gdk/gdkprivate.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
+
+//#include <gdk/gdktypes.h>
+//#include <gdk/gdkprivate.h>
 
 #include <cairo-ft.h>
 

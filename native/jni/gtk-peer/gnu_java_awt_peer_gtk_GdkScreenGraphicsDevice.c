@@ -337,9 +337,11 @@ Java_gnu_java_awt_peer_gtk_GdkScreenGraphicsDevice_nativeGetBounds
 	gdk_threads_enter();
 	
 	window = gdk_screen_get_root_window(screen);
-	
-	gdk_window_get_geometry(window, &x, &y, &w, &h, NULL);
-
+	 #if GTK_MAJOR_VERSION == 2
+	 gdk_window_get_geometry(window, &x, &y, &w, &h, NULL);
+         #elif GTK_MAJOR_VERSION ==3
+         gdk_window_get_geometry(window, &x, &y, &w, &h);
+         #endif
 	gdk_threads_leave();
 	
     instance = (*env)->NewObject(env,

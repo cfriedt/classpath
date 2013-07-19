@@ -75,14 +75,14 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_initState
 {
   struct peerfont *pfont = NULL;
 
-  gdk_threads_enter ();
+  gdk_threads_enter();
 
   g_assert (self != NULL);
   pfont = (struct peerfont *) g_malloc0 (sizeof (struct peerfont));
   g_assert (pfont != NULL);
   gtkpeer_set_font (env, self, pfont);
 
-  gdk_threads_leave ();
+  gdk_threads_leave();
 }
 
 
@@ -92,7 +92,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_dispose
 {
   struct peerfont *pfont = NULL;
 
-  gdk_threads_enter ();
+  gdk_threads_enter();
 
   pfont = (struct peerfont *) gtkpeer_get_font (env, self);
   g_assert (pfont != NULL);
@@ -108,7 +108,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_dispose
     pango_font_description_free (pfont->desc);
   g_free (pfont);
 
-  gdk_threads_leave ();
+  gdk_threads_leave();
 }
 
 
@@ -251,7 +251,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_setFont
   char const *family_name = NULL;
   enum java_awt_font_style style;
 
-  gdk_threads_enter ();
+  gdk_threads_enter();
 
   style = (enum java_awt_font_style) style_int;
 
@@ -303,7 +303,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_setFont
     pfont->layout = pango_layout_new (pfont->ctx);
   g_assert (pfont->layout != NULL);
 
-  gdk_threads_leave ();
+  gdk_threads_leave();
 }
 
 
@@ -324,7 +324,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_getTrueTypeTable
   if(pfont == NULL)
     return NULL;
 
-  gdk_threads_enter ();
+  gdk_threads_enter();
   face = pango_fc_font_lock_face ((PangoFcFont *)pfont->font);
   tag = FT_MAKE_TAG( n, a, m, e );
 
@@ -333,7 +333,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_getTrueTypeTable
   if ( error ) 
     {
       pango_fc_font_unlock_face ((PangoFcFont *)pfont->font);
-      gdk_threads_leave ();
+      gdk_threads_leave();
       return NULL;
     }
 
@@ -341,7 +341,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_getTrueTypeTable
   if ( buffer == NULL ) 
     {
       pango_fc_font_unlock_face ((PangoFcFont *)pfont->font);
-      gdk_threads_leave ();
+      gdk_threads_leave();
       return NULL;
     }
   /* get the table data */
@@ -350,7 +350,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_getTrueTypeTable
     {
       pango_fc_font_unlock_face ((PangoFcFont *)pfont->font);
       g_free(buffer);
-      gdk_threads_leave ();
+      gdk_threads_leave();
       return NULL;
     }
 
@@ -363,7 +363,7 @@ Java_gnu_java_awt_peer_gtk_GdkFontPeer_getTrueTypeTable
 
   g_free(buffer);
   pango_fc_font_unlock_face ((PangoFcFont *)pfont->font);
-  gdk_threads_leave ();
+  gdk_threads_leave();
 
   /* done */
   return result_array;

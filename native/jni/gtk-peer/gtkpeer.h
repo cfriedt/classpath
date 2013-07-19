@@ -307,8 +307,13 @@ jint cp_gtk_state_to_awt_mods (guint state);
 GdkPixbuf *cp_gtk_image_get_pixbuf (JNIEnv *env, jobject obj);
 
 /* Component Graphics helpers */
+#if GTK_MAJOR_VERSION == 2
 void cp_gtk_grab_current_drawable(GtkWidget *widget, GdkDrawable **draw,
 				  GdkWindow **win);
+#elif GTK_MAJOR_VERSION == 3
+void cp_gtk_grab_current_drawable(GtkWidget *widget, 
+				  GdkWindow **win);
+#endif
 
 /* JNI initialization functions */
 void cp_gtk_button_init_jni (JNIEnv*);
@@ -332,7 +337,7 @@ void cp_gtk_textcomponent_connect_signals (GObject *ptr, jobject gref);
 /* Debugging */
 void cp_gtk_print_current_thread (void);
 
-GdkPixmap *cp_gtk_get_pixmap( JNIEnv *env, jobject obj);
+//GdkPixmap *cp_gtk_get_pixmap( JNIEnv *env, jobject obj);
 
 #define SYNCHRONIZE_GDK 0
 

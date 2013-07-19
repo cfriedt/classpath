@@ -81,8 +81,13 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_create
 {
   GtkWidget *scrollbar;
   GtkWidget *eventbox;
+  
+  #if GTK_MAJOR_VERSION == 2
   GtkObject *adj;
-
+  #elif GTK_MAJOR_VERSION == 3
+  GtkAdjustment *adj;
+  #endif
+ 
   /* Create global reference and save it for future use */
   gtkpeer_set_global_ref (env, obj);
 
@@ -104,13 +109,20 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_create
 			    (gdouble) visible_amount);
 
   scrollbar = orientation
+
+    #if GTK_MAJOR_VERSION == 2
     ? gtk_vscrollbar_new (GTK_ADJUSTMENT (adj))
     : gtk_hscrollbar_new (GTK_ADJUSTMENT (adj));
+    #elif GTK_MAJOR_VERSION == 3
+    ? gtk_scrollbar_new(GTK_ORIENTATION_VERTICAL, adj)
+    : gtk_scrollbar_new (GTK_ORIENTATION_HORIZONTAL, adj);
+    #endif
+
   eventbox = gtk_event_box_new ();
   gtk_container_add (GTK_CONTAINER (eventbox), scrollbar);
   gtk_widget_show (scrollbar);
   
-  GTK_RANGE (scrollbar)->round_digits = 0;
+  gtk_range_set_round_digits(GTK_RANGE (scrollbar), 0);
   /* These calls seem redundant but they are not.  They clamp values
      so that the slider's entirety is always between the two
      steppers. */
@@ -162,7 +174,8 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setLineIncrement
   gdk_threads_enter ();
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
-  adj->step_increment = (gdouble) amount;
+  gtk_adjustment_set_step_increment(adj, (gdouble)amount);
+  //adj->step_increment = (gdouble) amount;
   gtk_adjustment_changed (adj);
 
   gdk_threads_leave ();
@@ -182,7 +195,8 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setPageIncrement
   gdk_threads_enter ();
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
-  adj->page_increment = (gdouble) amount;
+  gtk_adjustment_set_page_increment(adj, (gdouble)amount);
+  //adj->page_increment = (gdouble) amount;
   gtk_adjustment_changed (adj);
 
   gdk_threads_leave ();
@@ -210,7 +224,8 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setBarValues
     }
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
-  adj->page_size = (gdouble) visible;
+  gtk_adjustment_set_page_size(adj, (gdouble)visible);
+  //adj->page_size = (gdouble) visible;
 
   gtk_range_set_range (GTK_RANGE (wid), (gdouble) min, (gdouble) max);
   gtk_range_set_value (GTK_RANGE (wid), (gdouble) value);
@@ -227,15 +242,19 @@ slider_moved_cb (GtkRange *range,
 {
   GtkAdjustment *adj = gtk_range_get_adjustment (GTK_RANGE (range));
   
-  value = CLAMP (value, adj->lower,
-                 (adj->upper - adj->page_size));
+  /*value = CLAMP (value, adj->lower,
+                 (adj->upper - adj->page_size));*/
+  value = CLAMP (value, gtk_adjustment_get_lower(adj),
+                 (gtk_adjustment_get_upper(adj) - gtk_adjustment_get_page_size(adj)));
 
-  if (range->round_digits >= 0)
+  //if (range->round_digits >= 0)
+    if (gtk_range_get_round_digits(range) >= 0)
     {
       gdouble power;
       gint i;
 
-      i = range->round_digits;
+      //i = range->round_digits;
+        i = gtk_range_get_round_digits(range);
       power = 1;
       while (i--)
         power *= 10;

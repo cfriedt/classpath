@@ -1,4 +1,3 @@
-
 /* gtktoolkit.c -- Native portion of GtkToolkit
    Copyright (C) 1998, 1999, 2005, 2007, 2010  Free Software Foundation, Inc.
 
@@ -152,8 +151,10 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkInit (JNIEnv *env,
 {
   int argc = 1;
   char **argv;
-  char *homedir, *rcpath = NULL;
-
+  char *homedir ,*rcpath = NULL;
+  
+  //GtkCssProvider *css_provider;
+  
   gtkgenericpeer = (*env)->FindClass(env, "gnu/java/awt/peer/gtk/GtkGenericPeer");
 
   gtkgenericpeer = (*env)->NewGlobalRef(env, gtkgenericpeer);
@@ -181,8 +182,9 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkInit (JNIEnv *env,
   XSynchronize (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()), True);
 #endif
 
-  gtk_widget_set_default_colormap (gdk_rgb_get_colormap ());
-
+  //gtk_widget_set_default_colormap (gdk_rgb_get_colormap ());
+ // gtk_widget_set_visual(gdk_screen_get_system_visual (gdk_screen_get_default())); 
+  
   if ((homedir = getenv ("HOME")))
     {
       rcpath = (char *) g_malloc (strlen (homedir) + strlen (RC_FILE) + 2);
@@ -190,7 +192,15 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkInit (JNIEnv *env,
     }
   
   gtk_rc_parse ((rcpath) ? rcpath : RC_FILE);
-
+  /*css_provider = gtk_css_provider_new();
+  if((rcpath)){
+  printf("\n%s : PATH IS REACHED\n", rcpath);
+  gtk_css_provider_load_from_path (css_provider,   g_filename_to_utf8(rcpath, strlen(rcpath), &bytes_read, &bytes_written, &error) , NULL);
+  }
+  else{
+  printf("\nREACHED RC_FILE\n");
+  gtk_css_provider_load_from_file (css_provider, RC_FILE, NULL);
+  }*/
   g_free (rcpath);
   g_free (argv[0]);
   g_free (argv);
@@ -238,6 +248,7 @@ static void jni_lock_cb()
  * A callback function that implements gdk_threads_leave(). This is
  * implemented to wrap the JNI MonitorExit() function.
  */
+
 static void jni_unlock_cb()
 {
 
@@ -273,9 +284,13 @@ init_glib_threads(JNIEnv *env, jint portableNativeSync, jobject lock)
           global_lock = (*env)->NewGlobalRef(env, lock);
           gdk_threads_set_lock_functions(&jni_lock_cb, &jni_unlock_cb);
         }
-#if GLIB_MINOR_VERSION < 32
+
+#if GLIB_MINOR_VERSION < 32 && GTK_MAJOR_VERSION == 2
       g_thread_init(NULL);
 #endif
+
+     
+
     }
   else
     {
@@ -372,12 +387,19 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkMain
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)))
 {
   gdk_threads_enter();
-
+  #if GTK_MAJOR_VERSION == 2
   gtk_init_add (post_set_running_flag, NULL);
   gtk_quit_add (gtk_main_level (), clear_running_flag, NULL);
-
+  #elif GTK_MAJOR_VERSION == 3
+  post_set_running_flag(NULL);
+  #endif
+ 
+  //#if GTK_MAJOR_VERSION == 3
+  //g_idle_add(post_set_running_flag, NULL);
+  //#endif
+  
   gtk_main ();
-
+  
   gdk_threads_leave();
 }
 
@@ -386,9 +408,14 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkQuit
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)))
 {
   gdk_threads_enter ();
+  
+  #if GTK_MAJOR_VERSION == 3
+  gtk_main_level();
+  clear_running_flag(NULL);
+  #endif
 
   gtk_main_quit ();
-
+  
   gdk_threads_leave ();
 }
 
@@ -459,23 +486,33 @@ JNIEXPORT jint JNICALL
 Java_gnu_java_awt_peer_gtk_GtkToolkit_getMouseNumberOfButtons
   (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)))
 {
-  jint res = -1;
-  GList *devices;
+  #if GTK_MAJOR_VERSION == 3
+  GdkDeviceManager *gdk_device_manager;
+  #endif
   GdkDevice *d;
 
+  jint res = -1;
+  GList *devices;
+ 
+ 
   gdk_threads_enter ();
 
   /* FIXME: Why doesn't this return the correct number? */
+  #if GTK_MAJOR_VERSION == 2
   devices = gdk_devices_list();
-
+  #elif GTK_MAJOR_VERSION == 3 
+  gdk_device_manager = gdk_display_get_device_manager(gdk_display_get_default());
+  devices = gdk_device_manager_list_devices(gdk_device_manager, GDK_DEVICE_TYPE_MASTER); 
+  #endif
+ 
   while( res == -1 && devices != NULL )
     {
       d = GDK_DEVICE( devices->data );
-      if( d->source == GDK_SOURCE_MOUSE )
-	res = d->num_keys;
+      if( gdk_device_get_source(d) == GDK_SOURCE_MOUSE )
+	res = gdk_device_get_n_keys(d);
       devices = devices->next;
     }
-
+  g_list_free(devices);
   gdk_threads_leave ();
 
   return res;
@@ -563,11 +600,25 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_getLockState
   gint coord;
   GdkModifierType state, mask;
   GdkWindow *root_window;
+  
+  #if GTK_MAJOR_VERSION == 3
+  GdkDeviceManager *dev_manager;
+  GdkDevice *pointer;
+  #endif
 
+  
+  
   gdk_threads_enter ();
 
   root_window = gdk_get_default_root_window ();
+  
+  #if GTK_MAJOR_VERSION == 2
   gdk_window_get_pointer (root_window, &coord, &coord, &state);
+  #elif GTK_MAJOR_VERSION == 3
+  dev_manager = gdk_display_get_device_manager(gdk_window_get_display(root_window));
+  pointer = gdk_device_manager_get_client_pointer(dev_manager);
+  gdk_window_get_device_position (root_window, pointer, &coord, &coord, &state);
+  #endif
 
   switch (key)
     {

@@ -37,8 +37,12 @@ exception statement from your version. */
 
 #include "jcl.h"
 #include "gtkpeer.h"
-#include <gdk/gdktypes.h>
-#include <gdk/gdkprivate.h>
+
+//#include <gdk/gdktypes.h>
+#include <gdk/gdk.h>
+
+//#include <gdk/gdkprivate.h>
+#include <gdk/gdkx.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gdk-pixbuf/gdk-pixdata.h>
@@ -50,6 +54,7 @@ exception statement from your version. */
 
 #include "gnu_java_awt_peer_gtk_ComponentGraphicsCopy.h"
 
+#if GTK_MAJOR_VERSION == 2
 JNIEXPORT void JNICALL 
 Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_getPixbuf
    (JNIEnv *env, jobject obj __attribute__((unused)),
@@ -79,15 +84,51 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_getPixbuf
   width = gdk_pixbuf_get_width( pixbuf );
   height = gdk_pixbuf_get_height( pixbuf );
 
-  gdk_pixbuf_get_from_drawable( pixbuf, /* destination pixbuf */
+  gdk_pixbuf_get_from_drawable( pixbuf,
 				drawable, 
-				NULL, /* colormap */
+				NULL, 
 				0, 0, 0, 0,
 				width, height );
   gdk_threads_leave();
 }
+#elif GTK_MAJOR_VERSION == 3
+JNIEXPORT void JNICALL 
+Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_getPixbuf
+   (JNIEnv *env, jobject obj __attribute__((unused)),
+    jobject peer, jobject image)
+{
+  //printf("\ngetPixbuf\n");
+  gint width, height;
+  GdkPixbuf *pixbuf;
+  GdkWindow *win;
+  GtkWidget *widget = NULL;
+  void *ptr = NULL;
 
+  gdk_threads_enter();
 
+  ptr = gtkpeer_get_widget (env, peer);
+  g_assert (ptr != NULL);
+
+  widget = GTK_WIDGET (ptr);
+  g_assert (widget != NULL);
+
+  cp_gtk_grab_current_drawable (widget, &win);
+  
+
+  pixbuf = cp_gtk_image_get_pixbuf( env, image );
+  g_assert( pixbuf != NULL);
+
+  width = gdk_pixbuf_get_width( pixbuf );
+  height = gdk_pixbuf_get_height( pixbuf );
+
+  pixbuf = gdk_pixbuf_get_from_window( win,
+				       0, 0, 
+				width, height );
+  gdk_threads_leave();
+}
+#endif
+
+#if GTK_MAJOR_VERSION == 2
 JNIEXPORT void JNICALL 
 Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
   (JNIEnv *env, jobject obj __attribute__((unused)),
@@ -95,7 +136,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
    jint x __attribute__((unused)), jint y __attribute__((unused)),
    jint width __attribute__((unused)), jint height __attribute__((unused)))
 {
-  gint pwidth, pheight;
+  //gint pwidth, pheight;
   GdkPixbuf *pixbuf;
   GdkDrawable *drawable;
   GdkWindow *win;
@@ -116,14 +157,57 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
   pixbuf = cp_gtk_image_get_pixbuf( env, image );
   g_assert( pixbuf != NULL);
 
-  pwidth = gdk_pixbuf_get_width( pixbuf );
-  pheight = gdk_pixbuf_get_height( pixbuf );
+  //pwidth = gdk_pixbuf_get_width( pixbuf );
+  //pheight = gdk_pixbuf_get_height( pixbuf );
 
-  gdk_draw_pixbuf (drawable, NULL, pixbuf,
-		   0, 0, 0, 0, 
-		   pwidth, pheight, 
-		   GDK_RGB_DITHER_NORMAL, 0, 0);
+  //gdk_draw_pixbuf (drawable, NULL, pixbuf,
+		   //0, 0, 0, 0, 
+		   //pwidth, pheight, 
+		   //GDK_RGB_DITHER_NORMAL, 0, 0);
+
+   cairo_t *cr = gdk_cairo_create (drawable);
+   gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
+   cairo_paint (cr);
+   cairo_destroy (cr);
 
   gdk_threads_leave();
 }
+#elif GTK_MAJOR_VERSION == 3
 
+JNIEXPORT void JNICALL 
+Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
+  (JNIEnv *env, jobject obj __attribute__((unused)),
+   jobject peer, jobject image,
+   jint x __attribute__((unused)), jint y __attribute__((unused)),
+   jint width __attribute__((unused)), jint height __attribute__((unused)))
+{
+  //printf("\ncopyPixbuf\n");
+  GdkPixbuf *pixbuf;
+ 
+  GdkWindow *win;
+  GtkWidget *widget = NULL;
+  void *ptr = NULL;
+
+  gdk_threads_enter();
+
+  ptr = gtkpeer_get_widget (env, peer);
+  g_assert (ptr != NULL);
+
+  widget = GTK_WIDGET (ptr);
+  g_assert (widget != NULL);
+
+  cp_gtk_grab_current_drawable (widget, &win);
+  
+
+  pixbuf = cp_gtk_image_get_pixbuf( env, image );
+  g_assert( pixbuf != NULL);
+
+  
+   cairo_t *cr = gdk_cairo_create (win);
+   gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
+   cairo_paint (cr);
+   cairo_destroy (cr);
+
+  gdk_threads_leave();
+}
+#endif

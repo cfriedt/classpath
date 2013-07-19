@@ -154,15 +154,15 @@ Java_gnu_java_awt_dnd_peer_gtk_GtkDragSourceContextPeer_nativeSetCursor
       gdk_cursor_type = GDK_LEFT_PTR;
     }
   
-  win = widget->window;
-  if ((widget->window) == NULL)
-    win = widget->window;
+  win = gtk_widget_get_window(widget);
+  if ((gtk_widget_get_window(widget)) == NULL)
+    win = gtk_widget_get_window(widget);
     
   gdk_cursor = gdk_cursor_new (gdk_cursor_type);
 
   gdk_window_set_cursor (win, gdk_cursor);
-  gdk_cursor_unref (gdk_cursor);
-
+  //gdk_cursor_unref (gdk_cursor);
+  g_object_unref(gdk_cursor);
   gdk_flush();
   
   gdk_threads_leave ();

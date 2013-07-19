@@ -37,8 +37,14 @@ exception statement from your version. */
 
 #include "jcl.h"
 #include "gtkpeer.h"
-#include <gdk/gdktypes.h>
-#include <gdk/gdkprivate.h>
+
+
+//#include <gdk/gdktypes.h>
+#include <gdk/gdk.h>
+
+//#include <gdk/gdkprivate.h>
+#include <gdk/gdkx.h>
+
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gdk-pixbuf/gdk-pixdata.h>
 
@@ -55,11 +61,17 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env,
 						  jobject peer,
 						  jint width, jint height)
 {
+  printf("\n volatileimage_init \n");
   GtkWidget *widget = NULL;
+   #if GTK_MAJOR_VERSION == 2
   GdkPixmap* pixmap;
+  #elif GTK_MAJOR_VERSION == 3
+  cairo_surface_t *surface;
+  #endif
   void *ptr = NULL;
-
+  
   gdk_threads_enter();
+ 
 
   if( peer != NULL )
     {
@@ -68,35 +80,73 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env,
       
       widget = GTK_WIDGET (ptr);
       g_assert (widget != NULL);
-      pixmap = gdk_pixmap_new( widget->window, width, height, -1 );
-    }
-  else
-    pixmap = gdk_pixmap_new( NULL, width, height, 
-			     gdk_rgb_get_visual()->depth );
-
+      
+      #if GTK_MAJOR_VERSION == 2
+      pixmap = gdk_pixmap_new( gtk_widget_get_window(widget), width, height, -1 );
+      #elif GTK_MAJOR_VERSION == 3
+      surface = gdk_window_create_similar_surface(gtk_widget_get_window(widget), CAIRO_CONTENT_COLOR_ALPHA, width, height);
+      #endif 
+   }
+  else{
+  #if GTK_MAJOR_VERSION == 2
+   pixmap = gdk_pixmap_new( NULL, width, height, 
+			     //gdk_rgb_get_visual()->depth );
+				gdk_visual_get_depth(gdk_visual_get_system()));
+  #elif GTK_MAJOR_VERSION == 3
+  surface = gdk_window_create_similar_surface(gtk_widget_get_window(widget), CAIRO_CONTENT_COLOR_ALPHA, width, height);
+  #endif
+  }
   gdk_threads_leave();
 
+  #if GTK_MAJOR_VERSION == 2
   g_assert( pixmap != NULL );
-
-  return PTR_TO_JLONG( pixmap );
+  return PTR_TO_JLONG(pixmap);
+  #elif GTK_MAJOR_VERSION == 3
+  g_assert( surface != NULL);
+  return PTR_TO_JLONG( surface );
+  #endif
 }
 
 /**
  * Destroy the surface
  */
+#if GTK_MAJOR_VERSION == 3
+JNIEXPORT void JNICALL 
+Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy
+(JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
+ jlong pointer)
+{ printf("\n volatileimage_destroy \n");
+  //GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
+  gdk_threads_enter();
+  cairo_surface_t *surface = JLONG_TO_PTR(cairo_surface_t, pointer);
+  if( surface != NULL )
+    {
+      
+      g_object_unref( surface );
+      
+    }
+  gdk_threads_leave();
+}
+#endif
+#if GTK_MAJOR_VERSION == 2
 JNIEXPORT void JNICALL 
 Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer)
 {
   GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
+ 
+  
   if( pixmap != NULL )
     {
-      gdk_threads_enter();
-      g_object_unref( pixmap );
-      gdk_threads_leave();
+       gdk_threads_enter();
+      g_object_unref( pixmap);
+       gdk_threads_leave();
+      
     }
+ 
 }
+#endif
 
 /**
  * Gets all pixels in an array
@@ -105,9 +155,14 @@ JNIEXPORT jintArray JNICALL
 Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeGetPixels
 (JNIEnv *env, jobject obj, jlong pointer)
 {
-  /* jint *pixeldata, *jpixdata; */
+  printf("\n nativeGetPixels \n");
+  /*jint *pixeldata, *jpixdata;*/ 
   jint *jpixdata;
+  #if GTK_MAJOR_VERSION == 2
   GdkPixmap *pixmap;
+  
+  #endif
+  
   GdkPixbuf *pixbuf;
   jintArray jpixels;
   int width, height, size;
@@ -124,18 +179,30 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeGetPixels
   g_assert (field != 0);
   height = (*env)->GetIntField (env, obj, field);
 
+  #if GTK_MAJOR_VERSION == 2
   pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
   g_assert(pixmap != NULL);
+  #endif 
+ 
+  
 
   gdk_threads_enter();
-
+  #if GTK_MAJOR_VERSION == 3
+  cairo_surface_t *surface;
+  surface = JLONG_TO_PTR(cairo_surface_t, pointer);
+  g_assert(surface != NULL);
+  #endif
   size = width * height;
   jpixels = (*env)->NewIntArray ( env, size );
   jpixdata = (*env)->GetIntArrayElements (env, jpixels, NULL);
   
+  #if GTK_MAJOR_VERSION == 2
   pixbuf = gdk_pixbuf_new( GDK_COLORSPACE_RGB, TRUE, 8, width, height );
   gdk_pixbuf_get_from_drawable( pixbuf, pixmap, NULL, 0, 0, 0, 0, width, height );
-  
+  #elif GTK_MAJOR_VERSION == 3
+  pixbuf =  gdk_pixbuf_get_from_surface (surface, 0,0,width,height);
+  #endif  
+
   if (pixbuf != NULL)
     {
       pixels = gdk_pixbuf_get_pixels(pixbuf);
@@ -156,20 +223,41 @@ JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeCopyArea
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer, jint x, jint y, jint w, jint h, jint dx, jint dy)
-{
+{ 
+  printf("\n nativeCopyArea \n");
   GdkPixbuf *pixbuf;
+  
+  #if GTK_MAJOR_VERSION == 2
   GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
-
   g_assert (pixmap != NULL);
+  #elif GTK_MAJOR_VERSION == 3
+  cairo_surface_t *surface = JLONG_TO_PTR(cairo_surface_t, pointer);
+  g_assert (surface != NULL);
+  #endif
 
   gdk_threads_enter();
   
+  #if GTK_MAJOR_VERSION == 2
   pixbuf = gdk_pixbuf_new( GDK_COLORSPACE_RGB, TRUE, 8, w, h );
   gdk_pixbuf_get_from_drawable( pixbuf, pixmap, NULL, x, y, 0, 0, w, h );
-  gdk_draw_pixbuf (pixmap, NULL, pixbuf,
+  #elif GTK_MAJOR_VERSION == 3
+  pixbuf = gdk_pixbuf_get_from_surface (surface, x,y,w,h);
+  #endif
+
+  /*gdk_draw_pixbuf (pixmap, NULL, pixbuf,
 		   0, 0, x + dx, y + dy, 
 		   w, h, 
-		   GDK_RGB_DITHER_NORMAL, 0, 0);
+		   GDK_RGB_DITHER_NORMAL, 0, 0);*/
+  #if GTK_MAJOR_VERSION == 2
+  cairo_t *cr = gdk_cairo_create(pixmap);
+  #elif GTK_MAJOR_VERSION == 3
+  cairo_t *cr = cairo_create (surface);
+  #endif
+
+  gdk_cairo_set_source_pixbuf (cr, pixbuf, x + dx, y + dy);
+  cairo_paint (cr);
+  cairo_destroy (cr);
+
   gdk_threads_leave();
 }
 
@@ -178,24 +266,46 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer, jlong srcptr, jint x, jint y, jint w, jint h)
 {
-  GdkPixmap *dst, *src;
-  GdkGC *gc;
-
-  src = JLONG_TO_PTR(GdkPixmap, srcptr);
-  dst = JLONG_TO_PTR(GdkPixmap, pointer);
-  g_assert (src != NULL);
-  g_assert (dst != NULL);
+  printf("\n nativeDrawVolatile \n");
+  //GdkPixmap *dst, *src;
+  
+  //GdkGC *gc;
+  GdkRectangle clip;
+  
 
   gdk_threads_enter();
- 
-  gc = gdk_gc_new( dst );
-  gdk_draw_drawable(dst,
+  cairo_surface_t *dst, *src;
+  src = JLONG_TO_PTR(cairo_surface_t, srcptr);
+  dst = JLONG_TO_PTR(cairo_surface_t, pointer);
+  g_assert (src != NULL);
+  g_assert (dst != NULL);
+   /*gc = gdk_gc_new( dst );
+   gdk_draw_drawable(dst,
 		    gc,
 		    src,
 		    0, 0,
 		    x, y,
 		    w, h);
-  g_object_unref( gc );
+   g_object_unref( gc );*/
+  
+  clip.x = 0;
+  clip.y = 0;
+  clip.width = w;
+  clip.height = h;
+ 
+  cairo_t *cr = cairo_create (dst);
+  /* clipping restricts the intermediate surface's size, so it's a good idea
+  * to use it. */
+  gdk_cairo_rectangle (cr, &clip);
+  cairo_clip (cr);
+  /* Now push a group to change the target */
+  cairo_push_group (cr);
+  cairo_set_source_surface (cr, src, x, y);
+  cairo_paint (cr);
+  /* Now copy the intermediate target back */
+  cairo_pop_group_to_source (cr);
+  cairo_paint (cr);
+  cairo_destroy (cr);
 
   gdk_threads_leave();
 }

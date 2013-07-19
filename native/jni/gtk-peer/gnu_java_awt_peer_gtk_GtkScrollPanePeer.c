@@ -106,7 +106,8 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_gtkScrolledWindowSetHScrollIncremen
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
 
   hadj = gtk_scrolled_window_get_hadjustment (sw);
-  hadj->step_increment = u;
+  //hadj->step_increment = u;
+  gtk_adjustment_set_step_increment(hadj, u);
 
   gdk_threads_leave ();
 }
@@ -126,7 +127,8 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_gtkScrolledWindowSetVScrollIncremen
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
 
   vadj = gtk_scrolled_window_get_hadjustment (sw);
-  vadj->step_increment = u;
+  //vadj->step_increment = u;
+  gtk_adjustment_set_step_increment(vadj, u);
 
   gdk_threads_leave ();
 }
@@ -146,9 +148,16 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_getHScrollbarHeight
   ptr = gtkpeer_get_widget (env, obj);
 
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
-
-  gtk_widget_size_request (sw->hscrollbar, &requisition);
+  
+  #if GTK_MAJOR_VERSION == 2
+  gtk_widget_size_request (gtk_scrolled_window_get_hscrollbar(sw), &requisition);
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_widget_get_preferred_size(gtk_scrolled_window_get_hscrollbar(sw), &requisition, NULL);
+   #endif
+ 
   gtk_widget_style_get (GTK_WIDGET (sw), "scrollbar_spacing", &spacing, NULL);
+ 
+  
   height = requisition.height + spacing;
 
   gdk_threads_leave ();
@@ -171,9 +180,16 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_getVScrollbarWidth
   ptr = gtkpeer_get_widget (env, obj);
 
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
-
-  gtk_widget_size_request (sw->vscrollbar, &requisition);
+  
+  #if GTK_MAJOR_VERSION == 2
+  gtk_widget_size_request (gtk_scrolled_window_get_vscrollbar(sw), &requisition);
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_widget_get_preferred_size(gtk_scrolled_window_get_vscrollbar(sw), &requisition, NULL);
+  #endif
+  
   gtk_widget_style_get (GTK_WIDGET (sw), "scrollbar_spacing", &spacing, NULL);
+  
+ 
   width = requisition.width + spacing;
 
   gdk_threads_leave ();

@@ -187,8 +187,8 @@ get_border_width (GtkWidget *entry)
 			"focus-line-width", &focus_width,
 			NULL);
 
-  if (GTK_ENTRY (entry)->has_frame)
-    x_border_width += entry->style->xthickness;
+  if (gtk_entry_get_has_frame(GTK_ENTRY (entry)))
+    x_border_width += gtk_widget_get_style(entry)->xthickness;
 
   if (!interior_focus)
     x_border_width += focus_width;

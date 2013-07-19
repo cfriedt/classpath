@@ -109,7 +109,11 @@ Java_gnu_java_awt_peer_gtk_GtkFramePeer_getMenuBarHeight
 
   ptr = gtkpeer_get_widget (env, menubar);
 
+  #if GTK_MAJOR_VERSION == 2
   gtk_widget_size_request (ptr, &requisition);
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_widget_get_preferred_size(ptr, &requisition, NULL);
+  #endif
 
   gdk_threads_leave ();
 
@@ -141,7 +145,12 @@ Java_gnu_java_awt_peer_gtk_GtkFramePeer_setMenuBarWidthUnlocked
 
       /* Get the menubar's natural size request. */
       gtk_widget_set_size_request (GTK_WIDGET (ptr), -1, -1);
+      
+      #if GTK_MAJOR_VERSION == 2
       gtk_widget_size_request (GTK_WIDGET (ptr), &natural_req);
+      #elif GTK_MAJOR_VERSION == 3
+      gtk_widget_get_preferred_size(GTK_WIDGET (ptr), NULL, &natural_req);
+      #endif
 
       /* Set the menubar's size request to width by natural_req.height. */
       gtk_widget_set_size_request (GTK_WIDGET (ptr),

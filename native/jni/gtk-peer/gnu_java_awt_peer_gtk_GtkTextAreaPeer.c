@@ -252,7 +252,12 @@ Java_gnu_java_awt_peer_gtk_GtkTextAreaPeer_getHScrollbarHeight
 
   if (sw)
     {
-      gtk_widget_size_request (sw->hscrollbar, &requisition);
+      #if GTK_MAJOR_VERSION == 2
+      gtk_widget_size_request (gtk_scrolled_window_get_hscrollbar(sw), &requisition);
+      #elif GTK_MAJOR_VERSION == 3
+      gtk_widget_get_preferred_size (gtk_scrolled_window_get_hscrollbar(sw), &requisition, NULL);
+      #endif     
+ 
       gtk_widget_style_get (GTK_WIDGET (sw), "scrollbar_spacing", &spacing, NULL);
       height = requisition.height + spacing;
     }
@@ -282,7 +287,12 @@ Java_gnu_java_awt_peer_gtk_GtkTextAreaPeer_getVScrollbarWidth
 
   if (sw)
     {
-      gtk_widget_size_request (sw->vscrollbar, &requisition);
+      #if GTK_MAJOR_VERSION == 2
+      gtk_widget_size_request (gtk_scrolled_window_get_vscrollbar(sw), &requisition);
+      #elif GTK_MAJOR_VERSION == 3
+      gtk_widget_get_preferred_size(gtk_scrolled_window_get_vscrollbar(sw), &requisition, NULL);
+      #endif
+ 
       gtk_widget_style_get (GTK_WIDGET (sw), "scrollbar_spacing", &spacing, NULL);
       width = requisition.width + spacing;
     }

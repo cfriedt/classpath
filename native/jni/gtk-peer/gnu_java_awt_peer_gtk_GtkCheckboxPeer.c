@@ -222,10 +222,16 @@ Java_gnu_java_awt_peer_gtk_GtkCheckboxPeer_createRadioButton
   
   if (native_group == NULL)
     native_group = gtk_radio_button_get_group (GTK_RADIO_BUTTON (button));
+    
+
   if (g_slist_index (native_group, GTK_RADIO_BUTTON (button)) == -1)
   {
     native_group = g_slist_prepend (native_group, GTK_RADIO_BUTTON (button));
-    GTK_RADIO_BUTTON(button)->group = native_group;  
+   //GTK_RADIO_BUTTON(button)->group = native_group;
+   
+   #if GTK_MAJOR_VERSION == 2
+   gtk_radio_button_set_group(GTK_RADIO_BUTTON(button), native_group);
+   #endif   
   }
   
   gtk_container_add (GTK_CONTAINER (eventbox), button);
@@ -282,7 +288,8 @@ Java_gnu_java_awt_peer_gtk_GtkCheckboxPeer_addToGroup
   if (g_slist_index (native_group, GTK_RADIO_BUTTON (radio_button)) == -1)
   {
     native_group = g_slist_prepend (native_group, GTK_RADIO_BUTTON (radio_button));
-    GTK_RADIO_BUTTON(radio_button)->group = native_group;
+    //GTK_RADIO_BUTTON(radio_button)->group = native_group;
+    gtk_radio_button_set_group(GTK_RADIO_BUTTON(radio_button), native_group);
   }
              
   gtk_container_remove (GTK_CONTAINER (container), check_button);
@@ -331,7 +338,8 @@ Java_gnu_java_awt_peer_gtk_GtkCheckboxPeer_removeFromGroup
   if (native_group && ! GTK_IS_RADIO_BUTTON (native_group->data))
     native_group = NULL;
   
-  GTK_RADIO_BUTTON(radio_button)->group = NULL;
+  //GTK_RADIO_BUTTON(radio_button)->group = NULL;
+  gtk_radio_button_set_group(GTK_RADIO_BUTTON(radio_button), NULL);
   
   gtk_container_remove (GTK_CONTAINER (container), radio_button);  
   gtk_container_add (GTK_CONTAINER (container), check_button);
@@ -362,7 +370,8 @@ Java_gnu_java_awt_peer_gtk_GtkCheckboxPeer_switchToGroup
   
   native_group = gtk_radio_button_get_group (GTK_RADIO_BUTTON (radio_button));
   native_group = g_slist_remove (native_group, GTK_RADIO_BUTTON (radio_button));
-  GTK_RADIO_BUTTON(radio_button)->group = NULL;
+  //GTK_RADIO_BUTTON(radio_button)->group = NULL;
+  gtk_radio_button_set_group(GTK_RADIO_BUTTON(radio_button), NULL);
   
   if (groupPointer != 0)
   {
@@ -375,7 +384,8 @@ Java_gnu_java_awt_peer_gtk_GtkCheckboxPeer_switchToGroup
   if (g_slist_index (native_group, GTK_RADIO_BUTTON (radio_button)) == -1)
   {
     native_group = g_slist_prepend (native_group, GTK_RADIO_BUTTON (radio_button));
-    GTK_RADIO_BUTTON(radio_button)->group = native_group;
+    //GTK_RADIO_BUTTON(radio_button)->group = native_group;
+    gtk_radio_button_set_group(GTK_RADIO_BUTTON(radio_button), native_group);
   }
    
   (*cp_gtk_gdk_env())->CallVoidMethod (cp_gtk_gdk_env(), obj,
@@ -391,7 +401,8 @@ item_toggled_cb (GtkToggleButton *item, jobject peer)
   (*cp_gtk_gdk_env())->CallVoidMethod (cp_gtk_gdk_env(), peer,
                                 postItemEventID,
                                 peer,
-                                item->active);
+                                //item->active);
+				 gtk_toggle_button_get_active(item));
 }
 
 static GtkWidget *

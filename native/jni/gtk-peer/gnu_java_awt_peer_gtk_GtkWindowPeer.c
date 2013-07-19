@@ -346,93 +346,93 @@ keysym_to_awt_keycode (GdkEventKey *event)
   state = event->state;
 
   /* VK_A through VK_Z */
-  if (ukeyval >= GDK_A && ukeyval <= GDK_Z)
+  if (ukeyval >= GDK_KEY_A && ukeyval <= GDK_KEY_Z)
     return ukeyval;
 
   /* VK_0 through VK_9 */
-  if (ukeyval >= GDK_0 && ukeyval <= GDK_9)
+  if (ukeyval >= GDK_KEY_0 && ukeyval <= GDK_KEY_9)
     return ukeyval;
 
   switch (ukeyval)
     {
-    case GDK_Return:
-    case GDK_KP_Enter:
+    case GDK_KEY_Return:
+    case GDK_KEY_KP_Enter:
       return VK_ENTER;
-    case GDK_BackSpace:
+    case GDK_KEY_BackSpace:
       return VK_BACK_SPACE;
-    case GDK_Tab:
+    case GDK_KEY_Tab:
       return VK_TAB;
-    case GDK_Cancel:
+    case GDK_KEY_Cancel:
       return VK_CANCEL;
-    case GDK_Clear:
+    case GDK_KEY_Clear:
       return VK_CLEAR;
-    case GDK_Shift_L:
-    case GDK_Shift_R:
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
       return VK_SHIFT;
-    case GDK_Control_L:
-    case GDK_Control_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
       return VK_CONTROL;
-    case GDK_Alt_L:
-    case GDK_Alt_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
       return VK_ALT;
-    case GDK_Pause:
+    case GDK_KEY_Pause:
       return VK_PAUSE;
-    case GDK_Caps_Lock:
+    case GDK_KEY_Caps_Lock:
       return VK_CAPS_LOCK;
-    case GDK_Escape:
+    case GDK_KEY_Escape:
       return VK_ESCAPE;
-    case GDK_space:
+    case GDK_KEY_space:
       return VK_SPACE;
-    case GDK_KP_Page_Up:
+    case GDK_KEY_KP_Page_Up:
       /* For keys on the numeric keypad, the JVM produces one of two
          virtual keys, depending on the num lock state. */
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD9;
       else
         return VK_PAGE_UP;
-    case GDK_Page_Up:
+    case GDK_KEY_Page_Up:
       return VK_PAGE_UP;
-    case GDK_KP_Page_Down:
+    case GDK_KEY_KP_Page_Down:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD3;
       else
         return VK_PAGE_DOWN;
-    case GDK_Page_Down:
+    case GDK_KEY_Page_Down:
       return VK_PAGE_DOWN;
-    case GDK_KP_End:
+    case GDK_KEY_KP_End:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD1;
       else
         return VK_END;
-    case GDK_End:
+    case GDK_KEY_End:
       return VK_END;
-    case GDK_KP_Home:
+    case GDK_KEY_KP_Home:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD7;
       else
         return VK_HOME;
-    case GDK_Home:
+    case GDK_KEY_Home:
       return VK_HOME;
-    case GDK_KP_Begin:
+    case GDK_KEY_KP_Begin:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD5;
       else
         return VK_UNDEFINED;
-    case GDK_Left:
+    case GDK_KEY_Left:
       return VK_LEFT;
-    case GDK_Up:
+    case GDK_KEY_Up:
       return VK_UP;
-    case GDK_Right:
+    case GDK_KEY_Right:
       return VK_RIGHT;
-    case GDK_Down:
+    case GDK_KEY_Down:
       return VK_DOWN;
-    case GDK_comma:
+    case GDK_KEY_comma:
       return VK_COMMA;
-    case GDK_minus:
+    case GDK_KEY_minus:
       return VK_MINUS;
-    case GDK_period:
+    case GDK_KEY_period:
       return VK_PERIOD;
-    case GDK_slash:
+    case GDK_KEY_slash:
       return VK_SLASH;
       /*
       return VK_0;
@@ -446,9 +446,9 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_8;
       return VK_9;
       */
-    case GDK_semicolon:
+    case GDK_KEY_semicolon:
       return VK_SEMICOLON;
-    case GDK_equal:
+    case GDK_KEY_equal:
       return VK_EQUALS;
       /*
       return VK_A;
@@ -478,213 +478,213 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_Y;
       return VK_Z;
       */
-    case GDK_bracketleft:
+    case GDK_KEY_bracketleft:
       return VK_OPEN_BRACKET;
-    case GDK_backslash:
+    case GDK_KEY_backslash:
       return VK_BACK_SLASH;
-    case GDK_bracketright:
+    case GDK_KEY_bracketright:
       return VK_CLOSE_BRACKET;
-    case GDK_KP_0:
+    case GDK_KEY_KP_0:
       return VK_NUMPAD0;
-    case GDK_KP_1:
+    case GDK_KEY_KP_1:
       return VK_NUMPAD1;
-    case GDK_KP_2:
+    case GDK_KEY_KP_2:
       return VK_NUMPAD2;
-    case GDK_KP_3:
+    case GDK_KEY_KP_3:
       return VK_NUMPAD3;
-    case GDK_KP_4:
+    case GDK_KEY_KP_4:
       return VK_NUMPAD4;
-    case GDK_KP_5:
+    case GDK_KEY_KP_5:
       return VK_NUMPAD5;
-    case GDK_KP_6:
+    case GDK_KEY_KP_6:
       return VK_NUMPAD6;
-    case GDK_KP_7:
+    case GDK_KEY_KP_7:
       return VK_NUMPAD7;
-    case GDK_KP_8:
+    case GDK_KEY_KP_8:
       return VK_NUMPAD8;
-    case GDK_KP_9:
+    case GDK_KEY_KP_9:
       return VK_NUMPAD9;
-    case GDK_KP_Multiply:
+    case GDK_KEY_KP_Multiply:
       return VK_MULTIPLY;
-    case GDK_KP_Add:
+    case GDK_KEY_KP_Add:
       return VK_ADD;
       /*
       return VK_SEPARATER;
       */
-    case GDK_KP_Separator:
+    case GDK_KEY_KP_Separator:
       return VK_SEPARATOR;
-    case GDK_KP_Subtract:
+    case GDK_KEY_KP_Subtract:
       return VK_SUBTRACT;
-    case GDK_KP_Decimal:
+    case GDK_KEY_KP_Decimal:
       return VK_DECIMAL;
-    case GDK_KP_Divide:
+    case GDK_KEY_KP_Divide:
       return VK_DIVIDE;
-    case GDK_KP_Delete:
+    case GDK_KEY_KP_Delete:
       if (state & GDK_MOD2_MASK)
         return VK_DECIMAL;
       else
         return VK_DELETE;
-    case GDK_Delete:
+    case GDK_KEY_Delete:
       return VK_DELETE;
-    case GDK_Num_Lock:
+    case GDK_KEY_Num_Lock:
       return VK_NUM_LOCK;
-    case GDK_Scroll_Lock:
+    case GDK_KEY_Scroll_Lock:
       return VK_SCROLL_LOCK;
-    case GDK_F1:
+    case GDK_KEY_F1:
       return VK_F1;
-    case GDK_F2:
+    case GDK_KEY_F2:
       return VK_F2;
-    case GDK_F3:
+    case GDK_KEY_F3:
       return VK_F3;
-    case GDK_F4:
+    case GDK_KEY_F4:
       return VK_F4;
-    case GDK_F5:
+    case GDK_KEY_F5:
       return VK_F5;
-    case GDK_F6:
+    case GDK_KEY_F6:
       return VK_F6;
-    case GDK_F7:
+    case GDK_KEY_F7:
       return VK_F7;
-    case GDK_F8:
+    case GDK_KEY_F8:
       return VK_F8;
-    case GDK_F9:
+    case GDK_KEY_F9:
       return VK_F9;
-    case GDK_F10:
+    case GDK_KEY_F10:
       return VK_F10;
-    case GDK_F11:
+    case GDK_KEY_F11:
       return VK_F11;
-    case GDK_F12:
+    case GDK_KEY_F12:
       return VK_F12;
-    case GDK_F13:
+    case GDK_KEY_F13:
       return VK_F13;
-    case GDK_F14:
+    case GDK_KEY_F14:
       return VK_F14;
-    case GDK_F15:
+    case GDK_KEY_F15:
       return VK_F15;
-    case GDK_F16:
+    case GDK_KEY_F16:
       return VK_F16;
-    case GDK_F17:
+    case GDK_KEY_F17:
       return VK_F17;
-    case GDK_F18:
+    case GDK_KEY_F18:
       return VK_F18;
-    case GDK_F19:
+    case GDK_KEY_F19:
       return VK_F19;
-    case GDK_F20:
+    case GDK_KEY_F20:
       return VK_F20;
-    case GDK_F21:
+    case GDK_KEY_F21:
       return VK_F21;
-    case GDK_F22:
+    case GDK_KEY_F22:
       return VK_F22;
-    case GDK_F23:
+    case GDK_KEY_F23:
       return VK_F23;
-    case GDK_F24:
+    case GDK_KEY_F24:
       return VK_F24;
-    case GDK_Print:
+    case GDK_KEY_Print:
       return VK_PRINTSCREEN;
-    case GDK_KP_Insert:
+    case GDK_KEY_KP_Insert:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD0;
       else
         return VK_INSERT;
-    case GDK_Insert:
+    case GDK_KEY_Insert:
       return VK_INSERT;
-    case GDK_Help:
+    case GDK_KEY_Help:
       return VK_HELP;
-    case GDK_Meta_L:
-    case GDK_Meta_R:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
       return VK_META;
-    case GDK_grave:
+    case GDK_KEY_grave:
       return VK_BACK_QUOTE;
-    case GDK_apostrophe:
+    case GDK_KEY_apostrophe:
       return VK_QUOTE;
-    case GDK_KP_Up:
+    case GDK_KEY_KP_Up:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD8;
       else
         return VK_KP_UP;
-    case GDK_KP_Down:
+    case GDK_KEY_KP_Down:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD2;
       else
         return VK_KP_DOWN;
-    case GDK_KP_Left:
+    case GDK_KEY_KP_Left:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD4;
       else
         return VK_KP_LEFT;
-    case GDK_KP_Right:
+    case GDK_KEY_KP_Right:
       if (state & GDK_MOD2_MASK)
         return VK_NUMPAD6;
       else
         return VK_KP_RIGHT;
-    case GDK_dead_grave:
+    case GDK_KEY_dead_grave:
       return VK_DEAD_GRAVE;
-    case GDK_dead_acute:
+    case GDK_KEY_dead_acute:
       return VK_DEAD_ACUTE;
-    case GDK_dead_circumflex:
+    case GDK_KEY_dead_circumflex:
       return VK_DEAD_CIRCUMFLEX;
-    case GDK_dead_tilde:
+    case GDK_KEY_dead_tilde:
       return VK_DEAD_TILDE;
-    case GDK_dead_macron:
+    case GDK_KEY_dead_macron:
       return VK_DEAD_MACRON;
-    case GDK_dead_breve:
+    case GDK_KEY_dead_breve:
       return VK_DEAD_BREVE;
-    case GDK_dead_abovedot:
+    case GDK_KEY_dead_abovedot:
       return VK_DEAD_ABOVEDOT;
-    case GDK_dead_diaeresis:
+    case GDK_KEY_dead_diaeresis:
       return VK_DEAD_DIAERESIS;
-    case GDK_dead_abovering:
+    case GDK_KEY_dead_abovering:
       return VK_DEAD_ABOVERING;
-    case GDK_dead_doubleacute:
+    case GDK_KEY_dead_doubleacute:
       return VK_DEAD_DOUBLEACUTE;
-    case GDK_dead_caron:
+    case GDK_KEY_dead_caron:
       return VK_DEAD_CARON;
-    case GDK_dead_cedilla:
+    case GDK_KEY_dead_cedilla:
       return VK_DEAD_CEDILLA;
-    case GDK_dead_ogonek:
+    case GDK_KEY_dead_ogonek:
       return VK_DEAD_OGONEK;
-    case GDK_dead_iota:
+    case GDK_KEY_dead_iota:
       return VK_DEAD_IOTA;
-    case GDK_dead_voiced_sound:
+    case GDK_KEY_dead_voiced_sound:
       return VK_DEAD_VOICED_SOUND;
-    case GDK_dead_semivoiced_sound:
+    case GDK_KEY_dead_semivoiced_sound:
       return VK_DEAD_SEMIVOICED_SOUND;
-    case GDK_ampersand:
+    case GDK_KEY_ampersand:
       return VK_AMPERSAND;
-    case GDK_asterisk:
+    case GDK_KEY_asterisk:
       return VK_ASTERISK;
-    case GDK_quotedbl:
+    case GDK_KEY_quotedbl:
       return VK_QUOTEDBL;
-    case GDK_less:
+    case GDK_KEY_less:
       return VK_LESS;
-    case GDK_greater:
+    case GDK_KEY_greater:
       return VK_GREATER;
-    case GDK_braceleft:
+    case GDK_KEY_braceleft:
       return VK_BRACELEFT;
-    case GDK_braceright:
+    case GDK_KEY_braceright:
       return VK_BRACERIGHT;
-    case GDK_at:
+    case GDK_KEY_at:
       return VK_AT;
-    case GDK_colon:
+    case GDK_KEY_colon:
       return VK_COLON;
-    case GDK_asciicircum:
+    case GDK_KEY_asciicircum:
       return VK_CIRCUMFLEX;
-    case GDK_dollar:
+    case GDK_KEY_dollar:
       return VK_DOLLAR;
-    case GDK_EuroSign:
+    case GDK_KEY_EuroSign:
       return VK_EURO_SIGN;
-    case GDK_exclam:
+    case GDK_KEY_exclam:
       return VK_EXCLAMATION_MARK;
-    case GDK_exclamdown:
+    case GDK_KEY_exclamdown:
       return VK_INVERTED_EXCLAMATION_MARK;
-    case GDK_parenleft:
+    case GDK_KEY_parenleft:
       return VK_LEFT_PARENTHESIS;
-    case GDK_numbersign:
+    case GDK_KEY_numbersign:
       return VK_NUMBER_SIGN;
-    case GDK_plus:
+    case GDK_KEY_plus:
       return VK_PLUS;
-    case GDK_parenright:
+    case GDK_KEY_parenright:
       return VK_RIGHT_PARENTHESIS;
-    case GDK_underscore:
+    case GDK_KEY_underscore:
       return VK_UNDERSCORE;
       /*
       return VK_FINAL;
@@ -692,19 +692,19 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_NONCONVERT;
       return VK_ACCEPT;
       */
-    case GDK_Mode_switch:
+    case GDK_KEY_Mode_switch:
       return VK_MODECHANGE;
       /*
       return VK_KANA;
       */
-    case GDK_Kanji:
+    case GDK_KEY_Kanji:
       return VK_KANJI;
       /*
       return VK_ALPHANUMERIC;
       */
-    case GDK_Katakana:
+    case GDK_KEY_Katakana:
       return VK_KATAKANA;
-    case GDK_Hiragana:
+    case GDK_KEY_Hiragana:
       return VK_HIRAGANA;
       /*
       return VK_FULL_WIDTH;
@@ -712,16 +712,16 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_ROMAN_CHARACTERS;
       return VK_ALL_CANDIDATES;
       */
-    case GDK_PreviousCandidate:
+    case GDK_KEY_PreviousCandidate:
       return VK_PREVIOUS_CANDIDATE;
-    case GDK_Codeinput:
+    case GDK_KEY_Codeinput:
       return VK_CODE_INPUT;
       /*
       return VK_JAPANESE_KATAKANA;
       return VK_JAPANESE_HIRAGANA;
       return VK_JAPANESE_ROMAN;
       */
-    case GDK_Kana_Lock:
+    case GDK_KEY_Kana_Lock:
       return VK_KANA_LOCK;
       /*
       return VK_INPUT_METHOD_ON_OFF;
@@ -729,9 +729,9 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_COPY;
       return VK_PASTE;
       */
-    case GDK_Undo:
+    case GDK_KEY_Undo:
       return VK_UNDO;
-    case GDK_Redo:
+    case GDK_KEY_Redo:
       return VK_AGAIN;
       /*
       return VK_FIND;
@@ -739,15 +739,15 @@ keysym_to_awt_keycode (GdkEventKey *event)
       return VK_STOP;
       return VK_COMPOSE;
       */
-    case GDK_ISO_Level3_Shift:
+    case GDK_KEY_ISO_Level3_Shift:
       return VK_ALT_GRAPH;
       /*
 	case VK_BEGIN:
       */
-    case GDK_Menu:
+    case GDK_KEY_Menu:
       return VK_CONTEXT_MENU;
-    case GDK_Super_L:
-    case GDK_Super_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
       return VK_WINDOWS;
 
     default:
@@ -768,157 +768,157 @@ keysym_to_awt_keylocation (GdkEventKey *event)
     return -1;
 
   /* VK_A through VK_Z */
-  if (ukeyval >= GDK_A && ukeyval <= GDK_Z)
+  if (ukeyval >= GDK_KEY_A && ukeyval <= GDK_KEY_Z)
     return AWT_KEY_LOCATION_STANDARD;
 
   /* VK_0 through VK_9 */
-  if (ukeyval >= GDK_0 && ukeyval <= GDK_9)
+  if (ukeyval >= GDK_KEY_0 && ukeyval <= GDK_KEY_9)
     return AWT_KEY_LOCATION_STANDARD;
 
   switch (ukeyval)
     {
-    case GDK_Shift_L:
-    case GDK_Control_L:
-    case GDK_Alt_L:
-    case GDK_Meta_L:
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Meta_L:
       return AWT_KEY_LOCATION_LEFT;
 
-    case GDK_Shift_R:
-    case GDK_Control_R:
-    case GDK_Alt_R:
-    case GDK_Meta_R:
+    case GDK_KEY_Shift_R:
+    case GDK_KEY_Control_R:
+    case GDK_KEY_Alt_R:
+    case GDK_KEY_Meta_R:
       return AWT_KEY_LOCATION_RIGHT;
 
-    case GDK_Return:
-    case GDK_BackSpace:
-    case GDK_Tab:
-    case GDK_Cancel:
-    case GDK_Clear:
-    case GDK_Pause:
-    case GDK_Caps_Lock:
-    case GDK_Escape:
-    case GDK_space:
-    case GDK_Page_Up:
-    case GDK_Page_Down:
-    case GDK_End:
-    case GDK_Home:
-    case GDK_Left:
-    case GDK_Up:
-    case GDK_Right:
-    case GDK_Down:
-    case GDK_comma:
-    case GDK_minus:
-    case GDK_period:
-    case GDK_slash:
-    case GDK_semicolon:
-    case GDK_equal:
-    case GDK_bracketleft:
-    case GDK_backslash:
-    case GDK_bracketright:
-    case GDK_Delete:
-    case GDK_Scroll_Lock:
-    case GDK_F1:
-    case GDK_F2:
-    case GDK_F3:
-    case GDK_F4:
-    case GDK_F5:
-    case GDK_F6:
-    case GDK_F7:
-    case GDK_F8:
-    case GDK_F9:
-    case GDK_F10:
-    case GDK_F11:
-    case GDK_F12:
-    case GDK_F13:
-    case GDK_F14:
-    case GDK_F15:
-    case GDK_F16:
-    case GDK_F17:
-    case GDK_F18:
-    case GDK_F19:
-    case GDK_F20:
-    case GDK_F21:
-    case GDK_F22:
-    case GDK_F23:
-    case GDK_F24:
-    case GDK_Print:
-    case GDK_Insert:
-    case GDK_Help:
-    case GDK_grave:
-    case GDK_apostrophe:
-    case GDK_dead_grave:
-    case GDK_dead_acute:
-    case GDK_dead_circumflex:
-    case GDK_dead_tilde:
-    case GDK_dead_macron:
-    case GDK_dead_breve:
-    case GDK_dead_abovedot:
-    case GDK_dead_diaeresis:
-    case GDK_dead_abovering:
-    case GDK_dead_doubleacute:
-    case GDK_dead_caron:
-    case GDK_dead_cedilla:
-    case GDK_dead_ogonek:
-    case GDK_dead_iota:
-    case GDK_dead_voiced_sound:
-    case GDK_dead_semivoiced_sound:
-    case GDK_ampersand:
-    case GDK_asterisk:
-    case GDK_quotedbl:
-    case GDK_less:
-    case GDK_greater:
-    case GDK_braceleft:
-    case GDK_braceright:
-    case GDK_at:
-    case GDK_colon:
-    case GDK_asciicircum:
-    case GDK_dollar:
-    case GDK_EuroSign:
-    case GDK_exclam:
-    case GDK_exclamdown:
-    case GDK_parenleft:
-    case GDK_numbersign:
-    case GDK_plus:
-    case GDK_parenright:
-    case GDK_underscore:
-    case GDK_Mode_switch:
-    case GDK_Kanji:
-    case GDK_Katakana:
-    case GDK_Hiragana:
-    case GDK_PreviousCandidate:
-    case GDK_Codeinput:
-    case GDK_Kana_Lock:
+    case GDK_KEY_Return:
+    case GDK_KEY_BackSpace:
+    case GDK_KEY_Tab:
+    case GDK_KEY_Cancel:
+    case GDK_KEY_Clear:
+    case GDK_KEY_Pause:
+    case GDK_KEY_Caps_Lock:
+    case GDK_KEY_Escape:
+    case GDK_KEY_space:
+    case GDK_KEY_Page_Up:
+    case GDK_KEY_Page_Down:
+    case GDK_KEY_End:
+    case GDK_KEY_Home:
+    case GDK_KEY_Left:
+    case GDK_KEY_Up:
+    case GDK_KEY_Right:
+    case GDK_KEY_Down:
+    case GDK_KEY_comma:
+    case GDK_KEY_minus:
+    case GDK_KEY_period:
+    case GDK_KEY_slash:
+    case GDK_KEY_semicolon:
+    case GDK_KEY_equal:
+    case GDK_KEY_bracketleft:
+    case GDK_KEY_backslash:
+    case GDK_KEY_bracketright:
+    case GDK_KEY_Delete:
+    case GDK_KEY_Scroll_Lock:
+    case GDK_KEY_F1:
+    case GDK_KEY_F2:
+    case GDK_KEY_F3:
+    case GDK_KEY_F4:
+    case GDK_KEY_F5:
+    case GDK_KEY_F6:
+    case GDK_KEY_F7:
+    case GDK_KEY_F8:
+    case GDK_KEY_F9:
+    case GDK_KEY_F10:
+    case GDK_KEY_F11:
+    case GDK_KEY_F12:
+    case GDK_KEY_F13:
+    case GDK_KEY_F14:
+    case GDK_KEY_F15:
+    case GDK_KEY_F16:
+    case GDK_KEY_F17:
+    case GDK_KEY_F18:
+    case GDK_KEY_F19:
+    case GDK_KEY_F20:
+    case GDK_KEY_F21:
+    case GDK_KEY_F22:
+    case GDK_KEY_F23:
+    case GDK_KEY_F24:
+    case GDK_KEY_Print:
+    case GDK_KEY_Insert:
+    case GDK_KEY_Help:
+    case GDK_KEY_grave:
+    case GDK_KEY_apostrophe:
+    case GDK_KEY_dead_grave:
+    case GDK_KEY_dead_acute:
+    case GDK_KEY_dead_circumflex:
+    case GDK_KEY_dead_tilde:
+    case GDK_KEY_dead_macron:
+    case GDK_KEY_dead_breve:
+    case GDK_KEY_dead_abovedot:
+    case GDK_KEY_dead_diaeresis:
+    case GDK_KEY_dead_abovering:
+    case GDK_KEY_dead_doubleacute:
+    case GDK_KEY_dead_caron:
+    case GDK_KEY_dead_cedilla:
+    case GDK_KEY_dead_ogonek:
+    case GDK_KEY_dead_iota:
+    case GDK_KEY_dead_voiced_sound:
+    case GDK_KEY_dead_semivoiced_sound:
+    case GDK_KEY_ampersand:
+    case GDK_KEY_asterisk:
+    case GDK_KEY_quotedbl:
+    case GDK_KEY_less:
+    case GDK_KEY_greater:
+    case GDK_KEY_braceleft:
+    case GDK_KEY_braceright:
+    case GDK_KEY_at:
+    case GDK_KEY_colon:
+    case GDK_KEY_asciicircum:
+    case GDK_KEY_dollar:
+    case GDK_KEY_EuroSign:
+    case GDK_KEY_exclam:
+    case GDK_KEY_exclamdown:
+    case GDK_KEY_parenleft:
+    case GDK_KEY_numbersign:
+    case GDK_KEY_plus:
+    case GDK_KEY_parenright:
+    case GDK_KEY_underscore:
+    case GDK_KEY_Mode_switch:
+    case GDK_KEY_Kanji:
+    case GDK_KEY_Katakana:
+    case GDK_KEY_Hiragana:
+    case GDK_KEY_PreviousCandidate:
+    case GDK_KEY_Codeinput:
+    case GDK_KEY_Kana_Lock:
       return AWT_KEY_LOCATION_STANDARD;
 
-    case GDK_KP_Enter:
-    case GDK_KP_Page_Up:
-    case GDK_KP_Page_Down:
-    case GDK_KP_End:
-    case GDK_KP_Home:
-    case GDK_KP_Begin:
-    case GDK_KP_0:
-    case GDK_KP_1:
-    case GDK_KP_2:
-    case GDK_KP_3:
-    case GDK_KP_4:
-    case GDK_KP_5:
-    case GDK_KP_6:
-    case GDK_KP_7:
-    case GDK_KP_8:
-    case GDK_KP_9:
-    case GDK_KP_Multiply:
-    case GDK_KP_Add:
-    case GDK_KP_Separator:
-    case GDK_KP_Subtract:
-    case GDK_KP_Decimal:
-    case GDK_KP_Divide:
-    case GDK_KP_Delete:
-    case GDK_Num_Lock:
-    case GDK_KP_Insert:
-    case GDK_KP_Up:
-    case GDK_KP_Down:
-    case GDK_KP_Left:
-    case GDK_KP_Right:
+    case GDK_KEY_KP_Enter:
+    case GDK_KEY_KP_Page_Up:
+    case GDK_KEY_KP_Page_Down:
+    case GDK_KEY_KP_End:
+    case GDK_KEY_KP_Home:
+    case GDK_KEY_KP_Begin:
+    case GDK_KEY_KP_0:
+    case GDK_KEY_KP_1:
+    case GDK_KEY_KP_2:
+    case GDK_KEY_KP_3:
+    case GDK_KEY_KP_4:
+    case GDK_KEY_KP_5:
+    case GDK_KEY_KP_6:
+    case GDK_KEY_KP_7:
+    case GDK_KEY_KP_8:
+    case GDK_KEY_KP_9:
+    case GDK_KEY_KP_Multiply:
+    case GDK_KEY_KP_Add:
+    case GDK_KEY_KP_Separator:
+    case GDK_KEY_KP_Subtract:
+    case GDK_KEY_KP_Decimal:
+    case GDK_KEY_KP_Divide:
+    case GDK_KEY_KP_Delete:
+    case GDK_KEY_Num_Lock:
+    case GDK_KEY_KP_Insert:
+    case GDK_KEY_KP_Up:
+    case GDK_KEY_KP_Down:
+    case GDK_KEY_KP_Left:
+    case GDK_KEY_KP_Right:
       return AWT_KEY_LOCATION_NUMPAD;
 
     default:
@@ -941,12 +941,12 @@ keyevent_to_awt_keychar (GdkEventKey *event)
     {
       switch (event->keyval)
         {
-        case GDK_BackSpace:
+        case GDK_KEY_BackSpace:
           return VK_BACK_SPACE;
-        case GDK_Tab:
+        case GDK_KEY_Tab:
           return VK_TAB;
-        case GDK_Delete:
-        case GDK_KP_Delete:
+        case GDK_KEY_Delete:
+        case GDK_KEY_KP_Delete:
           return VK_DELETE;
         default:
           return AWT_KEY_CHAR_UNDEFINED;
@@ -972,8 +972,8 @@ keyevent_state_to_awt_mods (GdkEventKey *event)
     {
       state = event->state;
 
-      if (event->keyval == GDK_Shift_L
-          || event->keyval == GDK_Shift_R)
+      if (event->keyval == GDK_KEY_Shift_L
+          || event->keyval == GDK_KEY_Shift_R)
         result |= AWT_SHIFT_DOWN_MASK | AWT_SHIFT_MASK;
       else
         {
@@ -981,8 +981,8 @@ keyevent_state_to_awt_mods (GdkEventKey *event)
             result |= AWT_SHIFT_DOWN_MASK | AWT_SHIFT_MASK;
         }
 
-      if (event->keyval == GDK_Control_L
-          || event->keyval == GDK_Control_R)
+      if (event->keyval == GDK_KEY_Control_L
+          || event->keyval == GDK_KEY_Control_R)
         result |= AWT_CTRL_DOWN_MASK | AWT_CTRL_MASK;
       else
         {
@@ -990,8 +990,8 @@ keyevent_state_to_awt_mods (GdkEventKey *event)
             result |= AWT_CTRL_DOWN_MASK | AWT_CTRL_MASK;
         }
 
-      if (event->keyval == GDK_Alt_L
-          || event->keyval == GDK_Alt_R)
+      if (event->keyval == GDK_KEY_Alt_L
+          || event->keyval == GDK_KEY_Alt_R)
         result |= AWT_ALT_DOWN_MASK | AWT_ALT_MASK;
       else
         {
@@ -1003,21 +1003,21 @@ keyevent_state_to_awt_mods (GdkEventKey *event)
     {
       state = event->state;
 
-      if (event->keyval != GDK_Shift_L
-          && event->keyval != GDK_Shift_R)
+      if (event->keyval != GDK_KEY_Shift_L
+          && event->keyval != GDK_KEY_Shift_R)
         {
           if (state & GDK_SHIFT_MASK)
             result |= AWT_SHIFT_DOWN_MASK | AWT_SHIFT_MASK;
         }
-      if (event->keyval != GDK_Control_L
-          && event->keyval != GDK_Control_R)
+      if (event->keyval != GDK_KEY_Control_L
+          && event->keyval != GDK_KEY_Control_R)
         {
           if (state & GDK_CONTROL_MASK)
             result |= AWT_CTRL_DOWN_MASK | AWT_CTRL_MASK;
         }
 
-      if (event->keyval != GDK_Alt_L
-          && event->keyval != GDK_Alt_R)
+      if (event->keyval != GDK_KEY_Alt_L
+          && event->keyval != GDK_KEY_Alt_R)
         {
           if (state & GDK_MOD1_MASK)
             result |= AWT_ALT_DOWN_MASK | AWT_ALT_MASK;
@@ -1226,8 +1226,8 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_gtkWindowSetResizable
 
   ptr = gtkpeer_get_widget (env, obj);
   gtk_window_set_resizable (GTK_WINDOW (ptr), resizable);
-  g_object_set (G_OBJECT (ptr), "allow-shrink", resizable, NULL);
-
+  //g_object_set (G_OBJECT (ptr), "allow-shrink", resizable, NULL);
+  g_object_set (G_OBJECT (ptr), "resizable", resizable, NULL);
   gdk_threads_leave ();
 }
 
@@ -1389,7 +1389,7 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_toBack (JNIEnv *env,
 
   ptr = gtkpeer_get_widget (env, obj);
     
-  gdk_window_lower (GTK_WIDGET (ptr)->window);
+  gdk_window_lower (gtk_widget_get_window(GTK_WIDGET (ptr)));
   gdk_flush ();
 
   gdk_threads_leave ();
@@ -1405,7 +1405,7 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_toFront (JNIEnv *env,
 
   ptr = gtkpeer_get_widget (env, obj);
     
-  gdk_window_raise (GTK_WIDGET (ptr)->window);
+  gdk_window_raise (gtk_widget_get_window(GTK_WIDGET (ptr)));
   gdk_flush ();
 
   gdk_threads_leave ();
@@ -1452,8 +1452,8 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_nativeSetLocationUnlocked
 
   gtk_window_move (GTK_WINDOW(ptr), x, y);
 
-  if (GTK_WIDGET (ptr)->window != NULL)
-    gdk_window_move (GTK_WIDGET (ptr)->window, x, y);
+  if (gtk_widget_get_window(GTK_WIDGET (ptr)) != NULL)
+    gdk_window_move (gtk_widget_get_window(GTK_WIDGET (ptr)), x, y);
 }
 
 JNIEXPORT void JNICALL
@@ -1483,8 +1483,8 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_nativeSetBoundsUnlocked
   height = (height < 1) ? 1 : height;
 
   gtk_window_move (GTK_WINDOW(ptr), x, y);
-  /* The call to gdk_window_move is needed in addition to the call to
-     gtk_window_move.  If gdk_window_move isn't called, then the
+  /* The call to GDK_KEY_window_move is needed in addition to the call to
+     gtk_window_move.  If GDK_KEY_window_move isn't called, then the
      following set of operations doesn't give the expected results:
 
      1. show a window
@@ -1495,8 +1495,8 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_nativeSetBoundsUnlocked
 
      Instead of being at the position set by setLocation, the window
      is reshown at the position to which it was moved manually. */
-  if (GTK_WIDGET (ptr)->window != NULL)
-    gdk_window_move (GTK_WIDGET (ptr)->window, x, y);
+  if (gtk_widget_get_window(GTK_WIDGET (ptr)) != NULL)
+    gdk_window_move (gtk_widget_get_window(GTK_WIDGET (ptr)), x, y);
 
   /* Only request resizing if the actual width or height change, otherwise
    * we get unnecessary flickers because resizing causes GTK to clear the
@@ -1543,7 +1543,7 @@ window_get_frame_extents (GtkWidget *window,
 
   /* Attempt to retrieve window's frame extents. */
   gu_ex.extents = &extents;
-  if (gdk_property_get (window->window,
+  if (gdk_property_get (gtk_widget_get_window(window),
                         gdk_atom_intern ("_NET_FRAME_EXTENTS", FALSE),
                         gdk_atom_intern ("CARDINAL", FALSE),
                         0,
@@ -1573,7 +1573,8 @@ request_frame_extents (GtkWidget *window)
 
   /* Check if the current window manager supports
      _NET_REQUEST_FRAME_EXTENTS. */
-  if (gdk_net_wm_supports (request_extents))
+  //if (gdk_net_wm_supports (request_extents))
+    if (gdk_x11_screen_supports_net_wm_hint (gdk_screen_get_default(), request_extents))
     {
       GdkDisplay *display = gtk_widget_get_display (window);
       Display *xdisplay = GDK_DISPLAY_XDISPLAY (display);
@@ -1587,8 +1588,8 @@ request_frame_extents (GtkWidget *window)
       XEvent xevent;
       XEvent notify_xevent;
 
-      unsigned long window_id = GDK_WINDOW_XID (GDK_DRAWABLE(window->window));
-
+      //unsigned long window_id = GDK_WINDOW_XID (GDK_DRAWABLE(gtk_widget_get_window(window)));
+      unsigned long window_id = GDK_WINDOW_XID (gtk_widget_get_window(window));
       if (!extents_atom)
 	{
 	  const char *extents_str = "_NET_FRAME_EXTENTS";
@@ -1664,7 +1665,7 @@ window_focus_state_change_cb (GtkWidget *widget,
 			      GParamSpec *pspec __attribute__((unused)),
 			      jobject peer)
 {
-  if (GTK_WINDOW (widget)->has_toplevel_focus)
+  if (gtk_window_has_toplevel_focus(GTK_WINDOW (widget)))
     (*cp_gtk_gdk_env())->CallVoidMethod (cp_gtk_gdk_env(), peer,
                                 postWindowEventID,
                                 (jint) AWT_WINDOW_ACTIVATED,
@@ -1808,64 +1809,64 @@ __inline
 guint
 cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
 {
-  /* GDK_A through GDK_Z */
+  /* GDK_KEY_A through GDK_KEY_Z */
   if (keyCode >= VK_A && keyCode <= VK_Z)
     return gdk_keyval_to_lower (keyCode);
 
-  /* GDK_0 through GDK_9 */
+  /* GDK_KEY_0 through GDK_KEY_9 */
   if (keyCode >= VK_0 && keyCode <= VK_9)
     return keyCode;
 
   switch (keyCode)
     {
     case VK_ENTER:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Enter : GDK_Return;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Enter : GDK_KEY_Return;
     case VK_BACK_SPACE:
-      return GDK_BackSpace;
+      return GDK_KEY_BackSpace;
     case VK_TAB:
-      return GDK_Tab;
+      return GDK_KEY_Tab;
     case VK_CANCEL:
-      return GDK_Cancel;
+      return GDK_KEY_Cancel;
     case VK_CLEAR:
-      return GDK_Clear;
+      return GDK_KEY_Clear;
     case VK_SHIFT:
-      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_Shift_L : GDK_Shift_R;
+      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_KEY_Shift_L : GDK_KEY_Shift_R;
     case VK_CONTROL:
-      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_Control_L : GDK_Control_R;
+      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_KEY_Control_L : GDK_KEY_Control_R;
     case VK_ALT:
-      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_Alt_L : GDK_Alt_R;
+      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_KEY_Alt_L : GDK_KEY_Alt_R;
     case VK_PAUSE:
-      return GDK_Pause;
+      return GDK_KEY_Pause;
     case VK_CAPS_LOCK:
-      return GDK_Caps_Lock;
+      return GDK_KEY_Caps_Lock;
     case VK_ESCAPE:
-      return GDK_Escape;
+      return GDK_KEY_Escape;
     case VK_SPACE:
-      return GDK_space;
+      return GDK_KEY_space;
     case VK_PAGE_UP:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Page_Up : GDK_Page_Up;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Page_Up : GDK_KEY_Page_Up;
     case VK_PAGE_DOWN:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Page_Down : GDK_Page_Down;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Page_Down : GDK_KEY_Page_Down;
     case VK_END:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_End : GDK_End;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_End : GDK_KEY_End;
     case VK_HOME:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Home : GDK_Home;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Home : GDK_KEY_Home;
     case VK_LEFT:
-      return GDK_Left;
+      return GDK_KEY_Left;
     case VK_UP:
-      return GDK_Up;
+      return GDK_KEY_Up;
     case VK_RIGHT:
-      return GDK_Right;
+      return GDK_KEY_Right;
     case VK_DOWN:
-      return GDK_Down;
+      return GDK_KEY_Down;
     case VK_COMMA:
-      return GDK_comma;
+      return GDK_KEY_comma;
     case VK_MINUS:
-      return GDK_minus;
+      return GDK_KEY_minus;
     case VK_PERIOD:
-      return GDK_period;
+      return GDK_KEY_period;
     case VK_SLASH:
-      return GDK_slash;
+      return GDK_KEY_slash;
       /*
     case VK_0:
     case VK_1:
@@ -1879,9 +1880,9 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_9:
       */
     case VK_SEMICOLON:
-      return GDK_semicolon;
+      return GDK_KEY_semicolon;
     case VK_EQUALS:
-      return GDK_equal;
+      return GDK_KEY_equal;
       /*
     case VK_A:
     case VK_B:
@@ -1911,190 +1912,190 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_Z:
       */
     case VK_OPEN_BRACKET:
-      return GDK_bracketleft;
+      return GDK_KEY_bracketleft;
     case VK_BACK_SLASH:
-      return GDK_backslash;
+      return GDK_KEY_backslash;
     case VK_CLOSE_BRACKET:
-      return GDK_bracketright;
+      return GDK_KEY_bracketright;
     case VK_NUMPAD0:
-      return GDK_KP_0;
+      return GDK_KEY_KP_0;
     case VK_NUMPAD1:
-      return GDK_KP_1;
+      return GDK_KEY_KP_1;
     case VK_NUMPAD2:
-      return GDK_KP_2;
+      return GDK_KEY_KP_2;
     case VK_NUMPAD3:
-      return GDK_KP_3;
+      return GDK_KEY_KP_3;
     case VK_NUMPAD4:
-      return GDK_KP_4;
+      return GDK_KEY_KP_4;
     case VK_NUMPAD5:
-      return GDK_KP_5;
+      return GDK_KEY_KP_5;
     case VK_NUMPAD6:
-      return GDK_KP_6;
+      return GDK_KEY_KP_6;
     case VK_NUMPAD7:
-      return GDK_KP_7;
+      return GDK_KEY_KP_7;
     case VK_NUMPAD8:
-      return GDK_KP_8;
+      return GDK_KEY_KP_8;
     case VK_NUMPAD9:
-      return GDK_KP_9;
+      return GDK_KEY_KP_9;
     case VK_MULTIPLY:
-      return GDK_KP_Multiply;
+      return GDK_KEY_KP_Multiply;
     case VK_ADD:
-      return GDK_KP_Add;
+      return GDK_KEY_KP_Add;
       /*
     case VK_SEPARATER:
       */
     case VK_SEPARATOR:
-      return GDK_KP_Separator;
+      return GDK_KEY_KP_Separator;
     case VK_SUBTRACT:
-      return GDK_KP_Subtract;
+      return GDK_KEY_KP_Subtract;
     case VK_DECIMAL:
-      return GDK_KP_Decimal;
+      return GDK_KEY_KP_Decimal;
     case VK_DIVIDE:
-      return GDK_KP_Divide;
+      return GDK_KEY_KP_Divide;
     case VK_DELETE:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Delete : GDK_Delete;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Delete : GDK_KEY_Delete;
     case VK_NUM_LOCK:
-      return GDK_Num_Lock;
+      return GDK_KEY_Num_Lock;
     case VK_SCROLL_LOCK:
-      return GDK_Scroll_Lock;
+      return GDK_KEY_Scroll_Lock;
     case VK_F1:
-      return GDK_F1;
+      return GDK_KEY_F1;
     case VK_F2:
-      return GDK_F2;
+      return GDK_KEY_F2;
     case VK_F3:
-      return GDK_F3;
+      return GDK_KEY_F3;
     case VK_F4:
-      return GDK_F4;
+      return GDK_KEY_F4;
     case VK_F5:
-      return GDK_F5;
+      return GDK_KEY_F5;
     case VK_F6:
-      return GDK_F6;
+      return GDK_KEY_F6;
     case VK_F7:
-      return GDK_F7;
+      return GDK_KEY_F7;
     case VK_F8:
-      return GDK_F8;
+      return GDK_KEY_F8;
     case VK_F9:
-      return GDK_F9;
+      return GDK_KEY_F9;
     case VK_F10:
-      return GDK_F10;
+      return GDK_KEY_F10;
     case VK_F11:
-      return GDK_F11;
+      return GDK_KEY_F11;
     case VK_F12:
-      return GDK_F12;
+      return GDK_KEY_F12;
     case VK_F13:
-      return GDK_F13;
+      return GDK_KEY_F13;
     case VK_F14:
-      return GDK_F14;
+      return GDK_KEY_F14;
     case VK_F15:
-      return GDK_F15;
+      return GDK_KEY_F15;
     case VK_F16:
-      return GDK_F16;
+      return GDK_KEY_F16;
     case VK_F17:
-      return GDK_F17;
+      return GDK_KEY_F17;
     case VK_F18:
-      return GDK_F18;
+      return GDK_KEY_F18;
     case VK_F19:
-      return GDK_F19;
+      return GDK_KEY_F19;
     case VK_F20:
-      return GDK_F20;
+      return GDK_KEY_F20;
     case VK_F21:
-      return GDK_F21;
+      return GDK_KEY_F21;
     case VK_F22:
-      return GDK_F22;
+      return GDK_KEY_F22;
     case VK_F23:
-      return GDK_F23;
+      return GDK_KEY_F23;
     case VK_F24:
-      return GDK_F24;
+      return GDK_KEY_F24;
     case VK_PRINTSCREEN:
-      return GDK_Print;
+      return GDK_KEY_Print;
     case VK_INSERT:
-      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KP_Insert : GDK_Insert;
+      return keyLocation == AWT_KEY_LOCATION_NUMPAD ? GDK_KEY_KP_Insert : GDK_KEY_Insert;
     case VK_HELP:
-      return GDK_Help;
+      return GDK_KEY_Help;
     case VK_META:
-      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_Meta_L : GDK_Meta_R;
+      return keyLocation == AWT_KEY_LOCATION_LEFT ? GDK_KEY_Meta_L : GDK_KEY_Meta_R;
     case VK_BACK_QUOTE:
-      return GDK_grave;
+      return GDK_KEY_grave;
     case VK_QUOTE:
-      return GDK_apostrophe;
+      return GDK_KEY_apostrophe;
     case VK_KP_UP:
-      return GDK_KP_Up;
+      return GDK_KEY_KP_Up;
     case VK_KP_DOWN:
-      return GDK_KP_Down;
+      return GDK_KEY_KP_Down;
     case VK_KP_LEFT:
-      return GDK_KP_Left;
+      return GDK_KEY_KP_Left;
     case VK_KP_RIGHT:
-      return GDK_KP_Right;
+      return GDK_KEY_KP_Right;
     case VK_DEAD_GRAVE:
-      return GDK_dead_grave;
+      return GDK_KEY_dead_grave;
     case VK_DEAD_ACUTE:
-      return GDK_dead_acute;
+      return GDK_KEY_dead_acute;
     case VK_DEAD_CIRCUMFLEX:
-      return GDK_dead_circumflex;
+      return GDK_KEY_dead_circumflex;
     case VK_DEAD_TILDE:
-      return GDK_dead_tilde;
+      return GDK_KEY_dead_tilde;
     case VK_DEAD_MACRON:
-      return GDK_dead_macron;
+      return GDK_KEY_dead_macron;
     case VK_DEAD_BREVE:
-      return GDK_dead_breve;
+      return GDK_KEY_dead_breve;
     case VK_DEAD_ABOVEDOT:
-      return GDK_dead_abovedot;
+      return GDK_KEY_dead_abovedot;
     case VK_DEAD_DIAERESIS:
-      return GDK_dead_diaeresis;
+      return GDK_KEY_dead_diaeresis;
     case VK_DEAD_ABOVERING:
-      return GDK_dead_abovering;
+      return GDK_KEY_dead_abovering;
     case VK_DEAD_DOUBLEACUTE:
-      return GDK_dead_doubleacute;
+      return GDK_KEY_dead_doubleacute;
     case VK_DEAD_CARON:
-      return GDK_dead_caron;
+      return GDK_KEY_dead_caron;
     case VK_DEAD_CEDILLA:
-      return GDK_dead_cedilla;
+      return GDK_KEY_dead_cedilla;
     case VK_DEAD_OGONEK:
-      return GDK_dead_ogonek;
+      return GDK_KEY_dead_ogonek;
     case VK_DEAD_IOTA:
-      return GDK_dead_iota;
+      return GDK_KEY_dead_iota;
     case VK_DEAD_VOICED_SOUND:
-      return GDK_dead_voiced_sound;
+      return GDK_KEY_dead_voiced_sound;
     case VK_DEAD_SEMIVOICED_SOUND:
-      return GDK_dead_semivoiced_sound;
+      return GDK_KEY_dead_semivoiced_sound;
     case VK_AMPERSAND:
-      return GDK_ampersand;
+      return GDK_KEY_ampersand;
     case VK_ASTERISK:
-      return GDK_asterisk;
+      return GDK_KEY_asterisk;
     case VK_QUOTEDBL:
-      return GDK_quotedbl;
+      return GDK_KEY_quotedbl;
     case VK_LESS:
-      return GDK_less;
+      return GDK_KEY_less;
     case VK_GREATER:
-      return GDK_greater;
+      return GDK_KEY_greater;
     case VK_BRACELEFT:
-      return GDK_braceleft;
+      return GDK_KEY_braceleft;
     case VK_BRACERIGHT:
-      return GDK_braceright;
+      return GDK_KEY_braceright;
     case VK_AT:
-      return GDK_at;
+      return GDK_KEY_at;
     case VK_COLON:
-      return GDK_colon;
+      return GDK_KEY_colon;
     case VK_CIRCUMFLEX:
-      return GDK_asciicircum;
+      return GDK_KEY_asciicircum;
     case VK_DOLLAR:
-      return GDK_dollar;
+      return GDK_KEY_dollar;
     case VK_EURO_SIGN:
-      return GDK_EuroSign;
+      return GDK_KEY_EuroSign;
     case VK_EXCLAMATION_MARK:
-      return GDK_exclam;
+      return GDK_KEY_exclam;
     case VK_INVERTED_EXCLAMATION_MARK:
-      return GDK_exclamdown;
+      return GDK_KEY_exclamdown;
     case VK_LEFT_PARENTHESIS:
-      return GDK_parenleft;
+      return GDK_KEY_parenleft;
     case VK_NUMBER_SIGN:
-      return GDK_numbersign;
+      return GDK_KEY_numbersign;
     case VK_PLUS:
-      return GDK_plus;
+      return GDK_KEY_plus;
     case VK_RIGHT_PARENTHESIS:
-      return GDK_parenright;
+      return GDK_KEY_parenright;
     case VK_UNDERSCORE:
-      return GDK_underscore;
+      return GDK_KEY_underscore;
       /*
     case VK_FINAL:
     case VK_CONVERT:
@@ -2102,19 +2103,19 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_ACCEPT:
       */
     case VK_MODECHANGE:
-      return GDK_Mode_switch;
+      return GDK_KEY_Mode_switch;
       /*
     case VK_KANA:
       */
     case VK_KANJI:
-      return GDK_Kanji;
+      return GDK_KEY_Kanji;
       /*
     case VK_ALPHANUMERIC:
       */
     case VK_KATAKANA:
-      return GDK_Katakana;
+      return GDK_KEY_Katakana;
     case VK_HIRAGANA:
-      return GDK_Hiragana;
+      return GDK_KEY_Hiragana;
       /*
     case VK_FULL_WIDTH:
     case VK_HALF_WIDTH:
@@ -2122,16 +2123,16 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_ALL_CANDIDATES:
       */
     case VK_PREVIOUS_CANDIDATE:
-      return GDK_PreviousCandidate;
+      return GDK_KEY_PreviousCandidate;
     case VK_CODE_INPUT:
-      return GDK_Codeinput;
+      return GDK_KEY_Codeinput;
       /*
     case VK_JAPANESE_KATAKANA:
     case VK_JAPANESE_HIRAGANA:
     case VK_JAPANESE_ROMAN:
       */
     case VK_KANA_LOCK:
-      return GDK_Kana_Lock;
+      return GDK_KEY_Kana_Lock;
       /*
     case VK_INPUT_METHOD_ON_OFF:
     case VK_CUT:
@@ -2139,9 +2140,9 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_PASTE:
       */
     case VK_UNDO:
-      return GDK_Undo;
+      return GDK_KEY_Undo;
     case VK_AGAIN:
-      return GDK_Redo;
+      return GDK_KEY_Redo;
       /*
     case VK_FIND:
     case VK_PROPS:
@@ -2149,16 +2150,16 @@ cp_gtk_awt_keycode_to_keysym (jint keyCode, jint keyLocation)
     case VK_COMPOSE:
       */
     case VK_ALT_GRAPH:
-      return GDK_ISO_Level3_Shift;
+      return GDK_KEY_ISO_Level3_Shift;
       /*
 	case VK_BEGIN:
       */
     case VK_CONTEXT_MENU:
-      return GDK_Menu;
+      return GDK_KEY_Menu;
     case VK_WINDOWS:
-      return GDK_Super_R;
+      return GDK_KEY_Super_R;
 
     default:
-      return GDK_VoidSymbol;
+      return GDK_KEY_VoidSymbol;
     }
 }

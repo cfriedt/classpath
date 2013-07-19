@@ -115,8 +115,12 @@ Java_gnu_java_awt_peer_gtk_GtkListPeer_create
 
   gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (list), FALSE);
 
+  #if GTK_MAJOR_VERSION == 2
   gtk_widget_size_request (GTK_WIDGET (list), &req);
-
+  #elif GTK_MAJOR_VERSION == 3
+  gtk_widget_get_preferred_size(GTK_WIDGET (list), &req, NULL);
+  #endif 
+ 
   gtk_widget_set_size_request (GTK_WIDGET (list), req.width, req.height);
 
   gtk_container_add (GTK_CONTAINER (sw), list);
@@ -375,17 +379,30 @@ Java_gnu_java_awt_peer_gtk_GtkListPeer_getSize
   ptr = gtkpeer_get_widget (env, obj);
   bin = list_get_widget (GTK_WIDGET (ptr));
   
+  #if GTK_MAJOR_VERSION == 3
+  /* Save the widget's current size request. */
+  
+  gtk_widget_get_preferred_size(bin, &current_req, NULL);      
+  /* Get the widget's "natural" size request. */
+  gtk_widget_set_size_request (GTK_WIDGET (ptr), -1, -1);
+ 
+  gtk_widget_get_preferred_size(bin, NULL, &natural_req);
+  /* Reset the widget's size request. */
+  gtk_widget_set_size_request (bin,
+                               current_req.width, current_req.height);
+  #elif GTK_MAJOR_VERSION == 2
   /* Save the widget's current size request. */
   gtk_widget_size_request (bin, &current_req);
       
   /* Get the widget's "natural" size request. */
   gtk_widget_set_size_request (GTK_WIDGET (ptr), -1, -1);
   gtk_widget_size_request (bin, &natural_req);
-
+  
   /* Reset the widget's size request. */
   gtk_widget_set_size_request (bin,
                                current_req.width, current_req.height);
 
+  #endif
   dims[0] = natural_req.width;
 
   /* Calculate the final height, by comparing the number of rows

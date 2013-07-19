@@ -58,4 +58,11 @@ AM_CPPFLAGS = @CLASSPATH_INCLUDES@
 # headers contain broken prototypes (by design, see gtkitemfactory.h).
 AM_CFLAGS = @WARNING_CFLAGS@ @ERROR_CFLAGS@ \
             @GTK_CFLAGS@ @FREETYPE2_CFLAGS@ @PANGOFT2_CFLAGS@ \
-            @X_CFLAGS@ @EXTRA_CFLAGS@
+            @X_CFLAGS@ @EXTRA_CFLAGS@ \
+	    "-DGTK_DISABLE_SINGLE_INCLUDES" \
+            "-DGDK_DISABLE_DEPRECATED" \
+            "-DGSEAL_ENABLE" 
+           
+            
+	    	
+ 

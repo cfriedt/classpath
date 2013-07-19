@@ -51,7 +51,8 @@ Java_gnu_java_awt_peer_gtk_GtkMenuPeer_setupAccelGroup
 
   if (!parent)
     {
-      gtk_menu_set_accel_group (GTK_MENU (GTK_MENU_ITEM (ptr1)->submenu), 
+     // gtk_menu_set_accel_group (GTK_MENU (GTK_MENU_ITEM (ptr1)->submenu), 
+        gtk_menu_set_accel_group (GTK_MENU (gtk_menu_item_get_submenu(GTK_MENU_ITEM (ptr1))),
 				gtk_accel_group_new ());
     }
   else
@@ -59,9 +60,10 @@ Java_gnu_java_awt_peer_gtk_GtkMenuPeer_setupAccelGroup
       GtkAccelGroup *parent_accel;
 
       ptr2 = gtkpeer_get_widget (env, parent);
-      parent_accel = gtk_menu_get_accel_group (GTK_MENU (GTK_MENU_ITEM (ptr2)->submenu));
+      //parent_accel = gtk_menu_get_accel_group (GTK_MENU (GTK_MENU_ITEM (ptr2)->submenu));
+        parent_accel = gtk_menu_get_accel_group (GTK_MENU (gtk_menu_item_get_submenu(GTK_MENU_ITEM (ptr2))));
       
-      gtk_menu_set_accel_group (GTK_MENU (GTK_MENU_ITEM (ptr1)->submenu),
+      gtk_menu_set_accel_group (GTK_MENU (gtk_menu_item_get_submenu(GTK_MENU_ITEM (ptr1))),
 				parent_accel);
     }
       
@@ -93,8 +95,10 @@ Java_gnu_java_awt_peer_gtk_GtkMenuPeer_create
 
   /* Allow this menu to grab the pointer. */
   toplevel = gtk_widget_get_toplevel (menu);
+ 
   if (GTK_IS_WINDOW (toplevel))
     {
+     
       gtk_window_group_add_window (cp_gtk_global_window_group,
                                    GTK_WINDOW(toplevel));
     }
@@ -112,18 +116,27 @@ JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkMenuPeer_addTearOff
   (JNIEnv *env, jobject obj)
 {
+  printf("\nENTERING GTKMENUPEER ADDTEAROFF\n");
   void *ptr1;
   GtkWidget *menu, *item;
-
+  
   gdk_threads_enter ();
 
   ptr1 = gtkpeer_get_widget (env, obj);
 
   menu = gtk_menu_item_get_submenu (GTK_MENU_ITEM (ptr1));
+  #if GTK_MAJOR_VERSION == 2
   item = gtk_tearoff_menu_item_new ();
+  printf("\nCREATING ITEM\n");
+  #elif GTK_MAJOR_VERSION == 3
+  item = gtk_menu_item_new();
+  #endif
+  printf("\nITEM CREATED SETTING TEAROFF STATE\n");
+  
+  printf("\nAPPENDING SHELL TO GTK MENU\n");
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
   gtk_widget_show (item);
-
+  printf("\nLEAVING THREAD\n");
   gdk_threads_leave ();
 }
 

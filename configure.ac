@@ -558,7 +558,8 @@ if test "x${COMPILE_JNI}" = xyes; then
                  [${X_LIBS}])
 
 
-    PKG_CHECK_MODULES(GTK, gtk+-2.0 >= 2.8 gthread-2.0 >= 2.2 gdk-pixbuf-2.0)
+    
+    PKG_CHECK_MODULES(GTK, gtk+-3.0 >= 3.0 gthread-2.0 >= 2.2 gdk-pixbuf-2.0)
     PKG_CHECK_MODULES(FREETYPE2, freetype2)
     PKG_CHECK_MODULES(PANGOFT2, pangoft2)
     PKG_CHECK_MODULES(CAIRO, cairo >= 1.1.8)

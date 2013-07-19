@@ -92,7 +92,7 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_initNativeState (JNIEnv *env,
 							 jstring image,
 							 jstring files)
 {
-  GdkDisplay* display;
+  //GdkDisplay* display;
   jboolean can_cache;
 
   gtk_clipboard_class = clz;
@@ -137,9 +137,11 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_initNativeState (JNIEnv *env,
   cp_gtk_clipboard = gtk_clipboard_get (GDK_SELECTION_CLIPBOARD);
   cp_gtk_selection = gtk_clipboard_get (GDK_SELECTION_PRIMARY);
 
-  display = gtk_clipboard_get_display (cp_gtk_clipboard);
+  //display = gtk_clipboard_get_display (cp_gtk_clipboard);
   /* Check for support for clipboard owner changes. */
 #if GTK_MINOR_VERSION > 4
+  GdkDisplay* display;
+  display = gtk_clipboard_get_display (cp_gtk_clipboard);
   if (gdk_display_supports_selection_notification (display))
     {
       g_signal_connect (cp_gtk_clipboard, "owner-change",
@@ -183,7 +185,8 @@ clipboard_get_func (GtkClipboard *clipboard,
       jint len;
       jbyte *barray;
 
-      target_name = gdk_atom_name (selection->target);
+      //target_name = gdk_atom_name (selection->target);
+      target_name = gdk_atom_name (gtk_selection_data_get_target(selection));
       if (target_name == NULL)
 	return;
       target_string = (*env)->NewStringUTF (env, target_name);
@@ -202,7 +205,8 @@ clipboard_get_func (GtkClipboard *clipboard,
       barray = (*env)->GetByteArrayElements(env, bytes, NULL);
       if (barray == NULL)
 	return;
-      gtk_selection_data_set (selection, selection->target, 8,
+      //gtk_selection_data_set (selection, selection->target, 8,
+	gtk_selection_data_set (selection, gtk_selection_data_get_target(selection), 8,
 			      (guchar *) barray, len);
 
       (*env)->ReleaseByteArrayElements(env, bytes, barray, 0);
@@ -324,9 +328,12 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_advertiseContent
 #endif
 {
   GtkTargetList *target_list;
+  #if GTK_MAJOR_VERSION == 2
   GList *list;
+  #endif
   GtkTargetEntry *targets;
   gint n, i;
+   
 
   gdk_threads_enter ();
   target_list = gtk_target_list_new (NULL, 0);
@@ -371,9 +378,15 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_advertiseContent
 
 
   /* Turn list into a target table. */
+  
+  #if GTK_MAJOR_VERSION == 3
+  n = 0;
+  #elif GTK_MAJOR_VERSION == 2
   n = g_list_length (target_list->list);
+  #endif
   if (n > 0)
     {
+      #if GTK_MAJOR_VERSION == 2
       targets = g_new (GtkTargetEntry, n);
       for (list = target_list->list, i = 0;
 	   list != NULL;
@@ -384,7 +397,9 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_advertiseContent
 	  targets[i].flags = pair->flags;
 	  targets[i].info = pair->info;
 	}
-
+      #endif
+   targets = gtk_target_table_new_from_list (target_list, &n);
+ 
       /* Set the targets plus callback functions and ask for the clipboard
 	 to be stored when the application exists if supported. */
       if ((*env)->IsSameObject(env, instance, cp_gtk_clipboard_instance))

@@ -173,7 +173,8 @@ Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setLabel
 
   str = (*env)->GetStringUTFChars (env, label, NULL);
 
-  accel_label = GTK_ACCEL_LABEL (GTK_BIN (ptr)->child);
+  //accel_label = GTK_ACCEL_LABEL (GTK_BIN (ptr)->child);
+   accel_label = GTK_ACCEL_LABEL (gtk_bin_get_child(GTK_BIN (ptr)));
 
   gtk_label_set_text (GTK_LABEL (accel_label), str);
   gtk_accel_label_refetch (accel_label);
