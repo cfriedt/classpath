@@ -121,6 +121,7 @@ Java_gnu_java_awt_peer_gtk_CairoSurface_nativeDrawSurface
  jlong surfacePointer, jlong context, jdoubleArray java_matrix, double alpha,
  jint interpolation)
 {
+  
   struct cairographics2d *gr = JLONG_TO_PTR(struct cairographics2d, context);
   cairo_t *cr = gr->cr;
   jdouble *native_matrix = NULL;
@@ -181,8 +182,7 @@ JNIEXPORT jlong JNICALL
 Java_gnu_java_awt_peer_gtk_CairoSurface_getFlippedBuffer 
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong surfacePointer)
-{
-  cairo_surface_t* surface;
+{ cairo_surface_t* surface;
   jint *src;
   jint *dst;
   int i, t, width, height;

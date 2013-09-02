@@ -41,6 +41,7 @@ exception statement from your version. */
 #include "jcl.h"
 
 #define RC_FILE ".classpath-gtkrc"
+#define CSS_FILE ".classpath-gtk-keys.css"
 
 /* From java.awt.SystemColor */
 #define AWT_DESKTOP                  0
@@ -152,9 +153,7 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkInit (JNIEnv *env,
   int argc = 1;
   char **argv;
   char *homedir ,*rcpath = NULL;
-  
-  //GtkCssProvider *css_provider;
-  
+ 
   gtkgenericpeer = (*env)->FindClass(env, "gnu/java/awt/peer/gtk/GtkGenericPeer");
 
   gtkgenericpeer = (*env)->NewGlobalRef(env, gtkgenericpeer);
@@ -182,25 +181,18 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkInit (JNIEnv *env,
   XSynchronize (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()), True);
 #endif
 
-  //gtk_widget_set_default_colormap (gdk_rgb_get_colormap ());
- // gtk_widget_set_visual(gdk_screen_get_system_visual (gdk_screen_get_default())); 
-  
+    
   if ((homedir = getenv ("HOME")))
     {
+      
       rcpath = (char *) g_malloc (strlen (homedir) + strlen (RC_FILE) + 2);
       sprintf (rcpath, "%s/%s", homedir, RC_FILE);
+     
     }
-  
+ 
+  #if GTK_MAJOR_VERSION == 2
   gtk_rc_parse ((rcpath) ? rcpath : RC_FILE);
-  /*css_provider = gtk_css_provider_new();
-  if((rcpath)){
-  printf("\n%s : PATH IS REACHED\n", rcpath);
-  gtk_css_provider_load_from_path (css_provider,   g_filename_to_utf8(rcpath, strlen(rcpath), &bytes_read, &bytes_written, &error) , NULL);
-  }
-  else{
-  printf("\nREACHED RC_FILE\n");
-  gtk_css_provider_load_from_file (css_provider, RC_FILE, NULL);
-  }*/
+  #endif
   g_free (rcpath);
   g_free (argv[0]);
   g_free (argv);
@@ -394,10 +386,6 @@ Java_gnu_java_awt_peer_gtk_GtkToolkit_gtkMain
   post_set_running_flag(NULL);
   #endif
  
-  //#if GTK_MAJOR_VERSION == 3
-  //g_idle_add(post_set_running_flag, NULL);
-  //#endif
-  
   gtk_main ();
   
   gdk_threads_leave();

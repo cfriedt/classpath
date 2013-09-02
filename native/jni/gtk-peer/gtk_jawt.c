@@ -181,8 +181,7 @@ classpath_jawt_get_drawable (JNIEnv* env, jobject canvas)
 
   if (gtk_widget_get_realized(widget))
     {
-      //drawable = GDK_DRAWABLE_XID (gtk_widget_get_window(widget)); 
-      drawable = GDK_WINDOW_XID (gtk_widget_get_window(widget)); 
+     drawable = GDK_WINDOW_XID (gtk_widget_get_window(widget)); 
 
       return drawable;
     }

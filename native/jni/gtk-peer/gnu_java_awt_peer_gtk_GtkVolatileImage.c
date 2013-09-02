@@ -38,11 +38,8 @@ exception statement from your version. */
 #include "jcl.h"
 #include "gtkpeer.h"
 
-
-//#include <gdk/gdktypes.h>
 #include <gdk/gdk.h>
 
-//#include <gdk/gdkprivate.h>
 #include <gdk/gdkx.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -61,7 +58,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env,
 						  jobject peer,
 						  jint width, jint height)
 {
-  printf("\n volatileimage_init \n");
+  
   GtkWidget *widget = NULL;
    #if GTK_MAJOR_VERSION == 2
   GdkPixmap* pixmap;
@@ -90,8 +87,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_init (JNIEnv *env,
   else{
   #if GTK_MAJOR_VERSION == 2
    pixmap = gdk_pixmap_new( NULL, width, height, 
-			     //gdk_rgb_get_visual()->depth );
-				gdk_visual_get_depth(gdk_visual_get_system()));
+			    gdk_visual_get_depth(gdk_visual_get_system()));
   #elif GTK_MAJOR_VERSION == 3
   surface = gdk_window_create_similar_surface(gtk_widget_get_window(widget), CAIRO_CONTENT_COLOR_ALPHA, width, height);
   #endif
@@ -115,8 +111,7 @@ JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkVolatileImage_destroy
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer)
-{ printf("\n volatileimage_destroy \n");
-  //GdkPixmap* pixmap = JLONG_TO_PTR(GdkPixmap, pointer);
+{ 
   gdk_threads_enter();
   cairo_surface_t *surface = JLONG_TO_PTR(cairo_surface_t, pointer);
   if( surface != NULL )
@@ -155,9 +150,7 @@ JNIEXPORT jintArray JNICALL
 Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeGetPixels
 (JNIEnv *env, jobject obj, jlong pointer)
 {
-  printf("\n nativeGetPixels \n");
-  /*jint *pixeldata, *jpixdata;*/ 
-  jint *jpixdata;
+ jint *jpixdata;
   #if GTK_MAJOR_VERSION == 2
   GdkPixmap *pixmap;
   
@@ -224,7 +217,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeCopyArea
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer, jint x, jint y, jint w, jint h, jint dx, jint dy)
 { 
-  printf("\n nativeCopyArea \n");
+  
   GdkPixbuf *pixbuf;
   
   #if GTK_MAJOR_VERSION == 2
@@ -244,10 +237,6 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeCopyArea
   pixbuf = gdk_pixbuf_get_from_surface (surface, x,y,w,h);
   #endif
 
-  /*gdk_draw_pixbuf (pixmap, NULL, pixbuf,
-		   0, 0, x + dx, y + dy, 
-		   w, h, 
-		   GDK_RGB_DITHER_NORMAL, 0, 0);*/
   #if GTK_MAJOR_VERSION == 2
   cairo_t *cr = gdk_cairo_create(pixmap);
   #elif GTK_MAJOR_VERSION == 3
@@ -266,10 +255,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile
 (JNIEnv *env __attribute__((unused)), jobject obj __attribute__((unused)),
  jlong pointer, jlong srcptr, jint x, jint y, jint w, jint h)
 {
-  printf("\n nativeDrawVolatile \n");
-  //GdkPixmap *dst, *src;
-  
-  //GdkGC *gc;
+ 
   GdkRectangle clip;
   
 
@@ -279,15 +265,7 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile
   dst = JLONG_TO_PTR(cairo_surface_t, pointer);
   g_assert (src != NULL);
   g_assert (dst != NULL);
-   /*gc = gdk_gc_new( dst );
-   gdk_draw_drawable(dst,
-		    gc,
-		    src,
-		    0, 0,
-		    x, y,
-		    w, h);
-   g_object_unref( gc );*/
-  
+    
   clip.x = 0;
   clip.y = 0;
   clip.width = w;
@@ -309,4 +287,3 @@ Java_gnu_java_awt_peer_gtk_GtkVolatileImage_nativeDrawVolatile
 
   gdk_threads_leave();
 }
-

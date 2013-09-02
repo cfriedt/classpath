@@ -61,7 +61,8 @@ AM_CFLAGS = @WARNING_CFLAGS@ @ERROR_CFLAGS@ \
             @X_CFLAGS@ @EXTRA_CFLAGS@ \
 	    "-DGTK_DISABLE_SINGLE_INCLUDES" \
             "-DGDK_DISABLE_DEPRECATED" \
-            "-DGSEAL_ENABLE" 
+            "-DGSEAL_ENABLE" \
+            "-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_3_4"
            
             
 	    	

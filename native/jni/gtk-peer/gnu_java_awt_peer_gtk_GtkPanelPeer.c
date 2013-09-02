@@ -59,10 +59,8 @@ Java_gnu_java_awt_peer_gtk_GtkPanelPeer_create
 
   widget = gtk_fixed_new ();
 
-  //gtk_fixed_set_has_window (GTK_FIXED (widget), TRUE);
   gtk_widget_set_has_window (widget, TRUE);
 
-  //gtk_widget_set_can_focus (widget, GTK_CAN_FOCUS);
   gtk_widget_set_can_focus(widget, TRUE);
   gtkpeer_set_widget (env, obj, widget);
 

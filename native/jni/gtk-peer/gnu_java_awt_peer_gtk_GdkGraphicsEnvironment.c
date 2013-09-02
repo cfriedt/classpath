@@ -306,9 +306,8 @@ Java_gnu_java_awt_peer_gtk_GdkGraphicsEnvironment_isWindowUnderMouse
  #endif   
 
   while (windowAtPointer
-         //&& windowAtPointer != windowToTest->window)
          && windowAtPointer != gtk_widget_get_window(windowToTest))
-    windowAtPointer = gdk_window_get_parent (windowAtPointer);
+         windowAtPointer = gdk_window_get_parent (windowAtPointer);
 
   gdk_threads_leave ();
 

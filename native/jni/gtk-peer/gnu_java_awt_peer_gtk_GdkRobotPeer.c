@@ -388,11 +388,6 @@ Java_gnu_java_awt_peer_gtk_GdkRobotPeer_nativeGetRGBPixels
 
   gdk_threads_enter ();
 
-  /*pixbuf_no_alpha = gdk_pixbuf_get_from_drawable (NULL,
-						  gdk_get_default_root_window (),
-						  NULL, x, y, 0, 0,
-						  width, height);*/
-
   pixbuf_no_alpha = gdk_pixbuf_get_from_window(gdk_get_default_root_window(), x, y, width, height);
 
   pixbuf = gdk_pixbuf_add_alpha(pixbuf_no_alpha, FALSE, 0, 0, 0);

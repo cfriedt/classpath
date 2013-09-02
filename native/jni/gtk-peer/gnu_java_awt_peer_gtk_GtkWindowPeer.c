@@ -1226,7 +1226,6 @@ Java_gnu_java_awt_peer_gtk_GtkWindowPeer_gtkWindowSetResizable
 
   ptr = gtkpeer_get_widget (env, obj);
   gtk_window_set_resizable (GTK_WINDOW (ptr), resizable);
-  //g_object_set (G_OBJECT (ptr), "allow-shrink", resizable, NULL);
   g_object_set (G_OBJECT (ptr), "resizable", resizable, NULL);
   gdk_threads_leave ();
 }
@@ -1573,8 +1572,7 @@ request_frame_extents (GtkWidget *window)
 
   /* Check if the current window manager supports
      _NET_REQUEST_FRAME_EXTENTS. */
-  //if (gdk_net_wm_supports (request_extents))
-    if (gdk_x11_screen_supports_net_wm_hint (gdk_screen_get_default(), request_extents))
+  if (gdk_x11_screen_supports_net_wm_hint (gdk_screen_get_default(), request_extents))
     {
       GdkDisplay *display = gtk_widget_get_display (window);
       Display *xdisplay = GDK_DISPLAY_XDISPLAY (display);
@@ -1588,8 +1586,7 @@ request_frame_extents (GtkWidget *window)
       XEvent xevent;
       XEvent notify_xevent;
 
-      //unsigned long window_id = GDK_WINDOW_XID (GDK_DRAWABLE(gtk_widget_get_window(window)));
-      unsigned long window_id = GDK_WINDOW_XID (gtk_widget_get_window(window));
+     unsigned long window_id = GDK_WINDOW_XID (gtk_widget_get_window(window));
       if (!extents_atom)
 	{
 	  const char *extents_str = "_NET_FRAME_EXTENTS";
