@@ -92,7 +92,6 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_initNativeState (JNIEnv *env,
 							 jstring image,
 							 jstring files)
 {
-  //GdkDisplay* display;
   jboolean can_cache;
 
   gtk_clipboard_class = clz;
@@ -137,7 +136,7 @@ Java_gnu_java_awt_peer_gtk_GtkClipboard_initNativeState (JNIEnv *env,
   cp_gtk_clipboard = gtk_clipboard_get (GDK_SELECTION_CLIPBOARD);
   cp_gtk_selection = gtk_clipboard_get (GDK_SELECTION_PRIMARY);
 
-  //display = gtk_clipboard_get_display (cp_gtk_clipboard);
+ 
   /* Check for support for clipboard owner changes. */
 #if GTK_MINOR_VERSION > 4
   GdkDisplay* display;
@@ -185,7 +184,6 @@ clipboard_get_func (GtkClipboard *clipboard,
       jint len;
       jbyte *barray;
 
-      //target_name = gdk_atom_name (selection->target);
       target_name = gdk_atom_name (gtk_selection_data_get_target(selection));
       if (target_name == NULL)
 	return;
@@ -205,8 +203,7 @@ clipboard_get_func (GtkClipboard *clipboard,
       barray = (*env)->GetByteArrayElements(env, bytes, NULL);
       if (barray == NULL)
 	return;
-      //gtk_selection_data_set (selection, selection->target, 8,
-	gtk_selection_data_set (selection, gtk_selection_data_get_target(selection), 8,
+      gtk_selection_data_set (selection, gtk_selection_data_get_target(selection), 8,
 			      (guchar *) barray, len);
 
       (*env)->ReleaseByteArrayElements(env, bytes, barray, 0);

@@ -104,19 +104,16 @@ Java_gnu_java_awt_peer_gtk_GtkButtonPeer_gtkWidgetGetPreferredDimensions
   dims[0] = dims[1] = 0;
   #if GTK_MAJOR_VERSION == 3
   /* Save the button's current size request. */
-  //gtk_widget_size_request (GTK_WIDGET (button), &current_req);
-   gtk_widget_get_preferred_size(GTK_WIDGET(button), &current_req, NULL);
+  gtk_widget_get_preferred_size(GTK_WIDGET(button), &current_req, NULL);
 
   /* Save the label's current size request. */
-  //gtk_widget_size_request (GTK_WIDGET (label), &current_label_req);
   gtk_widget_get_preferred_size(GTK_WIDGET(label), &current_label_req, NULL);
 
   /* Get the widget's "natural" size request. */
   gtk_widget_set_size_request (GTK_WIDGET (button), -1, -1);
   gtk_widget_set_size_request (GTK_WIDGET (label), -1, -1);
 
-  //gtk_widget_size_request (GTK_WIDGET (button), &natural_req);
-   gtk_widget_get_preferred_size(GTK_WIDGET(button), NULL, &natural_req);
+  gtk_widget_get_preferred_size(GTK_WIDGET(button), NULL, &natural_req);
 
   /* Reset the button's size request. */
   gtk_widget_set_size_request (GTK_WIDGET (button),
@@ -126,7 +123,7 @@ Java_gnu_java_awt_peer_gtk_GtkButtonPeer_gtkWidgetGetPreferredDimensions
   gtk_widget_set_size_request (GTK_WIDGET (label),
                                current_label_req.width, current_label_req.height);
  #endif
- //HERE
+
   #if GTK_MAJOR_VERSION == 2
  /* Save the button's current size request. */
   gtk_widget_size_request (GTK_WIDGET (button), &current_req);
@@ -339,7 +336,7 @@ JNIEXPORT void JNICALL
 Java_gnu_java_awt_peer_gtk_GtkButtonPeer_gtkWidgetRequestFocus
   (JNIEnv *env, jobject obj)
 {
-printf("THIS IS WHERE ITS FAILING");
+
   void *ptr;
   GtkWidget *button;
 
@@ -381,9 +378,7 @@ Java_gnu_java_awt_peer_gtk_GtkButtonPeer_setNativeBounds
       /* ...and the label's size request. */
       gtk_widget_set_size_request (gtk_bin_get_child (GTK_BIN (child)), width,
 						      height);
-      /*if (widget->parent != NULL && GTK_IS_FIXED (widget->parent))
-        gtk_fixed_move (GTK_FIXED (widget->parent), widget, x, y);*/
-       if (gtk_widget_get_parent(widget) != NULL && GTK_IS_FIXED (gtk_widget_get_parent(widget)))
+     if (gtk_widget_get_parent(widget) != NULL && GTK_IS_FIXED (gtk_widget_get_parent(widget)))
         gtk_fixed_move (GTK_FIXED (gtk_widget_get_parent(widget)), widget, x, y);
      
     }

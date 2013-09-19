@@ -38,10 +38,10 @@ exception statement from your version. */
 #include "jcl.h"
 #include "gtkpeer.h"
 
-//#include <gdk/gdktypes.h>
+
 #include <gdk/gdk.h>
 
-//#include <gdk/gdkprivate.h>
+
 #include <gdk/gdkx.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -97,7 +97,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_getPixbuf
    (JNIEnv *env, jobject obj __attribute__((unused)),
     jobject peer, jobject image)
 {
-  //printf("\ngetPixbuf\n");
+  
   gint width, height;
   GdkPixbuf *pixbuf;
   GdkWindow *win;
@@ -112,8 +112,8 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_getPixbuf
   widget = GTK_WIDGET (ptr);
   g_assert (widget != NULL);
 
-  cp_gtk_grab_current_drawable (widget, &win);
-  
+ 
+  win = gtk_widget_get_window(widget);
 
   pixbuf = cp_gtk_image_get_pixbuf( env, image );
   g_assert( pixbuf != NULL);
@@ -136,7 +136,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
    jint x __attribute__((unused)), jint y __attribute__((unused)),
    jint width __attribute__((unused)), jint height __attribute__((unused)))
 {
-  //gint pwidth, pheight;
+
   GdkPixbuf *pixbuf;
   GdkDrawable *drawable;
   GdkWindow *win;
@@ -157,14 +157,6 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
   pixbuf = cp_gtk_image_get_pixbuf( env, image );
   g_assert( pixbuf != NULL);
 
-  //pwidth = gdk_pixbuf_get_width( pixbuf );
-  //pheight = gdk_pixbuf_get_height( pixbuf );
-
-  //gdk_draw_pixbuf (drawable, NULL, pixbuf,
-		   //0, 0, 0, 0, 
-		   //pwidth, pheight, 
-		   //GDK_RGB_DITHER_NORMAL, 0, 0);
-
    cairo_t *cr = gdk_cairo_create (drawable);
    gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
    cairo_paint (cr);
@@ -181,7 +173,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
    jint x __attribute__((unused)), jint y __attribute__((unused)),
    jint width __attribute__((unused)), jint height __attribute__((unused)))
 {
-  //printf("\ncopyPixbuf\n");
+
   GdkPixbuf *pixbuf;
  
   GdkWindow *win;
@@ -196,8 +188,8 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphicsCopy_copyPixbuf
   widget = GTK_WIDGET (ptr);
   g_assert (widget != NULL);
 
-  cp_gtk_grab_current_drawable (widget, &win);
   
+  win = gtk_widget_get_window(widget);
 
   pixbuf = cp_gtk_image_get_pixbuf( env, image );
   g_assert( pixbuf != NULL);

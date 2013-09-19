@@ -161,7 +161,6 @@ Java_gnu_java_awt_dnd_peer_gtk_GtkDragSourceContextPeer_nativeSetCursor
   gdk_cursor = gdk_cursor_new (gdk_cursor_type);
 
   gdk_window_set_cursor (win, gdk_cursor);
-  //gdk_cursor_unref (gdk_cursor);
   g_object_unref(gdk_cursor);
   gdk_flush();
   

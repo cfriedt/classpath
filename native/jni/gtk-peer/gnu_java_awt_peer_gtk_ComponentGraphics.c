@@ -38,10 +38,10 @@ exception statement from your version. */
 #include "jcl.h"
 #include "gtkpeer.h"
 
-//#include <gdk/gdktypes.h>
+
 #include <gdk/gdk.h>
 
-//#include <gdk/gdkprivate.h>
+
 #include <gdk/gdkx.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -62,6 +62,8 @@ exception statement from your version. */
 #include "cairographics2d.h"
 
 static short flush_scheduled = 0;
+
+
 
 static gboolean flush (gpointer data __attribute__((unused)))
 {
@@ -97,8 +99,7 @@ void cp_gtk_grab_current_drawable(GtkWidget *widget, GdkDrawable **draw,
   g_assert (draw != NULL);
   g_assert (win != NULL);
 
-    //*win = widget->window;
-    *win = gtk_widget_get_window(widget);
+   *win = gtk_widget_get_window(widget);
 
   *draw = *win;
   gdk_window_get_internal_paint_info (*win, draw, 0, 0); 
@@ -107,7 +108,7 @@ void cp_gtk_grab_current_drawable(GtkWidget *widget, GdkDrawable **draw,
 void cp_gtk_grab_current_drawable(GtkWidget *widget, GdkWindow **win)
 {
 
-  //printf("\ncp_gtk_current_drawable\n");
+  
   g_assert (widget != NULL);
   
   g_assert (win != NULL);
@@ -126,11 +127,10 @@ JNIEXPORT jboolean JNICALL
 Java_gnu_java_awt_peer_gtk_ComponentGraphics_hasXRender
   (JNIEnv *env __attribute__ ((unused)), jclass cls __attribute__ ((unused)))
 {
-  //printf(" \n hasXRenderCall \n");
+  
 #if HAVE_XRENDER
   int ev = 0, err = 0; 
-  //if( XRenderQueryExtension (GDK_DISPLAY(), &ev, &err) )
-    if( XRenderQueryExtension (gdk_x11_get_default_xdisplay (), &ev, &err) )
+  if( XRenderQueryExtension (gdk_x11_get_default_xdisplay (), &ev, &err) )
 
     return JNI_TRUE;
 #endif
@@ -148,14 +148,13 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_initState
   void *ptr;
 
   gdk_threads_enter();
-
+  
   ptr = gtkpeer_get_widget (env, peer);
   g_assert (ptr != NULL);
 
   widget = GTK_WIDGET (ptr);
   g_assert (widget != NULL);
 
-  //drawable = widget->window;
     drawable = gtk_widget_get_window(widget);
   g_assert (drawable != NULL);
   
@@ -168,18 +167,19 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_initState
   return PTR_TO_JLONG(cr);
 }
 #elif GTK_MAJOR_VERSION == 3
+
 JNIEXPORT jlong JNICALL 
 Java_gnu_java_awt_peer_gtk_ComponentGraphics_initState
   (JNIEnv *env, jobject obj __attribute__ ((unused)), jobject peer)
 {
-  //printf("\nComponent Graphics Init State\n");
+  
   GdkWindow *drawable;
   GtkWidget *widget;
   cairo_t *cr;
   void *ptr;
 
   gdk_threads_enter();
-
+ 
   ptr = gtkpeer_get_widget (env, peer);
   g_assert (ptr != NULL);
 
@@ -192,12 +192,14 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_initState
   
   cr = gdk_cairo_create(drawable);
 
-  //g_assert(cr != NULL);
+  g_assert(cr != NULL);
 
   gdk_threads_leave();
 
   return PTR_TO_JLONG(cr);
 }
+
+
 #endif
 
 JNIEXPORT jlong JNICALL 
@@ -205,7 +207,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_initFromVolatile
   (JNIEnv *env  __attribute__ ((unused)), jobject obj __attribute__ ((unused)),
    jlong ptr)
 {
-  //printf("\n initFromVolatile \n");
+
   GdkWindow *drawable;
   
 
@@ -279,7 +281,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_copyAreaNative
   (JNIEnv *env, jobject obj __attribute__((unused)), jobject peer,
    jint x, jint y, jint w, jint h, jint dx, jint dy)
 {
-  //printf("\ncopyAreaNative\n");
+  
   GdkPixbuf *pixbuf;
   GdkWindow *win;
   GtkWidget *widget = NULL;
@@ -313,7 +315,7 @@ JNIEXPORT jobject JNICALL
 Java_gnu_java_awt_peer_gtk_ComponentGraphics_nativeGrab
 (JNIEnv *env, jclass cls __attribute__((unused)), jobject peer )
 {
-  //printf("\nnativeGrab\n");
+ 
   GdkPixbuf *pixbuf;
   GdkWindow *win;
   gint w,h;
@@ -370,7 +372,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_nativeGrab
   cp_gtk_grab_current_drawable (widget, &drawable, &win);
   g_assert (drawable != NULL);
 
-  //gdk_drawable_get_size ( drawable, &w, &h );
+  
   
   w = gdk_window_get_width(drawable);
   h = gdk_window_get_height(drawable);
@@ -379,10 +381,6 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_nativeGrab
   gdk_pixbuf_get_from_drawable( pixbuf, drawable, NULL, 0, 0, 0, 0, w, h );
   g_object_ref( pixbuf );
   
-  //gdk_draw_pixbuf (drawable, NULL, pixbuf,
-	//	   0, 0, 0, 0, 
-	//	   w, h, 
-	//	   GDK_RGB_DITHER_NORMAL, 0, 0);
   
   cairo_t *cr = gdk_cairo_create (drawable);
   gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
@@ -403,7 +401,6 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_drawVolatile
 {
   GdkPixmap *pixmap;
   GtkWidget *widget = NULL;
-  //GdkGC *gc;
   GdkRectangle clip;
   void *ptr;
 
@@ -416,24 +413,17 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_drawVolatile
 
   pixmap = JLONG_TO_PTR(GdkPixmap, img);
  
-  //gc = gdk_gc_new(widget->window);
+ 
 
   clip.x = cx;
   clip.y = cy;
   clip.width = cw;
   clip.height = ch;
-  //gdk_gc_set_clip_rectangle(gc, &clip);
-
-  /*gdk_draw_drawable(widget->window,
-		    gc,
-		    pixmap,
-		    0, 0,
-		    x, y,
-		    w, h);*/
+  
       w = w;
       h = h;
 	
-	//cairo_t *cr = gdk_cairo_create (widget->window);
+	
         cairo_t *cr = gdk_cairo_create (gtk_widget_get_window(widget));
 	gdk_cairo_rectangle (cr,&clip);
 	cairo_clip (cr);
@@ -447,7 +437,7 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_drawVolatile
 	cairo_destroy (cr);
 
 
-  //g_object_unref( gc );
+ 
 
   schedule_flush ();
 
@@ -459,10 +449,10 @@ Java_gnu_java_awt_peer_gtk_ComponentGraphics_drawVolatile
 (JNIEnv *env, jobject obj __attribute__ ((unused)), jobject peer, 
  jlong img, jint x, jint y, jint w, jint h, jint cx, jint cy, jint cw, jint ch)
 {
-   //printf("\ndrawVolatile\n");
+   
   GdkPixbuf *pixbuf;
   GtkWidget *widget = NULL;
-  //GdkGC *gc;
+  
   GdkRectangle clip;
   void *ptr;
 

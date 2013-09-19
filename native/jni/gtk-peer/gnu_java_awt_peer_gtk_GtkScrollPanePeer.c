@@ -106,7 +106,6 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_gtkScrolledWindowSetHScrollIncremen
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
 
   hadj = gtk_scrolled_window_get_hadjustment (sw);
-  //hadj->step_increment = u;
   gtk_adjustment_set_step_increment(hadj, u);
 
   gdk_threads_leave ();
@@ -127,7 +126,6 @@ Java_gnu_java_awt_peer_gtk_GtkScrollPanePeer_gtkScrolledWindowSetVScrollIncremen
   sw = GTK_SCROLLED_WINDOW (scrollpane_get_widget (GTK_WIDGET (ptr)));
 
   vadj = gtk_scrolled_window_get_hadjustment (sw);
-  //vadj->step_increment = u;
   gtk_adjustment_set_step_increment(vadj, u);
 
   gdk_threads_leave ();

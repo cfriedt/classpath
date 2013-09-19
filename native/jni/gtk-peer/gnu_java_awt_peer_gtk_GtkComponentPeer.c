@@ -40,7 +40,7 @@ exception statement from your version. */
 #include "gnu_java_awt_peer_gtk_GtkComponentPeer.h"
 
 #include <gtk/gtk.h> 
-//#include <gtk/gtkprivate.h>
+
 
 #define AWT_DEFAULT_CURSOR 0
 #define AWT_CROSSHAIR_CURSOR 1
@@ -208,7 +208,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetSetCursorUnlocked
   GdkWindow *win;
   GdkCursorType gdk_cursor_type;
   GdkCursor *gdk_cursor;
-  printf("THIS IS YOUR CURSOOOOOORRRRR!!!");
+  
   ptr = gtkpeer_get_widget (env, obj);
 
   switch (type)
@@ -258,10 +258,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetSetCursorUnlocked
       
   widget = get_widget(GTK_WIDGET(ptr));
   
-  //win = widget->window;
-  //if ((widget->window) == NULL)	
-    //win = GTK_WIDGET(ptr)->window;
-    
+ 
      win = gtk_widget_get_window(widget);
      if ((gtk_widget_get_window(widget)) == NULL)
      	win = gtk_widget_get_window(GTK_WIDGET(ptr));
@@ -304,7 +301,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetSetParent
   widget = GTK_WIDGET (ptr);
   parent_widget = get_widget(GTK_WIDGET (parent_ptr));
 
-  //if (widget->parent == NULL)
+ 
    if (gtk_widget_get_parent(widget) == NULL)
     {
       if (GTK_IS_WINDOW (parent_widget))
@@ -322,14 +319,14 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetSetParent
           {
             gtk_scrolled_window_add_with_viewport 
               (GTK_SCROLLED_WINDOW (parent_widget), widget);
-           // gtk_viewport_set_shadow_type (GTK_VIEWPORT (widget->parent), 
+       
 	      gtk_viewport_set_shadow_type (GTK_VIEWPORT (gtk_widget_get_parent(widget)), 	
                                           GTK_SHADOW_NONE);
 
           }
         else
           {
-            //if (widget->parent == NULL)
+           
 	      if (gtk_widget_get_parent(widget) == NULL)	
               gtk_fixed_put (GTK_FIXED (parent_widget), widget, 0, 0);
           }
@@ -364,7 +361,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetHasFocus
 
   ptr = gtkpeer_get_widget (env, obj);
   
-	  //retval = GTK_WIDGET_HAS_FOCUS((GTK_WIDGET (ptr)));
+	  
     retval = gtk_widget_has_focus((GTK_WIDGET (ptr)));
 
   gdk_threads_leave ();
@@ -383,7 +380,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetCanFocus
 
   ptr = gtkpeer_get_widget (env, obj);
   
-  //retval = GTK_WIDGET_CAN_FOCUS((GTK_WIDGET (ptr)));
+ 
     retval = gtk_widget_get_can_focus((GTK_WIDGET (ptr)));
 
   gdk_threads_leave ();
@@ -437,14 +434,11 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetDispatchKeyEvent
     }
 
   if (GTK_IS_BUTTON (ptr))
-    //event->key.window = GTK_BUTTON (get_widget(GTK_WIDGET (ptr)))->event_window;
-      event->key.window = gtk_button_get_event_window (GTK_BUTTON (get_widget(GTK_WIDGET (ptr))));
+        event->key.window = gtk_button_get_event_window (GTK_BUTTON (get_widget(GTK_WIDGET (ptr))));
   else if (GTK_IS_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr))))
-    //event->key.window = GTK_WIDGET (GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container.child)->window;
-      event->key.window = gtk_widget_get_window(GTK_WIDGET (gtk_bin_get_child(&(GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container))));	
+         event->key.window = gtk_widget_get_window(GTK_WIDGET (gtk_bin_get_child(&(GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container))));	
   else
-    //event->key.window = get_widget(GTK_WIDGET (ptr))->window;
-      event->key.window = gtk_widget_get_window(get_widget(GTK_WIDGET (ptr)));	
+          event->key.window = gtk_widget_get_window(get_widget(GTK_WIDGET (ptr)));	
 
   event->key.send_event = 0;
   event->key.time = (guint32) when;
@@ -521,8 +515,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetDispatchKeyEvent
   if (!GTK_IS_WINDOW (ptr))
     {
       if (GTK_IS_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr))))
-        //gtk_widget_event (GTK_WIDGET (GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container.child), event);
-	gtk_widget_event (GTK_WIDGET (gtk_bin_get_child(&(GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container))), event);
+          gtk_widget_event (GTK_WIDGET (gtk_bin_get_child(&(GTK_SCROLLED_WINDOW (get_widget(GTK_WIDGET (ptr)))->container))), event);
       else
         gtk_widget_event (get_widget(GTK_WIDGET (ptr)), event);
     }
@@ -555,8 +548,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWindowGetLocationOnScreenUnlocked
   ptr = gtkpeer_get_widget (env, obj);
   point = (*env)->GetIntArrayElements (env, jpoint, 0);
 
-  //gdk_window_get_root_origin (get_widget(GTK_WIDGET (ptr))->window, point, point+1);
-    gdk_window_get_root_origin (gtk_widget_get_window(get_widget(GTK_WIDGET (ptr))), point, point+1);
+  gdk_window_get_root_origin (gtk_widget_get_window(get_widget(GTK_WIDGET (ptr))), point, point+1);
 
   (*env)->ReleaseIntArrayElements(env, jpoint, point, 0);
 }
@@ -590,11 +582,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetGetLocationOnScreenUnlocked
   widget = get_widget(GTK_WIDGET (ptr));
   while(gtk_widget_get_parent(widget) != NULL)
     widget = gtk_widget_get_parent(widget);
-  //gdk_window_get_position (GTK_WIDGET(widget)->window, point, point+1);
     gdk_window_get_position (gtk_widget_get_window(GTK_WIDGET(widget)), point, point+1);
-
-  //*point += GTK_WIDGET(ptr)->allocation.x;
-  //*(point+1) += GTK_WIDGET(ptr)->allocation.y;
 
   GtkAllocation alloc;
   gtk_widget_get_allocation(GTK_WIDGET(ptr), &alloc);
@@ -668,12 +656,10 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetGetPreferredDimensions
     {
       #if GTK_MAJOR_VERSION == 3
       /* Save the widget's current size request. */
-      //gtk_widget_size_request (get_widget(GTK_WIDGET (ptr)), &current_req);
       gtk_widget_get_preferred_size(get_widget(GTK_WIDGET(ptr)), &current_req, NULL);
 
       /* Get the widget's "natural" size request. */
       gtk_widget_set_size_request (get_widget(GTK_WIDGET (ptr)), -1, -1);
-      //gtk_widget_size_request (get_widget(GTK_WIDGET (ptr)), &natural_req);
       gtk_widget_get_preferred_size(get_widget(GTK_WIDGET (ptr)),NULL, &natural_req);
 
       /* Reset the widget's size request. */
@@ -730,9 +716,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_setNativeBounds
          case though, moving the child widget is invalid since a
          ScrollPane only has one child and that child is always
          located at (0, 0) in viewport coordinates. */
-     /* if (widget->parent != NULL && GTK_IS_FIXED (widget->parent))
-        gtk_fixed_move (GTK_FIXED (widget->parent), widget, x, y);*/
-	 if (gtk_widget_get_parent(widget) != NULL && GTK_IS_FIXED (gtk_widget_get_parent(widget)))
+      if (gtk_widget_get_parent(widget) != NULL && GTK_IS_FIXED (gtk_widget_get_parent(widget)))
         gtk_fixed_move (GTK_FIXED (gtk_widget_get_parent(widget)), widget, x, y);
     }
 
@@ -752,7 +736,6 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetGetBackground
 
   ptr = gtkpeer_get_widget (env, obj);
 
-  //bg = GTK_WIDGET (ptr)->style->bg[GTK_STATE_NORMAL];
   bg = gtk_widget_get_style(GTK_WIDGET (ptr))->bg[GTK_STATE_NORMAL];
    
 
@@ -783,8 +766,7 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetGetForeground
 
   ptr = gtkpeer_get_widget (env, obj);
 
-  //fg = get_widget(GTK_WIDGET (ptr))->style->fg[GTK_STATE_NORMAL];
-   fg = gtk_widget_get_style(get_widget(GTK_WIDGET (ptr)))->fg[GTK_STATE_NORMAL];
+  fg = gtk_widget_get_style(get_widget(GTK_WIDGET (ptr)))->fg[GTK_STATE_NORMAL];
 
   array = (*env)->NewIntArray (env, 3);
 
@@ -925,7 +907,6 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_modalHasGrab
   gdk_threads_enter ();
 
   widget = gtk_grab_get_current ();
-  //retval = (widget && GTK_IS_WINDOW (widget) && GTK_WINDOW (widget)->modal);
   retval = (widget && GTK_IS_WINDOW (widget) && gtk_window_get_modal(GTK_WINDOW (widget)));
 
   gdk_threads_leave ();
@@ -1135,7 +1116,6 @@ component_button_release_cb (GtkWidget *widget __attribute__((unused)),
   /* Generate an AWT click event only if the release occured in the
      window it was pressed in, and the mouse has not been dragged since
      the last time it was pressed. */
-  //gdk_drawable_get_size (event->window, &width, &height);
    width = gdk_window_get_width(event->window);
    height = gdk_window_get_height(event->window);
   if (! hasBeenDragged

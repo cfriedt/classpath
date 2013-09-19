@@ -337,7 +337,7 @@ void cp_gtk_textcomponent_connect_signals (GObject *ptr, jobject gref);
 /* Debugging */
 void cp_gtk_print_current_thread (void);
 
-//GdkPixmap *cp_gtk_get_pixmap( JNIEnv *env, jobject obj);
+
 
 #define SYNCHRONIZE_GDK 0
 

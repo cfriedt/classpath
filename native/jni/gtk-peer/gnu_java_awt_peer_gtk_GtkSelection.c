@@ -61,7 +61,6 @@ clipboard_targets_received (GtkClipboard *clipboard
   jobject selection_obj = (jobject) selection;
   JNIEnv *env = cp_gtk_gdk_env ();
 
-  //if (target_data != NULL && target_data->length > 0)
   if (target_data != NULL && gtk_selection_data_get_length(target_data) > 0)
     {
       include_text = gtk_selection_data_targets_include_text (target_data);
@@ -426,15 +425,11 @@ clipboard_bytes_received (GtkClipboard *clipboard
   jobject selection_obj = (jobject) selection;
   JNIEnv *env = cp_gtk_gdk_env ();
 
-   //if (selection_data != NULL && selection_data->length > 0)
      if (selection_data != NULL && gtk_selection_data_get_length(selection_data) > 0)
     {
-      //bytes = (*env)->NewByteArray (env, selection_data->length);
       bytes = (*env)->NewByteArray (env, gtk_selection_data_get_length(selection_data));
       if (bytes != NULL)
-	/*(*env)->SetByteArrayRegion(env, bytes, 0, selection_data->length,
-				   (jbyte *) selection_data->data);*/
-         (*env)->SetByteArrayRegion(env, bytes, 0, gtk_selection_data_get_length(selection_data),
+	(*env)->SetByteArrayRegion(env, bytes, 0, gtk_selection_data_get_length(selection_data),
 				   (jbyte *) gtk_selection_data_get_data(selection_data));
     }
 

@@ -175,7 +175,6 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setLineIncrement
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
   gtk_adjustment_set_step_increment(adj, (gdouble)amount);
-  //adj->step_increment = (gdouble) amount;
   gtk_adjustment_changed (adj);
 
   gdk_threads_leave ();
@@ -196,7 +195,6 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setPageIncrement
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
   gtk_adjustment_set_page_increment(adj, (gdouble)amount);
-  //adj->page_increment = (gdouble) amount;
   gtk_adjustment_changed (adj);
 
   gdk_threads_leave ();
@@ -225,8 +223,7 @@ Java_gnu_java_awt_peer_gtk_GtkScrollbarPeer_setBarValues
 
   adj = gtk_range_get_adjustment (GTK_RANGE (wid));
   gtk_adjustment_set_page_size(adj, (gdouble)visible);
-  //adj->page_size = (gdouble) visible;
-
+  
   gtk_range_set_range (GTK_RANGE (wid), (gdouble) min, (gdouble) max);
   gtk_range_set_value (GTK_RANGE (wid), (gdouble) value);
 
@@ -242,19 +239,16 @@ slider_moved_cb (GtkRange *range,
 {
   GtkAdjustment *adj = gtk_range_get_adjustment (GTK_RANGE (range));
   
-  /*value = CLAMP (value, adj->lower,
-                 (adj->upper - adj->page_size));*/
+ 
   value = CLAMP (value, gtk_adjustment_get_lower(adj),
                  (gtk_adjustment_get_upper(adj) - gtk_adjustment_get_page_size(adj)));
 
-  //if (range->round_digits >= 0)
-    if (gtk_range_get_round_digits(range) >= 0)
+  if (gtk_range_get_round_digits(range) >= 0)
     {
       gdouble power;
       gint i;
 
-      //i = range->round_digits;
-        i = gtk_range_get_round_digits(range);
+      i = gtk_range_get_round_digits(range);
       power = 1;
       while (i--)
         power *= 10;

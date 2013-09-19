@@ -225,10 +225,7 @@ Java_gnu_java_awt_peer_gtk_GtkLabelPeer_setNativeBounds
       /* ...and the label's size request. */
       gtk_widget_set_size_request (gtk_bin_get_child (GTK_BIN (widget)),
                                    width, height);
-
-     /* if (widget->parent != NULL && GTK_IS_FIXED (widget->parent))
-        gtk_fixed_move (GTK_FIXED (widget->parent), widget, x, y);*/
-        
+     
         if (gtk_widget_get_parent(widget) != NULL && GTK_IS_FIXED (gtk_widget_get_parent(widget)))
         gtk_fixed_move (GTK_FIXED (gtk_widget_get_parent(widget)), widget, x, y);
     }
