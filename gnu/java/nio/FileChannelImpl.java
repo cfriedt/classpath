@@ -176,7 +176,7 @@ public final class FileChannelImpl extends FileChannel
    *
    * @param mode READ or WRITE
    */
-  FileChannelImpl (VMChannel ch, int mode)
+  public FileChannelImpl (VMChannel ch, int mode)
   {
     this.mode = mode;
     this.description = "descriptor(" + ch.getState() + ")";
@@ -564,9 +564,14 @@ public final class FileChannelImpl extends FileChannel
 
   /**
    * @return The native file descriptor.
-   * /
+   */
   public int getNativeFD()
   {
+    int fd = -1;
+    try {
+      fd = ch.getState().getNativeFD();
+    } catch ( IOException e ) {
+    }
     return fd;
-  }*/
+  }
 }
