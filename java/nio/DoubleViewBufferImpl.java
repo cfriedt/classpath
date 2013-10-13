@@ -48,8 +48,14 @@ final class DoubleViewBufferImpl extends DoubleBuffer
 
   DoubleViewBufferImpl (ByteBuffer bb, int capacity)
   {
-    super (capacity, capacity, 0, -1, bb.isDirect() ?
-           VMDirectByteBuffer.adjustAddress(bb.address, bb.position()) : null, null, 0);
+    super (capacity, capacity, 0, -1,
+      bb.isDirect()
+        ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
+      bb.hasArray()
+        ? (double[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
+                                                       bb.position(), "[D")
+        :null,
+      0);
     this.bb = bb;
     this.offset = bb.position();
     this.readOnly = bb.isReadOnly();

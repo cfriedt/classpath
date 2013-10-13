@@ -55,6 +55,9 @@ final class VMDirectByteBuffer
 
   private VMDirectByteBuffer() {} // Prohibits instantiation.
 
+  static native Object pointerToArray(Pointer address, int capacity,
+                                      int array_offset, String className);
+
   static native Pointer allocate(int capacity);
 
   static native void free(Pointer address);

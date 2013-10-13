@@ -652,6 +652,11 @@ struct JNINativeInterface_
   /* ---- JNI 1.6 functions ---- */
 
   jobjectRefType (JNICALL *GetObjectRefType)       (JNIEnv *, jobject);
+
+  /* ---- Custom functions  ---- */
+
+  jobject (JNICALL *CreateArrayFromPointer)    (JNIEnv *, jobject, jint, jint,
+                                                jstring );
 };
 
 #ifdef __cplusplus

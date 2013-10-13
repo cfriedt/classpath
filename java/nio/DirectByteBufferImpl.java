@@ -110,7 +110,7 @@ abstract class DirectByteBufferImpl extends ByteBuffer
   DirectByteBufferImpl(int capacity)
   {
     super(capacity, capacity, 0, -1,
-          VMDirectByteBuffer.allocate(capacity), null, 0);
+      VMDirectByteBuffer.allocate(capacity), null, 0);
     this.owner = this;
   }
 
@@ -138,7 +138,7 @@ abstract class DirectByteBufferImpl extends ByteBuffer
 
   protected void finalize() throws Throwable
   {
-    if (owner == this)
+    if (owner == this && null != this.backing_buffer )
         VMDirectByteBuffer.free(address);
   }
 
