@@ -48,8 +48,13 @@ final class IntViewBufferImpl extends IntBuffer
 
   IntViewBufferImpl (ByteBuffer bb, int capacity)
   {
-    super (capacity, capacity, 0, -1, bb.isDirect() ?
-           VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null, null, 0);
+    super (capacity, capacity, 0, -1,
+      bb.isDirect()
+        ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
+      bb.hasArray()
+        ? (int[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
+                                                    bb.position(), "[I"):null,
+      0);
     this.bb = bb;
     this.offset = bb.position();
     this.readOnly = bb.isReadOnly();

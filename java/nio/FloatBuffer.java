@@ -53,7 +53,10 @@ public abstract class FloatBuffer extends Buffer
                Pointer address, float[] backing_buffer, int array_offset)
   {
     super (capacity, limit, position, mark, address);
-    this.backing_buffer = backing_buffer;
+    this.backing_buffer =
+      backing_buffer == null
+      ? (float[])pointerToArray( address, capacity, array_offset, "[F" )
+      : backing_buffer;
     this.array_offset = array_offset;
   }
 
