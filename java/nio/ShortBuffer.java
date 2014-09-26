@@ -54,7 +54,10 @@ public abstract class ShortBuffer extends Buffer
                int array_offset)
   {
     super (capacity, limit, position, mark, address);
-    this.backing_buffer = backing_buffer;
+    this.backing_buffer =
+      backing_buffer == null
+      ? (short[])pointerToArray( address, capacity, array_offset, "[S" )
+      : backing_buffer;
     this.array_offset = array_offset;
   }
 

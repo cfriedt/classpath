@@ -426,4 +426,11 @@ public abstract class Buffer
    * @since 1.6
    */
   public abstract boolean isDirect();
+
+  Object pointerToArray(Pointer address, int capacity, int array_offset,
+                        String className )
+  {
+    return VMDirectByteBuffer.pointerToArray(address, capacity, array_offset,
+                                             className);
+  }
 }
