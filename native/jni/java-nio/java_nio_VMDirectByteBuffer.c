@@ -135,12 +135,3 @@ Java_java_nio_VMDirectByteBuffer_adjustAddress
 {
   return JCL_NewRawDataObject (env, (jbyte *) JCL_GetRawData (env, address) + offset);
 }
-
-JNIEXPORT jobject JNICALL
-Java_java_nio_VMDirectByteBuffer_pointerToArray
-(JNIEnv *env, jclass clazz __attribute__ ((__unused__)), jobject pointer,
- jint capacity, jint array_offset, jstring className)
-{
-  return(*env)->CreateArrayFromPointer(env, pointer, capacity, array_offset,
-                                       className);
-}

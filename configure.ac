@@ -22,16 +22,15 @@ dnl We will not track/change lib version until we reach version 1.0
 dnl at which time we'll have to be more anal about such things
 dnl -----------------------------------------------------------
 AC_SUBST(LIBVERSION, "0:0:0")
+CLASSPATH_MODULE="-version-info ${LIBVERSION}"
 case "$host_os" in
      darwin*)
-	cp_module=""
+	CLASSPATH_MODULE="${CLASSPATH_MODULE} -undefined suppress -flat_namespace"
 	;;
 	*)
-	cp_module="-module"
+	CLASSPATH_MODULE="-module ${CLASSPATH_MODULE} -no-undefined"
 	;;
 esac
-
-CLASSPATH_MODULE="${cp_module} -version-info ${LIBVERSION} -no-undefined"
 AC_SUBST(CLASSPATH_MODULE)
 
 CLASSPATH_CONVENIENCE="-no-undefined"

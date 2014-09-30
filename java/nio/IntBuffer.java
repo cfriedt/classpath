@@ -55,7 +55,7 @@ public abstract class IntBuffer extends Buffer
     super (capacity, limit, position, mark, address);
     this.backing_buffer =
       backing_buffer == null
-      ? (int[])pointerToArray( address, capacity, array_offset, "[I" )
+      ? (int[])pointerToArray( address, capacity, array_offset, int[].class )
       : backing_buffer;
     this.array_offset = array_offset;
   }

@@ -55,7 +55,7 @@ public abstract class LongBuffer extends Buffer
     super (capacity, limit, position, mark, address);
     this.backing_buffer =
       backing_buffer == null
-      ? (long[])pointerToArray( address, capacity, array_offset, "[J" )
+      ? (long[])pointerToArray( address, capacity, array_offset, long[].class )
       : backing_buffer;
     this.array_offset = array_offset;
   }
