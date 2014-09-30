@@ -53,7 +53,7 @@ final class DoubleViewBufferImpl extends DoubleBuffer
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
         ? (double[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                       bb.position(), "[D")
+                                                       bb.position(), double[].class)
         :null,
       0);
     this.bb = bb;

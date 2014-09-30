@@ -427,7 +427,7 @@ public abstract class Buffer
    */
   public abstract boolean isDirect();
 
-  protected Object pointerToArray(Pointer address, int capacity, int array_offset,
+  Object pointerToArray(Pointer address, int capacity, int array_offset,
                         Class<?> cls )
   {
     return VMDirectByteBuffer.pointerToArray(address, capacity, array_offset,

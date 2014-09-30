@@ -53,7 +53,7 @@ final class ShortViewBufferImpl extends ShortBuffer
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
         ? (short[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                      bb.position(), "[S"):null,
+                                                      bb.position(), short[].class):null,
       0);
     this.bb = bb;
     this.offset = bb.position();

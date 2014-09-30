@@ -53,7 +53,7 @@ final class IntViewBufferImpl extends IntBuffer
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
         ? (int[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                    bb.position(), "[I"):null,
+                                                    bb.position(), int[].class):null,
       0);
     this.bb = bb;
     this.offset = bb.position();

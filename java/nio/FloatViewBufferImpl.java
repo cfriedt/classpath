@@ -53,7 +53,7 @@ final class FloatViewBufferImpl extends FloatBuffer
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
         ? (float[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                      bb.position(), "[F")
+                                                      bb.position(), float[].class)
         :null,
       0);
     this.bb = bb;

@@ -54,7 +54,7 @@ class CharViewBufferImpl extends CharBuffer
           :null,
         bb.hasArray()
           ? (char[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                       bb.position(), "[C")
+                                                       bb.position(), char[].class)
           :null,
         0);
     this.bb = bb;
