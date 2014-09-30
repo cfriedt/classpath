@@ -91,7 +91,7 @@ public final class Unsafe
    * Allocate an instance but do not run any constructor.
    * Initializes the class if it has not yet been.
    *
-   * @return an Object 
+   * @return an Object
    */
   public native Object allocateInstance( Class cls ) throws InstantiationException;
 

@@ -62,8 +62,8 @@ final class VMDirectByteBuffer
   private static class JamArrayObjectInfo {
     static final int size_idx = 2;
     static final int data_ptr_idx = 3;
-    static final int size_offset = unsafe.addressSize() * size_idx; 
-    static final int data_ptr_offset = unsafe.addressSize() * data_ptr_idx; 
+    static final int size_offset = unsafe.addressSize() * size_idx;
+    static final int data_ptr_offset = unsafe.addressSize() * data_ptr_idx;
   };
   private static Field ptr32data;
   private static Field ptr64data;
@@ -107,7 +107,7 @@ final class VMDirectByteBuffer
     class_map.put( "[F", float[].class );
     class_map.put( "[D", double[].class );
   }
-  
+
   static Object pointerToArray(Pointer address, int capacity, int array_offset, Class<?> cls )
   {
     Object o;
