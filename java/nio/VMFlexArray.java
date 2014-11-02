@@ -11,9 +11,16 @@ class VMFlexArray
 {
   private VMFlexArray() {}
 
-  private static final Unsafe unsafe = Unsafe.getUnsafe();
+  private static boolean enable;
+  private static final Unsafe unsafe;
   private static Field ptrdata;
   
+  static
+    {
+      enable = Boolean.parseBoolean( System.getProperty("gnu.classpath.flexarray.enable") );
+      unsafe = Unsafe.getUnsafe();
+    }
+
   private static void initPtrData()
   {
 
@@ -92,9 +99,15 @@ class VMFlexArray
   { 
     Object o = null;
     
+    if ( !enable )
+      {
+        return o;
+      }
+
     if ( !VMFlexArrayInfo.isArrayObjectFlexible() )
       {
-        throw new UnsupportedOperationException(); 
+        //throw new UnsupportedOperationException();
+        return o;
       }
     
     // only deal array types defined in array_classes (i.e. primitives)

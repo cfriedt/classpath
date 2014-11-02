@@ -112,6 +112,20 @@ AC_ARG_ENABLE([gconf-peer],
 AM_CONDITIONAL(CREATE_GCONF_PEER_LIBRARIES, test "x${COMPILE_GCONF_PEER}" = xyes)
 
 dnl -----------------------------------------------------------
+dnl VM Flexible Arrays (disabled by default)
+dnl -----------------------------------------------------------
+ENABLE_VM_FLEXARRAY=false
+AC_ARG_ENABLE([vm-flexarray],
+              [AS_HELP_STRING(--enable-vm-flexarray,enable VM flexible arrays (disabled by default) [default=no])],
+              [case "${enableval}" in
+                yes) ENABLE_VM_FLEXARRAY=true ;;
+                no) ENABLE_VM_FLEXARRAY=false ;;
+                *) ENABLE_VM_FLEXARRAY=false ;;
+              esac],
+              [ENABLE_VM_FLEXARRAY=false])
+AC_SUBST(ENABLE_VM_FLEXARRAY)
+
+dnl -----------------------------------------------------------
 dnl GConf native peer error checking
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([gconf-peers],,AC_MSG_ERROR([No --enable-gconf-peers (or --disable-gconf-peers) option; you want --enable-gconf-peer]))

@@ -430,7 +430,7 @@ public abstract class Buffer
   Object pointerToArray(Pointer address, int capacity, int array_offset,
                         Class<?> cls )
   {
-    return VMDirectByteBuffer.pointerToArray(address, capacity, array_offset,
+    return VMFlexArray.pointerToArray(address, capacity, array_offset,
                                              cls);
   }
 }
