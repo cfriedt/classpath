@@ -116,7 +116,7 @@ dnl VM Flexible Arrays (disabled by default)
 dnl -----------------------------------------------------------
 ENABLE_VM_FLEXARRAY=false
 AC_ARG_ENABLE([vm-flexarray],
-              [AS_HELP_STRING(--enable-vm-flexarray,enable VM flexible arrays (disabled by default) [default=no])],
+              [AS_HELP_STRING(--enable-vm-flexarray,enable VM flexible arrays [default=no])],
               [case "${enableval}" in
                 yes) ENABLE_VM_FLEXARRAY=true ;;
                 no) ENABLE_VM_FLEXARRAY=false ;;
