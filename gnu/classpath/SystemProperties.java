@@ -119,7 +119,7 @@ public class SystemProperties
                             "/etc/mime.types");
     // Set flexarray
     defaultProperties.put("gnu.classpath.flexarray.enable",
-                          Configuration.ENABLE_VM_FLEXARRAY);
+                          "" + Configuration.ENABLE_VM_FLEXARRAY);
 
     VMSystemProperties.postInit(defaultProperties);
 

@@ -13,37 +13,47 @@ class VMFlexArray
 
   private static boolean enable;
   private static final Unsafe unsafe;
-  private static Field ptrdata;
-  
+  private static final Field ptrdata;
+
   static
     {
       enable = Boolean.parseBoolean( System.getProperty("gnu.classpath.flexarray.enable") );
       unsafe = Unsafe.getUnsafe();
+      if ( enable )
+        {
+          ptrdata = initPtrData();
+          if ( null != ptrdata )
+            {
+              ptrdata.setAccessible(true);
+            }
+        }
+      else
+        {
+          ptrdata = null;
+        }
     }
 
-  private static void initPtrData()
+  private static Field initPtrData()
   {
 
+    Field r = null;
     Exception e2 = null;
-
-    if (null != ptrdata)
-      {
-        return;
-      }
 
     try
       {
         switch (unsafe.addressSize())
           {
           case 4:
-            ptrdata = Pointer32.class.getDeclaredField("data");
+            r = Pointer32.class.getDeclaredField("data");
             break;
           case 8:
-            ptrdata = Pointer64.class.getDeclaredField("data");
+            r = Pointer64.class.getDeclaredField("data");
             break;
+          default:
+            throw new IllegalStateException();
           }
       }
-    catch (NoSuchFieldException e)
+    catch (Exception e)
       {
         e2 = e;
       }
@@ -53,13 +63,13 @@ class VMFlexArray
         ex.setStackTrace(e2.getStackTrace());
         throw ex;
       }
+    r.setAccessible( true );
+    return r;
   }
   
   private static long getNativePointer( Pointer ptr, int address_size ) {
     long r = -1;
     Exception e2 = null;
-    
-    initPtrData();
     
     try {
       switch( unsafe.addressSize() ) {
