@@ -48,8 +48,14 @@ final class FloatViewBufferImpl extends FloatBuffer
 
   FloatViewBufferImpl (ByteBuffer bb, int capacity)
   {
-    super (capacity, capacity, 0, -1, bb.isDirect() ?
-           VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null, null, 0);
+    super (capacity, capacity, 0, -1,
+      bb.isDirect()
+        ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
+      bb.hasArray()
+        ? (float[]) VMDirectByteBuffer.VMFlexArray.pointerToArray(bb.address, capacity,
+                                                      bb.position(), float[].class)
+        :null,
+      0);
     this.bb = bb;
     this.offset = bb.position();
     this.readOnly = bb.isReadOnly();

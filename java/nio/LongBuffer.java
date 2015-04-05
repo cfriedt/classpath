@@ -53,7 +53,10 @@ public abstract class LongBuffer extends Buffer
               Pointer address, long[] backing_buffer, int array_offset)
   {
     super (capacity, limit, position, mark, address);
-    this.backing_buffer = backing_buffer;
+    this.backing_buffer =
+      backing_buffer == null
+      ? (long[])VMFlexArray.pointerToArray( address, capacity, array_offset, long[].class )
+      : backing_buffer;
     this.array_offset = array_offset;
   }
 

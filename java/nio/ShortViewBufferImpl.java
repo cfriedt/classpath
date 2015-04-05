@@ -48,9 +48,13 @@ final class ShortViewBufferImpl extends ShortBuffer
 
   ShortViewBufferImpl (ByteBuffer bb, int capacity)
   {
-    super (capacity, capacity, 0, -1, bb.isDirect() ?
-           VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
-           null, 0);
+    super (capacity, capacity, 0, -1,
+      bb.isDirect()
+        ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
+      bb.hasArray()
+        ? (short[]) VMDirectByteBuffer.VMFlexArray.pointerToArray(bb.address, capacity,
+                                                      bb.position(), short[].class ):null,
+      0);
     this.bb = bb;
     this.offset = bb.position();
     this.readOnly = bb.isReadOnly();
