@@ -139,8 +139,7 @@ Java_java_nio_VMDirectByteBuffer_adjustAddress
 JNIEXPORT jobject JNICALL
 Java_java_nio_VMDirectByteBuffer_pointerToArray
 (JNIEnv *env, jclass clazz __attribute__ ((__unused__)), jobject pointer,
- jint capacity, jint array_offset, jstring className)
+ jint capacity, jint array_offset, jclass clazz)
 {
-  return(*env)->CreateArrayFromPointer(env, pointer, capacity, array_offset,
-                                       className);
+  return NULL;
 }
