@@ -78,6 +78,24 @@ public final class Unsafe
   }
 
   /**
+   * Report the size in bytes of a native pointer, as stored via
+   * <code>putAddress</code>. This value will be either 4 or 8.  Note that
+   * the sizes of other primitive types (as stored in native memory blocks)
+   * is determined fully by their information content.
+   *
+   * @return the size of an address
+   */
+  public native int addressSize();
+
+  /**
+   * Allocate an instance but do not run any constructor.
+   * Initializes the class if it has not yet been.
+   *
+   * @return an Object
+   */
+  public native Object allocateInstance( Class cls ) throws InstantiationException;
+
+  /**
    * Returns the memory address offset of the given static field.
    * The offset is merely used as a means to access a particular field
    * in the other methods of this class.  The value is unique to the given
