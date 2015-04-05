@@ -426,11 +426,4 @@ public abstract class Buffer
    * @since 1.6
    */
   public abstract boolean isDirect();
-
-  Object pointerToArray(Pointer address, int capacity, int array_offset,
-                        Class<?> cls )
-  {
-    return VMFlexArray.pointerToArray(address, capacity, array_offset,
-                                             cls);
-  }
 }

@@ -122,9 +122,10 @@ get_raw_values (JNIEnv *env, jobject this, void **address, size_t *size)
     }
 
   *address = (void *)
-    JCL_GetRawData (env, MappedByteBufferImpl_address_value);
+    ALIGN_DOWN (JCL_GetRawData (env, MappedByteBufferImpl_address_value), pagesize);
   *size = (size_t)
-    (*env)->GetIntField (env, this, MappedByteBufferImpl_size);
+    ALIGN_UP ((*env)->GetIntField (env, this, MappedByteBufferImpl_size),
+	      pagesize);
 }
 
 JNIEXPORT void JNICALL

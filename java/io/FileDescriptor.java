@@ -40,7 +40,6 @@ exception statement from your version. */
 package java.io;
 
 import gnu.java.nio.FileChannelImpl;
-import gnu.java.nio.VMChannel;
 
 import java.nio.channels.ByteChannel;
 import java.nio.channels.FileChannel;
@@ -81,7 +80,6 @@ public final class FileDescriptor
   = new FileDescriptor (FileChannelImpl.err);
 
   final ByteChannel channel;
-  int fd;
 
   /**
    * This method is used to initialize an invalid FileDescriptor object.
@@ -99,17 +97,6 @@ public final class FileDescriptor
     this.channel = channel;
   }
 
-  FileDescriptor(FileChannelImpl channel)
-  {
-    this.channel = channel;
-    this.fd = channel.getNativeFD();
-  }
-
-  FileDescriptor(int fd, int mode) throws IOException
-  {
-    channel = new FileChannelImpl(new VMChannel(fd), mode);
-    this.fd = fd;
-  }
 
   /**
    * This method forces all data that has not yet been physically written to
@@ -148,8 +135,6 @@ public final class FileDescriptor
   public boolean valid ()
   {
     ByteChannel c = channel;
-    boolean valid = (c != null) && (c.isOpen());
-    valid = (channel instanceof FileChannel) ? (fd >= 0) : valid;
-    return valid;
+    return (c != null) && (c.isOpen());
   }
 }

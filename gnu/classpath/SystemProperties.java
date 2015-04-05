@@ -117,9 +117,6 @@ public class SystemProperties
         && "Linux".equals(defaultProperties.get("os.name")))
       defaultProperties.put("gnu.classpath.mime.types.file",
                             "/etc/mime.types");
-    // Set flexarray
-    defaultProperties.put("gnu.classpath.flexarray.enable",
-                          "" + Configuration.ENABLE_VM_FLEXARRAY);
 
     VMSystemProperties.postInit(defaultProperties);
 

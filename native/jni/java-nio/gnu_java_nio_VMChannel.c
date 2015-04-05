@@ -1944,20 +1944,18 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
         }
       if (position + size > st.st_size)
         {
-          if ( !(S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) )
+          if (ftruncate(fd, position + size) == -1)
             {
-              if (ftruncate(fd, position + size) == -1)
-                {
-                  JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
-                  return NULL;
-                }
+              JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
+              return NULL;
             }
         }
       prot |= PROT_WRITE;
     }
 
   flags = (mode == 'c' ? MAP_PRIVATE : MAP_SHARED);
-  p = mmap (NULL, size, prot, flags, fd, position);
+  p = mmap (NULL, (size_t) ALIGN_UP (size, pagesize), prot, flags,
+	    fd, ALIGN_DOWN (position, pagesize));
   if (p == MAP_FAILED)
     {
       JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
@@ -1981,7 +1979,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
 
   if ((*env)->ExceptionOccurred (env))
     {
-      munmap (p, size);
+      munmap (p, ALIGN_UP (size, pagesize));
       return NULL;
     }
   if (MappedByteBufferImpl_init == NULL)

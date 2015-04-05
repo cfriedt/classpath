@@ -38,11 +38,8 @@ exception statement from your version. */
 
 package java.nio;
 
-import java.lang.reflect.*;
-import java.util.*;
-
-import sun.misc.*;
-import gnu.classpath.*;
+import gnu.classpath.Configuration;
+import gnu.classpath.Pointer;
 
 final class VMDirectByteBuffer
 {

@@ -131,14 +131,7 @@ cpnio_fcntl (int fd, int cmd, long arg)
 #ifdef HAVE_FCNTL
   return fcntl (fd, cmd, arg);
 #else
-#ifndef ENOSUP
-#ifdef ENOTSUP
-#define ENOSUP ENOTSUP
-#else
-#error must define ENOSUP or ENOTSUP
-#endif
-#endif
-  errno = ENOTSUP;
+  errno = ENOSUP;
   return -1;
 #endif /* HAVE_FCNTL */
 }

@@ -111,19 +111,4 @@ public interface Configuration
    */
   boolean WANT_NATIVE_BIG_INTEGER = @WANT_NATIVE_BIG_INTEGER@;
 
-  /**
-   * The value of ENABLE_VM_FLEXARRAY is substituted according to whether the
-   * "--enable-vm-flexarray" or "--disable-vm-flexarray" argument was passed
-   * to configure.  By default, configure should define this is as
-   * <code>false</code>. If set to false, ByteBuffer.array() and subclasses
-   * throw an UnsupportedOperationException. Otherwise, if the underlying JVM
-   * supports flexible arrays, and the Buffer object was created with a
-   * backing array, a suitable primitive Java array will be returned. There are
-   * a number of ways to create a Buffer object with a backing array,
-   * including, but not limited to, the following:
-   *
-   * 1) Obtain a MappedByteBuffer via FileChannel.map()
-   * 2) ByteBuffer.allocateDirect()
-   */
-  boolean ENABLE_VM_FLEXARRAY = @ENABLE_VM_FLEXARRAY@;
 }

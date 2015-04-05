@@ -266,12 +266,10 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
     fabricateTree(sm.size());
     Node<K,V> node = firstNode();
 
-    ArrayList<K> alk = new ArrayList<K>();
-    alk.addAll( sm.keySet() );
-    for( int i=0; i<alk.size(); i++ )
+    for (Map.Entry<K,? extends V> me : sm.entrySet())
       {
-        node.key = alk.get(i);
-        node.value = sm.get(node.key);
+        node.key = me.getKey();
+        node.value = me.getValue();
         node = successor(node);
       }
   }
@@ -573,10 +571,8 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
    */
   public void putAll(Map<? extends K, ? extends V> m)
   {
-    ArrayList<K> alk = new ArrayList<K>();
-    alk.addAll( m.keySet() );
-    for( int i=0; i<alk.size(); i++ )
-      put( alk.get(i), m.get(alk.get(i)) );
+    for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
+      put(e.getKey(), e.getValue());
   }
 
   /**

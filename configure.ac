@@ -22,15 +22,16 @@ dnl We will not track/change lib version until we reach version 1.0
 dnl at which time we'll have to be more anal about such things
 dnl -----------------------------------------------------------
 AC_SUBST(LIBVERSION, "0:0:0")
-CLASSPATH_MODULE="-version-info ${LIBVERSION}"
 case "$host_os" in
      darwin*)
-	CLASSPATH_MODULE="${CLASSPATH_MODULE} -undefined suppress -flat_namespace"
+	cp_module=""
 	;;
 	*)
-	CLASSPATH_MODULE="-module ${CLASSPATH_MODULE} -no-undefined"
+	cp_module="-module"
 	;;
 esac
+
+CLASSPATH_MODULE="${cp_module} -version-info ${LIBVERSION} -no-undefined"
 AC_SUBST(CLASSPATH_MODULE)
 
 CLASSPATH_CONVENIENCE="-no-undefined"
@@ -60,7 +61,7 @@ dnl Enable JNI libraries (enabled by default)
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([jni],
               [AS_HELP_STRING(--enable-jni,compile JNI source [default=yes])],
-              [case "${enableval}" in
+              [case "${enableval}" in 
                 yes) COMPILE_JNI=yes; COMPILE_JAVA=yes ;;
                 no) COMPILE_JNI=no ;;
                 *) COMPILE_JNI=yes; COMPILE_JAVA=yes ;;
@@ -74,7 +75,7 @@ dnl -----------------------------------------------------------
 AC_ARG_ENABLE([core-jni],
               [AS_HELP_STRING(--enable-core-jni,
 	                      compile JNI sources for core [default=yes])],
-              [case "${enableval}" in
+              [case "${enableval}" in 
                 yes) COMPILE_CORE_JNI=yes; COMPILE_JAVA=yes ;;
                 no) COMPILE_CORE_JNI=no ;;
                 *) COMPILE_CORE_JNI=yes; COMPILE_JAVA=yes ;;
@@ -88,7 +89,7 @@ dnl -----------------------------------------------------------
 AC_ARG_ENABLE([default-preferences-peer],
               [AS_HELP_STRING([--enable-default-preferences-peer@<:@=peer type or class name@:>@],
                               [specify one of: "gconf" [default] for a GConf based backend, "file" for a file based one, "memory" for a transient one, or a fully qualified class name implementing java.util.prefs.PreferencesFactory])],
-              [case "${enableval}" in
+              [case "${enableval}" in 
                 file) DEFAULT_PREFS_PEER=gnu.java.util.prefs.FileBasedFactory  ;;
                 gconf|yes|true) DEFAULT_PREFS_PEER=gnu.java.util.prefs.GConfBasedFactory  ;;
                 memory) DEFAULT_PREFS_PEER=gnu.java.util.prefs.MemoryBasedFactory  ;;
@@ -110,20 +111,6 @@ AC_ARG_ENABLE([gconf-peer],
               esac],
               [COMPILE_GCONF_PEER=yes])
 AM_CONDITIONAL(CREATE_GCONF_PEER_LIBRARIES, test "x${COMPILE_GCONF_PEER}" = xyes)
-
-dnl -----------------------------------------------------------
-dnl VM Flexible Arrays (disabled by default)
-dnl -----------------------------------------------------------
-ENABLE_VM_FLEXARRAY=false
-AC_ARG_ENABLE([vm-flexarray],
-              [AS_HELP_STRING(--enable-vm-flexarray,enable VM flexible arrays [default=no])],
-              [case "${enableval}" in
-                yes) ENABLE_VM_FLEXARRAY=true ;;
-                no) ENABLE_VM_FLEXARRAY=false ;;
-                *) ENABLE_VM_FLEXARRAY=false ;;
-              esac],
-              [ENABLE_VM_FLEXARRAY=false])
-AC_SUBST(ENABLE_VM_FLEXARRAY)
 
 dnl -----------------------------------------------------------
 dnl GConf native peer error checking
@@ -229,7 +216,7 @@ AC_ARG_ENABLE([gtk-peer],
 AM_CONDITIONAL(CREATE_GTK_PEER_LIBRARIES, test "x${COMPILE_GTK_PEER}" = xyes)
 
 dnl -----------------------------------------------------------
-dnl GTK native peer error checking
+dnl GTK native peer error checking 
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([gtk-peers],,AC_MSG_ERROR([No --enable-gtk-peers (or --disable-gtk-peers) option; you want --enable-gtk-peer]))
 
@@ -420,13 +407,13 @@ if test "x${COMPILE_JNI}" = xyes; then
 
   AC_HEADER_STDC
 
-  dnl Checking sizeof void * is needed for fdlibm to work properly on ppc64,
-  dnl at least.
+  dnl Checking sizeof void * is needed for fdlibm to work properly on ppc64, 
+  dnl at least. 
   AC_COMPILE_CHECK_SIZEOF(void *)
 
   dnl Checking for endianess.
   AC_C_BIGENDIAN_CROSS
-
+  
   dnl We check for sys/filio.h because Solaris 2.5 defines FIONREAD there.
   dnl On that system, sys/ioctl.h will not include sys/filio.h unless
   dnl BSD_COMP is defined; just including sys/filio.h is simpler.
@@ -454,7 +441,7 @@ if test "x${COMPILE_JNI}" = xyes; then
 
   AC_SEARCH_LIBS([clock_gettime], [rt])
   AC_SEARCH_LIBS([inet_pton],[nsl])
-  AC_CHECK_LIB([socket], [gethostname])
+  AC_CHECK_LIB([socket], [gethostname]) 
 
   AC_CHECK_FUNCS([ftruncate fsync select \
 		  gethostname socket strerror fork pipe execve open close \
@@ -464,7 +451,7 @@ if test "x${COMPILE_JNI}" = xyes; then
 		  gethostbyname_r localtime_r \
 		  strerror_r \
                   fcntl \
-		  statvfs \
+		  statvfs \  
 		  mmap munmap mincore msync madvise getpagesize sysconf \
 		  lstat readlink \
  		  inet_aton inet_addr inet_pton \
@@ -643,12 +630,12 @@ if test "x${COMPILE_JNI}" = xyes; then
     PKG_CHECK_MODULES(GDK, gdk-2.0 >= 2.8)
     AC_SUBST(GDK_CFLAGS)
     AC_SUBST(GDK_LIBS)
-
+	
 	dnl set the gstreamer based file reader, writer and mixer
 	GSTREAMER_FILE_READER=gnu.javax.sound.sampled.gstreamer.io.GstAudioFileReader
 	GSTREAMER_MIXER_PROVIDER=gnu.javax.sound.sampled.gstreamer.GStreamerMixerProvider
   fi
-  dnl add the gstreamer resources
+  dnl add the gstreamer resources 
   AC_SUBST(GSTREAMER_FILE_READER)
   AC_SUBST(GSTREAMER_MIXER_PROVIDER)
 
@@ -812,7 +799,7 @@ if test "x${REGENERATE_JNI_HEADERS}" = xyes; then
   CLASSPATH_WITH_JAVAH
 fi
 
-dnl -----------------------------------------------------------
+dnl ----------------------------------------------------------- 
 dnl Add the include files for the native abstraction layer.
 dnl Used by AM_CPPFLAGS in the different modules.
 dnl -----------------------------------------------------------
@@ -826,7 +813,7 @@ if test "x${COMPILE_JNI}" = xyes; then
     AC_MSG_RESULT(yes)
   else
     target_cpu=x86
-    target_os=linux-gnu
+    target_os=linux-gnu 
     AC_MSG_WARN(no, using x86-linux-gnu)
   fi
   ac_sources="include/jni_md-${target_cpu}-${target_os}.h"
@@ -849,15 +836,15 @@ AM_MAINTAINER_MODE
 dnl -----------------------------------------------------------
 dnl Enable debugging statements at compile time.  By default
 dnl these statements should be optimized out of the bytecode
-dnl produced by an optimizing Java compiler and not hinder
+dnl produced by an optimizing Java compiler and not hinder 
 dnl performance because debugging is turned off by default.
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([debug],
               [AS_HELP_STRING(--enable-debug,enable runtime debugging code)],
-              [case "${enableval}" in
-                yes)
+              [case "${enableval}" in 
+                yes) 
               	LIBDEBUG="true"
-                AC_DEFINE(DEBUG, 1, [Define to 1 if you want native library runtime debugging code enabled])
+                AC_DEFINE(DEBUG, 1, [Define to 1 if you want native library runtime debugging code enabled]) 
               	;;
                 no)   LIBDEBUG="false" ;;
                 *) 	AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
@@ -866,14 +853,14 @@ AC_ARG_ENABLE([debug],
 AC_SUBST(LIBDEBUG)
 
 dnl -----------------------------------------------------------
-dnl Enable execution of all static initializer loadLibrary()
+dnl Enable execution of all static initializer loadLibrary() 
 dnl calls at compile time.  By default most people will not
-dnl want to disable this, but some VMs (gcj) don't need or want
+dnl want to disable this, but some VMs (gcj) don't need or want 
 dnl them.
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([load-library],
               [AS_HELP_STRING(--enable-load-library,enable to use JNI native methods [default=yes])],
-              [case "${enableval}" in
+              [case "${enableval}" in 
                 yes) INIT_LOAD_LIBRARY="true" ;;
                 no) INIT_LOAD_LIBRARY="false" ;;
                 *) AC_MSG_ERROR(bad value ${enableval} for --enable-load-library) ;;
@@ -896,12 +883,12 @@ AC_SUBST(ECJ_JAR)
 
 dnl -----------------------------------------------------------
 dnl Should the VM explicitly run class initialization subfunctions for
-dnl java.lang.System?   (default is false -- the subfunctions will be run
+dnl java.lang.System?   (default is false -- the subfunctions will be run 
 dnl automatically by the class initializer)
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([java-lang-system-explicit-initialization],
               [AS_HELP_STRING(--enable-java-lang-system-explicit-initialization,will the VM explicitly invoke java.lang.System's static initialization methods [default=no])],
-              [case "${enableval}" in
+              [case "${enableval}" in 
                 yes|true) JAVA_LANG_SYSTEM_EXPLICIT_INITIALIZATION="true" ;;
                 no|false) JAVA_LANG_SYSTEM_EXPLICIT_INITIALIZATION="false" ;;
                 *) AC_MSG_ERROR(bad value ${enableval} for --enable-java-lang-system-explicit-initialization) ;;
@@ -924,8 +911,8 @@ AC_PATH_PROG(CP, cp)
 AC_PATH_PROG(DATE, date)
 
 dnl -----------------------------------------------------------
-dnl According to the GNU coding guide, we shouldn't require find,
-dnl and zip, however GNU provides both so it should be okay
+dnl According to the GNU coding guide, we shouldn't require find, 
+dnl and zip, however GNU provides both so it should be okay 
 dnl -----------------------------------------------------------
 AC_PATH_PROG(FIND, find)
 
@@ -945,19 +932,19 @@ dnl -----------------------------------------------------------
 REGEN_WITH_JAY
 
 dnl -----------------------------------------------------------
-dnl This sets the build-time default, which can now be overridden
+dnl This sets the build-time default, which can now be overridden 
 dnl by setting the system property gnu.classpath.awt.gtk.portable.native.sync
 dnl to "true" or "false".
 dnl -----------------------------------------------------------
 AC_ARG_ENABLE([portable-native-sync],
               [AS_HELP_STRING(--enable-portable-native-sync,synchronize VM threads portably)],
-              [case "${enableval}" in
-                yes)
+              [case "${enableval}" in 
+                yes) 
                      AC_DEFINE(PORTABLE_NATIVE_SYNC, 1, [Define if you want to synchronize VM threads portably by default; undef otherwise])
                      ;;
                 no)  ;;
-                *)
-                     AC_MSG_ERROR(bad value ${enableval} for --enable-portable-native-sync)
+                *)   
+                     AC_MSG_ERROR(bad value ${enableval} for --enable-portable-native-sync) 
                      ;;
               esac],
               [])
@@ -1007,7 +994,7 @@ fi
 if test "x${use_glibj_zip}" = xfalse || \
    test "x${EXAMPLESDIR}" != x || \
    test "x${TOOLSDIR}" != x && \
-   test "x${build_class_files}" != xno; then
+   test "x${build_class_files}" != xno; then 	
 	AC_PROG_JAVAC_WORKS
   	CLASSPATH_JAVAC_MEM_CHECK
 fi
