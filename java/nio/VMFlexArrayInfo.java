@@ -5,7 +5,7 @@ import sun.misc.*;
 public class VMFlexArrayInfo
 {
   private static final Unsafe unsafe = Unsafe.getUnsafe();
-  
+
   private VMFlexArrayInfo() {}
 
   private static interface IVMFlexArrayInfo
@@ -19,7 +19,7 @@ public class VMFlexArrayInfo
     if ( "JamVM".equals( System.getProperty("java.vm.name") ) ) {
       vmFlexArrayInfo = new JamVMArrayInfo();
     } else {
-      vmFlexArrayInfo = new OtherVMArrayInfo(); 
+      vmFlexArrayInfo = new OtherVMArrayInfo();
     }
   }
   public static boolean isArrayObjectFlexible()
@@ -40,13 +40,13 @@ public class VMFlexArrayInfo
     }
     return vmFlexArrayInfo.dataPointerOffset();
   }
-  
+
   /*
-   * A VMArrayInfo is required for each JVM that supports VMFlexArray 
+   * A VMArrayInfo is required for each JVM that supports VMFlexArray
    */
-  
+
   private static final class JamVMArrayInfo implements IVMFlexArrayInfo {
-    
+
     private static final boolean flexible;
     private static final int size_offset;
     private static final int data_ptr_offset;
@@ -54,14 +54,14 @@ public class VMFlexArrayInfo
     static {
       String jamvminfo = System.getProperty("java.vm.info");
       flexible = null == jamvminfo ? false : jamvminfo.contains( "flexarray" );
-      
+
       final int size_idx = 2;
       size_offset = flexible ? unsafe.addressSize() * size_idx : -1;
-      
+
       final int data_ptr_idx = 3;
       data_ptr_offset = flexible ? unsafe.addressSize() * data_ptr_idx : -1;
     }
-    
+
     public boolean isArrayObjectFlexible()
     {
       return flexible;
@@ -75,7 +75,7 @@ public class VMFlexArrayInfo
       return data_ptr_offset;
     }
   };
-  
+
   private static final class OtherVMArrayInfo implements IVMFlexArrayInfo {
 
     public boolean isArrayObjectFlexible()
@@ -92,6 +92,6 @@ public class VMFlexArrayInfo
     {
       return -1;
     }
-    
+
   }
 }

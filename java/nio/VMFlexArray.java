@@ -66,11 +66,11 @@ class VMFlexArray
     r.setAccessible( true );
     return r;
   }
-  
+
   private static long getNativePointer( Pointer ptr, int address_size ) {
     long r = -1;
     Exception e2 = null;
-    
+
     try {
       switch( unsafe.addressSize() ) {
         case 4:
@@ -90,7 +90,7 @@ class VMFlexArray
     }
     return r;
   }
-  
+
   private static final HashSet<Class<?>> array_classes;
   static
     {
@@ -106,9 +106,9 @@ class VMFlexArray
     }
 
   static Object pointerToArray(Pointer address, int capacity, int array_offset, Class<?> cls )
-  { 
+  {
     Object o = null;
-    
+
     if ( !enable )
       {
         return o;
@@ -119,13 +119,13 @@ class VMFlexArray
         //throw new UnsupportedOperationException();
         return o;
       }
-    
+
     // only deal array types defined in array_classes (i.e. primitives)
     if ( !array_classes.contains( cls ) )
       {
         throw new IllegalArgumentException();
       }
-    
+
     Exception e1 = null;
     try
       {
@@ -137,11 +137,11 @@ class VMFlexArray
       }
     if ( null != e1 ) {
       // catch InstantiationException and throw an exception that does not need to be declared
-      UnsupportedOperationException e2 = new UnsupportedOperationException(); 
+      UnsupportedOperationException e2 = new UnsupportedOperationException();
       e2.setStackTrace( e1.getStackTrace() );
       throw e2;
     }
-    
+
     switch( unsafe.addressSize() )
       {
         case 4:
