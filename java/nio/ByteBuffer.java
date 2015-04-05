@@ -54,7 +54,10 @@ public abstract class ByteBuffer extends Buffer
               Pointer address, byte[] backing_buffer, int array_offset)
   {
     super (capacity, limit, position, mark, address);
-    this.backing_buffer = backing_buffer;
+    this.backing_buffer =
+      backing_buffer == null
+      ? (byte[])VMFlexArray.pointerToArray( address, capacity, array_offset, byte[].class )
+      : backing_buffer;
     this.array_offset = array_offset;
   }
 

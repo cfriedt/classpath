@@ -55,7 +55,10 @@ public abstract class CharBuffer extends Buffer
               Pointer address, char[] backing_buffer, int array_offset)
   {
     super (capacity, limit, position, mark, address);
-    this.backing_buffer = backing_buffer;
+    this.backing_buffer =
+      backing_buffer == null
+      ? (char[])VMFlexArray.pointerToArray( address, capacity, array_offset, char[].class )
+      : backing_buffer;
     this.array_offset = array_offset;
   }
 
