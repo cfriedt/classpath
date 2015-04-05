@@ -85,7 +85,7 @@ public final class VMChannel
    * @param native_fd The native file descriptor integer.
    * @throws IOException
    */
-  VMChannel(final int native_fd) throws IOException
+  public VMChannel(final int native_fd) throws IOException
   {
     this();
     this.nfd.setNativeFD(native_fd);
