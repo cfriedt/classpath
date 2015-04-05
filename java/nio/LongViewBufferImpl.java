@@ -53,7 +53,7 @@ final class LongViewBufferImpl extends LongBuffer
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
         ? (long[]) VMDirectByteBuffer.pointerToArray(bb.address, capacity,
-                                                     bb.position(), "[J"):null,
+                                                     bb.position(), long[].class):null,
       0);
     this.bb = bb;
     this.offset = bb.position();

@@ -55,7 +55,7 @@ public abstract class DoubleBuffer extends Buffer
     super (capacity, limit, position, mark, address);
     this.backing_buffer =
       backing_buffer == null
-      ? (double[])pointerToArray( address, capacity, array_offset, "[D" )
+      ? (double[])pointerToArray( address, capacity, array_offset, double[].class )
       : backing_buffer;
     this.array_offset = array_offset;
   }
