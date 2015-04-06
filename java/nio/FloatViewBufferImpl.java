@@ -52,7 +52,7 @@ final class FloatViewBufferImpl extends FloatBuffer
       bb.isDirect()
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
-        ? (float[]) VMDirectByteBuffer.VMFlexArray.pointerToArray(bb.address, capacity,
+        ? (float[]) VMFlexArray.pointerToArray(bb.address, capacity,
                                                       bb.position(), float[].class)
         :null,
       0);

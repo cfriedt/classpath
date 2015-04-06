@@ -52,7 +52,7 @@ final class LongViewBufferImpl extends LongBuffer
       bb.isDirect()
         ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position()):null,
       bb.hasArray()
-        ? (long[]) VMDirectByteBuffer.VMFlexArray.pointerToArray(bb.address, capacity,
+        ? (long[]) VMFlexArray.pointerToArray(bb.address, capacity,
                                                      bb.position(), long[].class):null,
       0);
     this.bb = bb;

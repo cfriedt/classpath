@@ -53,7 +53,7 @@ class CharViewBufferImpl extends CharBuffer
           ? VMDirectByteBuffer.adjustAddress(bb.address, bb.position())
           :null,
         bb.hasArray()
-          ? (char[]) VMDirectByteBuffer.VMFlexArray.pointerToArray(bb.address, capacity,
+          ? (char[]) VMFlexArray.pointerToArray(bb.address, capacity,
                                                        bb.position(), char[].class)
           :null,
         0);
