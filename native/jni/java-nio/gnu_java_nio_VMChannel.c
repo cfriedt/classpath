@@ -1944,18 +1944,20 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
         }
       if (position + size > st.st_size)
         {
-          if (ftruncate(fd, position + size) == -1)
+          if ( !(S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) )
             {
-              JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
-              return NULL;
+              if (ftruncate(fd, position + size) == -1)
+                {
+                  JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
+                  return NULL;
+                }
             }
         }
       prot |= PROT_WRITE;
     }
 
   flags = (mode == 'c' ? MAP_PRIVATE : MAP_SHARED);
-  p = mmap (NULL, (size_t) ALIGN_UP (size, pagesize), prot, flags,
-	    fd, ALIGN_DOWN (position, pagesize));
+  p = mmap (NULL, size, prot, flags, fd, position);
   if (p == MAP_FAILED)
     {
       JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
@@ -1979,14 +1981,14 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
 
   if ((*env)->ExceptionOccurred (env))
     {
-      munmap (p, ALIGN_UP (size, pagesize));
+      munmap (p, size);
       return NULL;
     }
   if (MappedByteBufferImpl_init == NULL)
     {
       JCL_ThrowException (env, "java/lang/InternalError",
                           "could not get MappedByteBufferImpl constructor");
-      munmap (p, ALIGN_UP (size, pagesize));
+      munmap (p, size);
       return NULL;
     }
 
