@@ -1901,6 +1901,8 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
                                  jclass clazz __attribute__((unused)),
                                  jint fd, jchar mode, jlong position, jint size)
 {
+  printf("DEBUG:fd = %d, mode = %c, position = %d, size = %d\n", fd, mode, position, size);
+
 #ifdef HAVE_MMAP
   jclass MappedByteBufferImpl_class;
   jmethodID MappedByteBufferImpl_init = NULL;
@@ -1921,6 +1923,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
 #elif defined(HAVE_SYSCONF)
   pagesize = sysconf (_SC_PAGESIZE);
 #else
+  printf("DEBUG:a\n");
   JCL_ThrowException (env, IO_EXCEPTION,
 		      "can't determine memory page size");
   return NULL;
@@ -1928,6 +1931,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
 
   if ((*env)->ExceptionOccurred (env))
     {
+      printf("DEBUG:b\n");
       return NULL;
     }
 
@@ -1939,6 +1943,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
       struct stat st;
       if (fstat (fd, &st) == -1)
         {
+          printf("DEBUG:c\n");
           JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
           return NULL;
         }
@@ -1948,6 +1953,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
             {
               if (ftruncate(fd, position + size) == -1)
                 {
+	          printf("DEBUG:d\n");
                   JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
                   return NULL;
                 }
@@ -1960,6 +1966,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
   p = mmap (NULL, size, prot, flags, fd, position);
   if (p == MAP_FAILED)
     {
+      printf("DEBUG:d\n");
       JCL_ThrowException (env, IO_EXCEPTION, strerror (errno));
       return NULL;
     }
@@ -1981,11 +1988,13 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
 
   if ((*env)->ExceptionOccurred (env))
     {
+      printf("DEBUG:e\n");
       munmap (p, size);
       return NULL;
     }
   if (MappedByteBufferImpl_init == NULL)
     {
+      printf("DEBUG:f\n");
       JCL_ThrowException (env, "java/lang/InternalError",
                           "could not get MappedByteBufferImpl constructor");
       munmap (p, size);
@@ -2001,6 +2010,7 @@ Java_gnu_java_nio_VMChannel_map (JNIEnv *env,
   (void) mode;
   (void) position;
   (void) size;
+  printf("DEBUG:g\n");
   JCL_ThrowException (env, IO_EXCEPTION,
 		      "memory-mapped files not implemented");
   return 0;
